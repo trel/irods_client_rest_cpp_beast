@@ -30,6 +30,7 @@ if (NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   message(STATUS "Setting unspecified CMAKE_BUILD_TYPE to '${CMAKE_BUILD_TYPE}'. This is the correct setting for normal builds.")
 endif()
 
+find_package(CURL REQUIRED)
 find_package(nlohmann_json "3.6.1" REQUIRED)
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED COMPONENTS Crypto SSL)
@@ -61,10 +62,12 @@ target_include_directories(
   PRIVATE
   ${IRODS_INCLUDE_DIRS}
   ${IRODS_EXTERNALS_FULLPATH_BOOST}/include
-  ${IRODS_EXTERNALS_FULLPATH_FMT}/include)
+  ${IRODS_EXTERNALS_FULLPATH_FMT}/include
+  CURL::libcurl)
 
 target_link_libraries(
   ${EXECUTABLE_NAME}
   PRIVATE
   irods_client
-  ${IRODS_EXTERNALS_FULLPATH_FMT}/lib/libfmt.so)
+  ${IRODS_EXTERNALS_FULLPATH_FMT}/lib/libfmt.so
+  CURL::libcurl)

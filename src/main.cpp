@@ -13,6 +13,8 @@
 //
 //------------------------------------------------------------------------------
 
+#include <curl/curl.h>
+
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
@@ -209,6 +211,19 @@ handle_request(
     fmt::print("has content length: {}\n", req.has_content_length());
     fmt::print("chunked           : {}\n", req.chunked());
     fmt::print("needs eof         : {}\n", req.need_eof());
+
+    // Show how to decode URLs using libcurl.
+    if (auto* curl = curl_easy_init(); curl) {
+        int decoded_length = -1;
+        if (auto* decoded = curl_easy_unescape(nullptr, "%63%75%72%6c", 12, &decoded_length); decoded) {
+            fmt::print("decoded = [{}]\n", decoded);
+            curl_free(decoded);
+        }
+        curl_easy_cleanup(curl);
+    }
+
+    // TODO Show how to parse URLs using libcurl.
+    // See https://curl.se/libcurl/c/parseurl.html for an example.
 
     // Respond to GET request
     http::response<http::file_body> res{
