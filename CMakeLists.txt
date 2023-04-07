@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.18.0 FATAL_ERROR)
 
 find_package(IRODS REQUIRED CONFIG)
 
@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD ${IRODS_CXX_STANDARD})
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-rdynamic -Wl,--export-dynamic -Wl,--enable-new-dtags -Wl,--as-needed -Wl,-z,defs")
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE_INIT "-Wl,--gc-sections -Wl,-z,combreloc")
 
-project(irods_project_template_cpp_client VERSION "${IRODS_VERSION}" LANGUAGES CXX)
+project(irods_client_rest_cpp_beast VERSION "${IRODS_VERSION}" LANGUAGES CXX)
 
 set(CMAKE_SKIP_BUILD_RPATH OFF)
 set(CMAKE_SKIP_INSTALL_RPATH OFF)
@@ -38,9 +38,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fpermissive>)
 endif()
 
-add_compile_options(-Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic)
+add_compile_options(-Wall -Wextra -Werror -Wpedantic)
 
-set(EXECUTABLE_NAME "irods_cpp_client_example")
+set(EXECUTABLE_NAME "irods_client_rest_cpp_beast")
 
 add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/src/main.cpp)
 
@@ -48,7 +48,13 @@ target_compile_definitions(
   ${EXECUTABLE_NAME}
   PRIVATE
   ${IRODS_COMPILE_DEFINITIONS}
-  ${IRODS_COMPILE_DEFINITIONS_PRIVATE})
+  ${IRODS_COMPILE_DEFINITIONS_PRIVATE}
+  # Needed so that beast::string_view can be passed to fmtlib.
+  # Likely defines the following:
+  #
+  #  using string_view = std::string_view;
+  #
+  BOOST_BEAST_USE_STD_STRING_VIEW)
 
 target_include_directories(
   ${EXECUTABLE_NAME}
