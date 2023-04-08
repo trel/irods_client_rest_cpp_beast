@@ -34,12 +34,30 @@
 #include <thread>
 #include <vector>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <unordered_map>
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
+
+// This will eventually become a mapping of strings to functions.
+// The incoming requests will be passed to the functions for further processing.
+const std::unordered_map<std::string_view, std::string_view> req_handlers{
+    {"/irods/v1/auth",         "/auth"},
+    {"/irods/v1/collections",  "/collections"},
+    {"/irods/v1/config",       "/config"},
+    {"/irods/v1/data-objects", "/data-objects"},
+    {"/irods/v1/metadata",     "/metadata"},
+    {"/irods/v1/query",        "/query"},
+    {"/irods/v1/resources",    "/resources"},
+    {"/irods/v1/rules",        "/rules"},
+    {"/irods/v1/tickets",      "/tickets"},
+    {"/irods/v1/users",        "/users"},
+    {"/irods/v1/zones",        "/zones"}
+};
 
 // This function produces an HTTP response for the given
 // request. The type of the response object depends on the
@@ -50,7 +68,6 @@ template<
     class Send>
 void
 handle_request(
-    [[maybe_unused]] beast::string_view doc_root,
     http::request<Body, http::basic_fields<Allocator>>&& req,
     Send&& send)
 {
@@ -83,16 +100,25 @@ handle_request(
     // TODO Show how to parse URLs using libcurl.
     // See https://curl.se/libcurl/c/parseurl.html for an example.
     if (auto* curl = curl_url(); curl) {
-        // Include a bogus prefix. We only care about the query part of the URL.
-        if (const auto ec = curl_url_set(curl, CURLUPART_URL, ("http://localhost/" + std::string{req.target()}).c_str(), 0); ec) {
+        // Include a bogus prefix. We only care about the path and query parts of the URL.
+        if (const auto ec = curl_url_set(curl, CURLUPART_URL, ("http://ignored" + std::string{req.target()}).c_str(), 0); ec) {
             fmt::print("error: {}\n", ec);
         }
 
+        // Extract the path.
+        // This is what we use to route requests to the various endpoints.
         char* path{};
         if (const auto ec = curl_url_get(curl, CURLUPART_PATH, &path, 0); ec == 0) {
             if (path) {
-                // FIXME Why does this prepend two forward slashes?
                 fmt::print("path: [{}]\n", path);
+
+                if (const auto iter = req_handlers.find(path); iter != std::end(req_handlers)) {
+                    fmt::print("request triggered endpoint: [{}]\n", iter->second);
+                }
+                else {
+                    fmt::print("path [{}] not supported.\n", path);
+                }
+
                 curl_free(path);
             }
         }
@@ -100,11 +126,17 @@ handle_request(
             fmt::print("error: {}\n", ec);
         }
 
+        // Extract the query.
+        // ChatGPT states that the values in the key value pairs must escape embedded equal signs.
+        // This allows the HTTP server to parse the query string correctly. Therefore, we don't have
+        // to protect against that case. The client must send the correct URL escaped input.
         char* query{};
         if (const auto ec = curl_url_get(curl, CURLUPART_QUERY, &query, CURLU_URLDECODE); ec == 0) {
             if (query) {
                 fmt::print("query: [{}]\n", query);
 
+                // I really wish Boost.URL was part of Boost 1.78. Things would be so much easier.
+                // Sadly, we have to release an updated Boost external to get it.
                 try {
                     std::vector<std::string> tokens;
                     boost::split(tokens, query, boost::is_any_of("&"));
@@ -201,18 +233,14 @@ class session : public std::enable_shared_from_this<session>
 
     beast::tcp_stream stream_;
     beast::flat_buffer buffer_;
-    std::shared_ptr<std::string const> doc_root_;
     http::request<http::string_body> req_;
     std::shared_ptr<void> res_;
     send_lambda lambda_;
 
 public:
     // Take ownership of the stream
-    session(
-        tcp::socket&& socket,
-        std::shared_ptr<std::string const> const& doc_root)
+    session(tcp::socket&& socket)
         : stream_(std::move(socket))
-        , doc_root_(doc_root)
         , lambda_(*this)
     {
     }
@@ -263,7 +291,7 @@ public:
             return fail(ec, "read");
 
         // Send the response
-        handle_request(*doc_root_, std::move(req_), lambda_);
+        handle_request(std::move(req_), lambda_);
     }
 
     void
@@ -309,16 +337,11 @@ class listener : public std::enable_shared_from_this<listener>
 {
     net::io_context& ioc_;
     tcp::acceptor acceptor_;
-    std::shared_ptr<std::string const> doc_root_;
 
 public:
-    listener(
-        net::io_context& ioc,
-        tcp::endpoint endpoint,
-        std::shared_ptr<std::string const> const& doc_root)
+    listener(net::io_context& ioc, tcp::endpoint endpoint)
         : ioc_(ioc)
         , acceptor_(net::make_strand(ioc))
-        , doc_root_(doc_root)
     {
         beast::error_code ec;
 
@@ -378,18 +401,13 @@ private:
     void
     on_accept(beast::error_code ec, tcp::socket socket)
     {
-        if(ec)
-        {
+        if (ec) {
             fail(ec, "accept");
             return; // To avoid infinite loop
         }
-        else
-        {
-            // Create the session and run it
-            std::make_shared<session>(
-                std::move(socket),
-                doc_root_)->run();
-        }
+
+        // Create the session and run it
+        std::make_shared<session>(std::move(socket))->run();
 
         // Accept another connection
         do_accept();
@@ -401,37 +419,28 @@ private:
 int main(int argc, char* argv[])
 {
     // Check command line arguments.
-    if (argc != 5)
-    {
+    if (argc != 4) {
         std::cerr <<
-            "Usage: http-server-async <address> <port> <doc_root> <threads>\n" <<
+            "Usage: http-server-async <address> <port> <threads>\n" <<
             "Example:\n" <<
-            "    http-server-async 0.0.0.0 8080 . 1\n";
+            "    http-server-async 0.0.0.0 8080 1\n";
         return EXIT_FAILURE;
     }
     auto const address = net::ip::make_address(argv[1]);
     auto const port = static_cast<unsigned short>(std::atoi(argv[2]));
-    auto const doc_root = std::make_shared<std::string>(argv[3]);
-    auto const threads = std::max<int>(1, std::atoi(argv[4]));
+    auto const threads = std::max<int>(1, std::atoi(argv[3]));
 
     // The io_context is required for all I/O
     net::io_context ioc{threads};
 
     // Create and launch a listening port
-    std::make_shared<listener>(
-        ioc,
-        tcp::endpoint{address, port},
-        doc_root)->run();
+    std::make_shared<listener>(ioc, tcp::endpoint{address, port})->run();
 
     // Run the I/O service on the requested number of threads
     std::vector<std::thread> v;
     v.reserve(threads - 1);
     for(auto i = threads - 1; i > 0; --i)
-        v.emplace_back(
-        [&ioc]
-        {
-            ioc.run();
-        });
+        v.emplace_back([&ioc] { ioc.run(); });
     ioc.run();
 
     return EXIT_SUCCESS;
