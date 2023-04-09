@@ -43,31 +43,88 @@ namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
+using request_handler = std::function<void(const http::request<http::string_body>&)>;
+
+auto handle_auth(const http::request<http::string_body>& _req) -> void
+{
+    // TODO Authentication needs to be implemented as a pluggable interface.
+    // Out of the box, the REST API will support Basic authentication. Later,
+    // we add OIDC (and more, perhaps).
+
+    // OIDC authentication for this REST API may require a mapping between a
+    // value in the returned ID/access token and a user in iRODS. For example:
+    //
+    //   {
+    //       // The claim to use.
+    //       // This may require use of multiple claims.
+    //       "claim": "email",
+    //
+    //       // The user mapping.
+    //       "users": {
+    //           "alice@ymail.com": {
+    //               "username": "alice",
+    //               "zone": "tempZone"
+    //           }
+    //           "bob@ymail.com": {
+    //               "username": "bob#otherZone",
+    //               "zone": "tempZone"
+    //           }
+    //       }
+    //   }
+    //
+    // This assumes the OIDC Provider (OP) always defines an email claim. 
+
+    if (_req.method() != http::verb::post) {
+        fmt::print("{}: Incorrect HTTP method for authentication.\n", __func__);
+        return;
+    }
+
+    const auto& hdrs = _req.base();
+    const auto iter = hdrs.find("authorization");
+    if (iter == std::end(hdrs)) {
+        fmt::print("{}: Missing authorization header.\n", __func__);
+        return;
+    }
+
+    fmt::print("{}: Authorization value: [{}]\n", __func__, iter->value());
+
+    // TODO Parse the header value and determine if the user is allowed to access.
+    // 
+    // Q. For Basic authorization, is it better to store an iRODS connection in memory
+    // for the duration of the user's session? Or, is it better to connect and then
+    // disconnect for each request?
+    // 
+    // A. My first thought is it is probably better to connect/disconnect so that the
+    // remote server's connections aren't exhausted (i.e. consider what else may be
+    // happening on the remote server). However, using a connection pool along with
+    // rc_switch_user is likely the correct answer. That and exposing server options
+    // which allow an administrator to tune the number of connections and threads. By
+    // exposing server options, we let the system administrator make the decision,
+    // which is a good thing.
+}
+
 // This will eventually become a mapping of strings to functions.
 // The incoming requests will be passed to the functions for further processing.
-const std::unordered_map<std::string_view, std::string_view> req_handlers{
-    {"/irods/v1/auth",         "/auth"},
-    {"/irods/v1/collections",  "/collections"},
-    {"/irods/v1/config",       "/config"},
-    {"/irods/v1/data-objects", "/data-objects"},
-    {"/irods/v1/metadata",     "/metadata"},
-    {"/irods/v1/query",        "/query"},
-    {"/irods/v1/resources",    "/resources"},
-    {"/irods/v1/rules",        "/rules"},
-    {"/irods/v1/tickets",      "/tickets"},
-    {"/irods/v1/users",        "/users"},
-    {"/irods/v1/zones",        "/zones"}
+const std::unordered_map<std::string_view, request_handler> req_handlers{
+    {"/irods-rest/0.9.4/auth",         handle_auth},
+    //{"/irods-rest/0.9.4/collections",  "/collections"},
+    //{"/irods-rest/0.9.4/config",       "/config"},
+    //{"/irods-rest/0.9.4/data-objects", "/data-objects"},
+    //{"/irods-rest/0.9.4/metadata",     "/metadata"},
+    //{"/irods-rest/0.9.4/query",        "/query"},
+    //{"/irods-rest/0.9.4/resources",    "/resources"},
+    //{"/irods-rest/0.9.4/rules",        "/rules"},
+    //{"/irods-rest/0.9.4/tickets",      "/tickets"},
+    //{"/irods-rest/0.9.4/users",        "/users"},
+    //{"/irods-rest/0.9.4/zones",        "/zones"}
 };
 
 // This function produces an HTTP response for the given
 // request. The type of the response object depends on the
 // contents of the request, so the interface requires the
 // caller to pass a generic lambda for receiving the response.
-template<
-    class Body, class Allocator,
-    class Send>
-void
-handle_request(
+template <class Body, class Allocator, class Send>
+void handle_request(
     http::request<Body, http::basic_fields<Allocator>>&& req,
     Send&& send)
 {
@@ -113,7 +170,7 @@ handle_request(
                 fmt::print("path: [{}]\n", path);
 
                 if (const auto iter = req_handlers.find(path); iter != std::end(req_handlers)) {
-                    fmt::print("request triggered endpoint: [{}]\n", iter->second);
+                    (iter->second)(req);
                 }
                 else {
                     fmt::print("path [{}] not supported.\n", path);
