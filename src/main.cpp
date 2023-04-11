@@ -43,9 +43,106 @@ namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
-using request_handler = std::function<void(const http::request<http::string_body>&)>;
+using response        = http::response<http::string_body>;
+using request_handler = std::function<response (const http::request<http::string_body>&)>;
 
-auto handle_auth(const http::request<http::string_body>& _req) -> void
+struct url
+{
+    std::string path;
+    std::vector<std::pair<std::string, std::string>> query;
+};
+
+auto decode(const std::string_view _v) -> std::string
+{
+    std::string result;
+    int decoded_length = -1;
+
+    if (auto* decoded = curl_easy_unescape(nullptr, _v.data(), _v.size(), &decoded_length); decoded) {
+        result = decoded;
+        curl_free(decoded);
+    }
+
+    return result;
+}
+
+auto parse_url(const http::request<http::string_body>& _req) -> url
+{
+    // TODO Show how to parse URLs using libcurl.
+    // See https://curl.se/libcurl/c/parseurl.html for an example.
+    auto* curl = curl_url();
+
+    if (!curl) {
+        // TODO Report internal server error.
+    }
+
+    // Include a bogus prefix. We only care about the path and query parts of the URL.
+    const auto url_to_parse = fmt::format("http://ignored{}", _req.target());
+    if (const auto ec = curl_url_set(curl, CURLUPART_URL, url_to_parse.c_str(), 0); ec) {
+        // TODO Report error.
+        fmt::print("error: {}\n", ec);
+    }
+
+    url url;
+
+    // Extract the path.
+    // This is what we use to route requests to the various endpoints.
+    char* path{};
+    if (const auto ec = curl_url_get(curl, CURLUPART_PATH, &path, 0); ec == 0) {
+        if (path) {
+            url.path = path;
+            curl_free(path);
+        }
+    }
+    else {
+        // TODO Report error.
+        fmt::print("error: {}\n", ec);
+    }
+
+    // Extract the query.
+    // ChatGPT states that the values in the key value pairs must escape embedded equal signs.
+    // This allows the HTTP server to parse the query string correctly. Therefore, we don't have
+    // to protect against that case. The client must send the correct URL escaped input.
+    char* query{};
+    if (const auto ec = curl_url_get(curl, CURLUPART_QUERY, &query, 0); ec == 0) {
+        if (query) {
+            // I really wish Boost.URL was part of Boost 1.78. Things would be so much easier.
+            // Sadly, we have to release an updated Boost external to get it.
+            try {
+                std::vector<std::string> tokens;
+                boost::split(tokens, query, boost::is_any_of("&"));
+
+                std::vector<std::string> kvp;
+                
+                for (auto&& t : tokens) {
+                    boost::split(kvp, t, boost::is_any_of("="));
+
+                    if (kvp.size() == 2) {
+                        url.query.emplace_back(std::move(kvp[0]), decode(kvp[1]));
+                    }
+                    else if (kvp.size() == 1) {
+                        url.query.emplace_back(std::move(kvp[0]), "");
+                    }
+
+                    kvp.clear();
+                }
+            }
+            catch (const std::exception& e) {
+                // TODO
+                fmt::print("exception: {}\n", e.what());
+            }
+
+            curl_free(query);
+        }
+    }
+    else {
+        // TODO
+        fmt::print("error: {}\n", ec);
+    }
+
+    return url;
+}
+
+auto handle_auth(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
     // TODO Authentication needs to be implemented as a pluggable interface.
     // Out of the box, the REST API will support Basic authentication. Later,
@@ -76,17 +173,42 @@ auto handle_auth(const http::request<http::string_body>& _req) -> void
 
     if (_req.method() != http::verb::post) {
         fmt::print("{}: Incorrect HTTP method for authentication.\n", __func__);
-        return;
+        http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
     }
 
     const auto& hdrs = _req.base();
     const auto iter = hdrs.find("authorization");
     if (iter == std::end(hdrs)) {
         fmt::print("{}: Missing authorization header.\n", __func__);
-        return;
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
     }
 
     fmt::print("{}: Authorization value: [{}]\n", __func__, iter->value());
+
+    auto pos = iter->value().find("Basic ");
+    if (std::string_view::npos == pos) {
+        fmt::print("{}: Malformed authorization header.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    std::string authorization{iter->value().substr(pos + 6)};
+    boost::trim(authorization);
+    fmt::print("{}: Authorization value (trimmed): [{}]\n", __func__, authorization);
 
     // TODO Parse the header value and determine if the user is allowed to access.
     // 
@@ -101,6 +223,13 @@ auto handle_auth(const http::request<http::string_body>& _req) -> void
     // which allow an administrator to tune the number of connections and threads. By
     // exposing server options, we let the system administrator make the decision,
     // which is a good thing.
+
+    http::response<http::string_body> res{http::status::ok, _req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/plain");
+    res.set(http::field::content_length, "0");
+    res.keep_alive(_req.keep_alive());
+    return res;
 }
 
 // This will eventually become a mapping of strings to functions.
@@ -124,9 +253,7 @@ const std::unordered_map<std::string_view, request_handler> req_handlers{
 // contents of the request, so the interface requires the
 // caller to pass a generic lambda for receiving the response.
 template <class Body, class Allocator, class Send>
-void handle_request(
-    http::request<Body, http::basic_fields<Allocator>>&& req,
-    Send&& send)
+void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send)
 {
     // Print the headers.
     for (auto&& h : req.base()) {
@@ -144,99 +271,19 @@ void handle_request(
     fmt::print("chunked           : {}\n", req.chunked());
     fmt::print("needs eof         : {}\n", req.need_eof());
 
-    // Show how to decode URLs using libcurl.
-    if (auto* curl = curl_easy_init(); curl) {
-        int decoded_length = -1;
-        if (auto* decoded = curl_easy_unescape(nullptr, "%63%75%72%6c", 12, &decoded_length); decoded) {
-            fmt::print("decoded = [{}]\n", decoded);
-            curl_free(decoded);
-        }
-        curl_easy_cleanup(curl);
+    const auto url = parse_url(req);
+    const auto iter = req_handlers.find(url.path);
+
+    if (iter == std::end(req_handlers)) {
+        // TODO Invalid path (send bad request error code?).
+        http::response<http::empty_body> res{http::status::bad_request, req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.keep_alive(req.keep_alive());
+        send(std::move(res));
     }
 
-    // TODO Show how to parse URLs using libcurl.
-    // See https://curl.se/libcurl/c/parseurl.html for an example.
-    if (auto* curl = curl_url(); curl) {
-        // Include a bogus prefix. We only care about the path and query parts of the URL.
-        if (const auto ec = curl_url_set(curl, CURLUPART_URL, ("http://ignored" + std::string{req.target()}).c_str(), 0); ec) {
-            fmt::print("error: {}\n", ec);
-        }
-
-        // Extract the path.
-        // This is what we use to route requests to the various endpoints.
-        char* path{};
-        if (const auto ec = curl_url_get(curl, CURLUPART_PATH, &path, 0); ec == 0) {
-            if (path) {
-                fmt::print("path: [{}]\n", path);
-
-                if (const auto iter = req_handlers.find(path); iter != std::end(req_handlers)) {
-                    (iter->second)(req);
-                }
-                else {
-                    fmt::print("path [{}] not supported.\n", path);
-                }
-
-                curl_free(path);
-            }
-        }
-        else {
-            fmt::print("error: {}\n", ec);
-        }
-
-        // Extract the query.
-        // ChatGPT states that the values in the key value pairs must escape embedded equal signs.
-        // This allows the HTTP server to parse the query string correctly. Therefore, we don't have
-        // to protect against that case. The client must send the correct URL escaped input.
-        char* query{};
-        if (const auto ec = curl_url_get(curl, CURLUPART_QUERY, &query, CURLU_URLDECODE); ec == 0) {
-            if (query) {
-                fmt::print("query: [{}]\n", query);
-
-                // I really wish Boost.URL was part of Boost 1.78. Things would be so much easier.
-                // Sadly, we have to release an updated Boost external to get it.
-                try {
-                    std::vector<std::string> tokens;
-                    boost::split(tokens, query, boost::is_any_of("&"));
-
-                    for (auto&& t : tokens) {
-                        fmt::print(fmt::runtime("key value pair string: [{}]\n"), t);
-                    }
-
-                    std::vector<std::pair<std::string, std::string>> kvps;
-                    std::vector<std::string> kvp;
-                    std::for_each(std::begin(tokens), std::end(tokens), [&kvps, &kvp](auto&& _t) {
-                        boost::split(kvp, _t, boost::is_any_of("="));
-                        if (kvp.size() == 2) {
-                            kvps.emplace_back(std::move(kvp[0]), std::move(kvp[1]));
-                        }
-                        else if (kvp.size() == 1) {
-                            kvps.emplace_back(std::move(kvp[0]), "");
-                        }
-                        kvp.clear();
-                    });
-
-                    for (auto&& [k, v] : kvps) {
-                        fmt::print(fmt::runtime("key value pair: {{[{}], [{}]}}\n"), k, v);
-                    }
-                }
-                catch (const std::exception& e) {
-                    fmt::print("exception: {}\n", e.what());
-                }
-
-                curl_free(query);
-            }
-        }
-        else {
-            fmt::print("error: {}\n", ec);
-        }
-    }
-
-    // Respond to request.
-    http::response<http::empty_body> res{http::status::ok, req.version()};
-    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    res.set(http::field::content_type, "text/plain");
-    res.keep_alive(req.keep_alive());
-    return send(std::move(res));
+    send((iter->second)(req));
 }
 
 //------------------------------------------------------------------------------
