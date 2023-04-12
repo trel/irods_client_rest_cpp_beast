@@ -19,8 +19,10 @@
 #include <irods/irods_exception.hpp>
 #include <irods/irods_query.hpp>
 #include <irods/rcConnect.h>
+#include <irods/resource_administration.hpp>
 #include <irods/rodsClient.h>
 #include <irods/rodsErrorTable.h>
+#include <irods/user_administration.hpp>
 
 #include <curl/curl.h>
 
@@ -834,12 +836,428 @@ auto handle_query(const http::request<http::string_body>& _req) -> http::respons
 
 auto handle_resources(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
+    if (_req.method() != http::verb::get && _req.method() != http::verb::post) {
+        fmt::print("{}: Incorrect HTTP method.\n", __func__);
+        http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    //
+    // Extract the Bearer token from the Authorization header.
+    //
+
+    const auto& hdrs = _req.base();
+    const auto iter = hdrs.find("authorization");
+    if (iter == std::end(hdrs)) {
+        fmt::print("{}: Missing authorization header.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    fmt::print("{}: Authorization value: [{}]\n", __func__, iter->value());
+
+    auto pos = iter->value().find("Bearer ");
+    if (std::string_view::npos == pos) {
+        fmt::print("{}: Malformed authorization header.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    std::string bearer_token{iter->value().substr(pos + 7)};
+    boost::trim(bearer_token);
+    fmt::print("{}: Bearer token: [{}]\n", __func__, bearer_token);
+
+    // Verify the bearer token is known to the server. If not, return an error.
+    {
+        const auto iter = authenticated_client_info.find(bearer_token);
+        if (iter == std::end(authenticated_client_info)) {
+            fmt::print("{}: Could not find bearer token matching [{}].\n", __func__, bearer_token);
+            http::response<http::string_body> res{http::status::unauthorized, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+    }
+
+    //
+    // At this point, we know the user has authorization to perform this operation.
+    //
+
+    const auto url = parse_url(_req);
+
+    const auto op_iter = url.query.find("op");
+    if (op_iter == std::end(url.query)) {
+        fmt::print("{}: Missing [op] parameter.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
     http::response<http::string_body> res{http::status::ok, _req.version()};
     res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
     res.set(http::field::content_type, "text/plain");
     res.keep_alive(_req.keep_alive());
-    res.body() ="";
+
+    namespace ia = irods::experimental::administration;
+
+    if (op_iter->second == "create") {
+        const auto name_iter = url.query.find("name");
+        if (name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        const auto type_iter = url.query.find("type");
+        if (type_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [type] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            ia::resource_registration_info resc_info;
+            resc_info.resource_name = name_iter->second;
+            resc_info.resource_type = type_iter->second;
+
+            const auto host_iter = url.query.find("host");
+            if (host_iter != std::end(url.query)) {
+                resc_info.host_name = host_iter->second;
+            }
+
+            const auto vault_path_iter = url.query.find("vault_path");
+            if (vault_path_iter != std::end(url.query)) {
+                resc_info.vault_path = vault_path_iter->second;
+            }
+
+            const auto ctx_iter = url.query.find("context");
+            if (ctx_iter != std::end(url.query)) {
+                resc_info.context_string = ctx_iter->second;
+            }
+
+            irods::experimental::client_connection conn;
+            ia::client::add_resource(conn, resc_info);
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
+    }
+    else if (op_iter->second == "remove") {
+        const auto name_iter = url.query.find("name");
+        if (name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+            ia::client::remove_resource(conn, name_iter->second);
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
+    }
+    else if (op_iter->second == "modify") {
+        // TODO
+    }
+    else if (op_iter->second == "stat") {
+        const auto name_iter = url.query.find("name");
+        if (name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+
+            json::object_t info;
+            bool exists = false;
+
+            if (const auto resc = ia::client::resource_info(conn, name_iter->second); resc) {
+                exists = true;
+
+                info = { // TODO Can't use += yet :-(
+                    {"id", resc->id()},
+                    {"name", resc->name()},
+                    {"type", resc->type()},
+                    {"zone", resc->zone_name()},
+                    {"host", resc->host_name()},
+                    {"vault_path", resc->vault_path()},
+                    {"status", resc->status()},
+                    {"context", resc->context_string()},
+                    {"comments", resc->comments()},
+                    {"information", resc->information()},
+                    {"free_space", resc->free_space()},
+                    {"free_space_last_modified", resc->free_space_last_modified().time_since_epoch().count()},
+                    {"parent_id", resc->parent_id()},
+                    {"created", resc->created().time_since_epoch().count()},
+                    {"last_modified", resc->last_modified().time_since_epoch().count()}
+                };
+            }
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }},
+                {"exists", exists},
+                {"info", info}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
+    }
+    else if (op_iter->second == "add_child") {
+        const auto parent_name_iter = url.query.find("parent_name");
+        if (parent_name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        const auto child_name_iter = url.query.find("child_name");
+        if (child_name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+
+            const auto ctx_iter = url.query.find("context");
+            if (ctx_iter != std::end(url.query)) {
+                ia::client::add_child_resource(conn, parent_name_iter->second, child_name_iter->second, ctx_iter->second);
+            }
+            else {
+                ia::client::add_child_resource(conn, parent_name_iter->second, child_name_iter->second);
+            }
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
+    }
+    else if (op_iter->second == "remove_child") {
+        const auto parent_name_iter = url.query.find("parent_name");
+        if (parent_name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        const auto child_name_iter = url.query.find("child_name");
+        if (child_name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+            ia::client::remove_child_resource(conn, parent_name_iter->second, child_name_iter->second);
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
+    }
+    else if (op_iter->second == "rebalance") {
+        const auto name_iter = url.query.find("name");
+        if (name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+            ia::client::rebalance_resource(conn, name_iter->second);
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
+    }
+    else {
+        fmt::print("{}: Invalid operator [{}].\n", __func__, op_iter->second);
+        res.result(http::status::bad_request);
+    }
+
     res.prepare_payload();
+
     return res;
 }
 
@@ -856,6 +1274,7 @@ const std::unordered_map<std::string_view, request_handler> req_handlers{
     //{"/irods-rest/0.9.5/rules",        "/rules"},
     //{"/irods-rest/0.9.5/tickets",      "/tickets"},
     //{"/irods-rest/0.9.5/users",        "/users"},
+    //{"/irods-rest/0.9.5/groups",       "/groups"},
     //{"/irods-rest/0.9.5/zones",        "/zones"}
 };
 

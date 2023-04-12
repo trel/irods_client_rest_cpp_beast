@@ -13,3 +13,4 @@ curl -H "authorization: Bearer $bearer_token" "${base_url}/collections?op=stat&l
 curl -H "authorization: Bearer $bearer_token" "${base_url}/collections?op=list&lpath=/tempZone/home/kory" -v | jq
 curl -H "authorization: Bearer $bearer_token" "${base_url}/query?op=execute&query=select%20COLL_NAME,%20DATA_NAME" -v | jq
 curl -H "authorization: Bearer $bearer_token" "${base_url}/query?op=bogus" -v | jq
+curl -H "authorization: Bearer $bearer_token" "${base_url}/resources?op=stat&name=demoResc" -v | jq
