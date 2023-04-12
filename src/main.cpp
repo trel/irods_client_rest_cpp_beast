@@ -13,6 +13,9 @@
 //
 //------------------------------------------------------------------------------
 
+#include <irods/base64.hpp>
+#include <irods/rcConnect.h>
+
 #include <curl/curl.h>
 
 #include <boost/beast/core.hpp>
@@ -60,6 +63,9 @@ auto decode(const std::string_view _v) -> std::string
     if (auto* decoded = curl_easy_unescape(nullptr, _v.data(), _v.size(), &decoded_length); decoded) {
         result = decoded;
         curl_free(decoded);
+    }
+    else {
+        result.assign(_v);
     }
 
     return result;
@@ -195,6 +201,10 @@ auto handle_auth(const http::request<http::string_body>& _req) -> http::response
 
     fmt::print("{}: Authorization value: [{}]\n", __func__, iter->value());
 
+    //
+    // TODO Here is where we determine what form of authentication to perform (e.g. Basic or OIDC).
+    //
+
     auto pos = iter->value().find("Basic ");
     if (std::string_view::npos == pos) {
         fmt::print("{}: Malformed authorization header.\n", __func__);
@@ -209,6 +219,51 @@ auto handle_auth(const http::request<http::string_body>& _req) -> http::response
     std::string authorization{iter->value().substr(pos + 6)};
     boost::trim(authorization);
     fmt::print("{}: Authorization value (trimmed): [{}]\n", __func__, authorization);
+
+    std::vector<std::uint8_t> creds;
+    creds.resize(128);
+    unsigned long size = 128;
+    const auto ec = irods::base64_decode((unsigned char*) authorization.data(), authorization.size(), creds.data(), &size);
+    fmt::print("{}: base64 error code         = [{}]\n", __func__, ec);
+    fmt::print("{}: base64 decoded size       = [{}]\n", __func__, size);
+
+    std::string_view sv{(char*) creds.data(), size}; 
+    fmt::print("{}: base64 decode credentials = [{}]\n", __func__, sv);
+
+    const auto colon = sv.find(':');
+    const std::string username{sv.substr(0, colon)};
+    std::string password{sv.substr(colon + 1)};
+    fmt::print("{}: username = [{}]\n", __func__, username);
+    fmt::print("{}: password = [{}]\n", __func__, password);
+
+    bool login_successful = false;
+
+    rErrMsg_t error{};
+    if (auto* comm = rcConnect("localhost", 1247, username.c_str(), "tempZone", 0, &error); comm) {
+        // TODO client_connection library needs support for logging in via a password.
+        //
+        // This call will print "rcAuthResponse failed with error -826000 CAT_INVALID_AUTHENTICATION"
+        // to the terminal when given a bad password. It shouldn't do that.
+        login_successful = (clientLoginWithPassword(comm, password.data()) == 0);
+        rcDisconnect(comm);
+    }
+
+    if (!login_successful) {
+        http::response<http::string_body> res{http::status::unauthorized, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    // TODO If login succeeded, generate a token (i.e. JWT) that represents the
+    // authenticated user. The client is now required to pass the token back to the
+    // server when executing requests.
+    //
+    // The token will be mapped to an object that contains information needed to
+    // execute operations on the iRODS server. The object will likely contain the user's
+    // iRODS username and password.
 
     // TODO Parse the header value and determine if the user is allowed to access.
     // 
