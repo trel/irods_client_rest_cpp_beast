@@ -13,6 +13,7 @@
 //
 //------------------------------------------------------------------------------
 
+#include <irods/atomic_apply_metadata_operations.h>
 #include <irods/base64.hpp>
 #include <irods/client_connection.hpp>
 #include <irods/execCmd.h>
@@ -28,6 +29,7 @@
 #include <irods/rodsClient.h>
 #include <irods/rodsErrorTable.h>
 #include <irods/rodsKeyWdDef.h>
+#include <irods/ruleExecDel.h>
 #include <irods/user_administration.hpp>
 
 #include <curl/curl.h>
@@ -722,7 +724,7 @@ auto handle_metadata(const http::request<http::string_body>& _req) -> http::resp
     fmt::print("{}: Bearer token: [{}]\n", __func__, bearer_token);
 
     // Verify the bearer token is known to the server. If not, return an error.
-    const std::string* username{};
+    [[maybe_unused]] const std::string* username{};
     {
         const auto iter = authenticated_client_info.find(bearer_token);
         if (iter == std::end(authenticated_client_info)) {
@@ -760,152 +762,33 @@ auto handle_metadata(const http::request<http::string_body>& _req) -> http::resp
     res.set(http::field::content_type, "text/plain");
     res.keep_alive(_req.keep_alive());
 
-    if (op_iter->second == "execute") {
+    // TODO This atomic metadata endpoint feels like it should be part of the other endpoints
+    // rather than its own. Consider merging it. If it is merged, the command can become the
+    // following:
+    //
+    //     /data-objects?op=apply_metadata_operations
+    //
+    // However, this one endpoint already covers all iRODS entities.
+    if (op_iter->second == "atomic_execute") {
         try {
             irods::experimental::client_connection conn;
 
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", SYS_LIBRARY_ERROR},
-                    {"error_message", e.what()}
-                }}
-            }.dump();
-        }
-    }
-    else if (op_iter->second == "remove_delay_rule") {
-    }
-    else if (op_iter->second == "modify_delay_rule") {
-    }
-    else if (op_iter->second == "list_rule_engines") {
-        ExecMyRuleInp input{};
+            const auto& atomic_ops = _req.body();
+            char* output{};
+            irods::at_scope_exit_unsafe free_output{[&output] { std::free(output); }};
 
-        irods::at_scope_exit clear_kvp{[&input] {
-            clearKeyVal(&input.condInput);
-            clearMsParamArray(input.inpParamArray, 0); // 0 -> do not free external structure.
-        }};
+            const auto ec = rc_atomic_apply_metadata_operations(static_cast<RcComm*>(conn), atomic_ops.c_str(), &output);
 
-        addKeyVal(&input.condInput, AVAILABLE_KW, "");
-
-        const auto rep_instance_iter = url.query.find("rep_instance");
-        if (rep_instance_iter == std::end(url.query)) {
-            addKeyVal(&input.condInput, "rule-engine-plugin-instance", rep_instance_iter->second.c_str());
-        }
-
-        MsParamArray param_array{};
-        //MsParamArray* mspa_ptr = &param_array;
-        input.inpParamArray = &param_array;
-
-        MsParamArray* out_param_array{};
-
-        irods::experimental::client_connection conn;
-
-        if (const auto ec = rcExecMyRule(static_cast<RcComm*>(conn), &input, &out_param_array); ec < 0) {
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", ec},
-                }}
-            }.dump();
-        }
-        else {
-            json stdout_output;
-            json stderr_output;
-
-            if (auto* msp = getMsParamByType(out_param_array, ExecCmdOut_PI); msp) {
-                if (const auto* exec_out = static_cast<ExecCmdOut*>(msp->inOutStruct); exec_out) {
-                    if (exec_out->stdoutBuf.buf) {
-                        stdout_output = static_cast<const char*>(exec_out->stdoutBuf.buf);
-                    }
-
-                    if (exec_out->stderrBuf.buf) {
-                        stderr_output = static_cast<const char*>(exec_out->stderrBuf.buf);
-                    }
-                }
+            json error_info;
+            if (output) {
+                error_info = json::parse(output);
             }
 
             res.body() = json{
                 {"irods_response", {
-                    {"error_code", ec},
+                    {"error_code", ec}
                 }},
-                {"stdout", stdout_output},
-                {"stderr", stderr_output}
-            }.dump();
-        }
-    }
-    else if (op_iter->second == "list_delay_rules") {
-        /*
-         RULE_EXEC_ID
-         RULE_EXEC_NAME
-         RULE_EXEC_REI_FILE_PATH
-         RULE_EXEC_USER_NAME
-         RULE_EXEC_ADDRESS
-         RULE_EXEC_TIME
-         RULE_EXEC_FREQUENCY
-         RULE_EXEC_PRIORITY
-         RULE_EXEC_ESTIMATED_EXE_TIME
-         RULE_EXEC_NOTIFICATION_ADDR
-         RULE_EXEC_LAST_EXE_TIME
-         RULE_EXEC_STATUS
-         RULE_EXEC_CONTEXT
-         */
-        const auto all_rules_iter = url.query.find("all_rules");
-        if (all_rules_iter == std::end(url.query)) {
-        }
-
-        try {
-            irods::experimental::client_connection conn;
-
-            const auto gql = fmt::format(
-                "select "
-                "RULE_EXEC_ID, "
-                "RULE_EXEC_NAME, "
-                "RULE_EXEC_REI_FILE_PATH, "
-                "RULE_EXEC_USER_NAME, "
-                "RULE_EXEC_ADDRESS, "
-                "RULE_EXEC_TIME, "
-                "RULE_EXEC_FREQUENCY, "
-                "RULE_EXEC_PRIORITY, "
-                "RULE_EXEC_ESTIMATED_EXE_TIME, "
-                "RULE_EXEC_NOTIFICATION_ADDR, "
-                "RULE_EXEC_LAST_EXE_TIME, "
-                "RULE_EXEC_STATUS, "
-                "RULE_EXEC_CONTEXT "
-                "where RULE_EXEC_USER_NAME = '{}'",
-                *username);
-
-            json::array_t row;
-            json::array_t rows;
-
-            for (auto&& r : irods::query{static_cast<RcComm*>(conn), gql}) {
-                for (auto&& c : r) {
-                    row.push_back(c);
-                }
-
-                rows.push_back(row);
-                row.clear();
-            }
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }},
-                {"rows", rows}
+                {"error_info", error_info}
             }.dump();
         }
         catch (const irods::exception& e) {
@@ -1517,8 +1400,323 @@ auto handle_resources(const http::request<http::string_body>& _req) -> http::res
     return res;
 }
 
-// This will eventually become a mapping of strings to functions.
-// The incoming requests will be passed to the functions for further processing.
+auto handle_rules(const http::request<http::string_body>& _req) -> http::response<http::string_body>
+{
+    if (_req.method() != http::verb::get && _req.method() != http::verb::post) {
+        fmt::print("{}: Incorrect HTTP method.\n", __func__);
+        http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    //
+    // Extract the Bearer token from the Authorization header.
+    //
+
+    const auto& hdrs = _req.base();
+    const auto iter = hdrs.find("authorization");
+    if (iter == std::end(hdrs)) {
+        fmt::print("{}: Missing authorization header.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    fmt::print("{}: Authorization value: [{}]\n", __func__, iter->value());
+
+    auto pos = iter->value().find("Bearer ");
+    if (std::string_view::npos == pos) {
+        fmt::print("{}: Malformed authorization header.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    std::string bearer_token{iter->value().substr(pos + 7)};
+    boost::trim(bearer_token);
+    fmt::print("{}: Bearer token: [{}]\n", __func__, bearer_token);
+
+    // Verify the bearer token is known to the server. If not, return an error.
+    const std::string* username{};
+    {
+        const auto iter = authenticated_client_info.find(bearer_token);
+        if (iter == std::end(authenticated_client_info)) {
+            fmt::print("{}: Could not find bearer token matching [{}].\n", __func__, bearer_token);
+            http::response<http::string_body> res{http::status::unauthorized, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        username = &iter->second.username;
+    }
+
+    //
+    // At this point, we know the user has authorization to perform this operation.
+    //
+
+    const auto url = parse_url(_req);
+
+    const auto op_iter = url.query.find("op");
+    if (op_iter == std::end(url.query)) {
+        fmt::print("{}: Missing [op] parameter.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    http::response<http::string_body> res{http::status::ok, _req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/plain");
+    res.keep_alive(_req.keep_alive());
+
+    if (op_iter->second == "execute") {
+        // TODO Wrap all of this in a try-catch block.
+
+        ExecMyRuleInp input{};
+
+        std::strncpy(input.myRule, "@external rule { writeLine('stdout', 'DID IT'); }", sizeof(ExecMyRuleInp::myRule));
+
+        irods::at_scope_exit clear_kvp{[&input] {
+            clearKeyVal(&input.condInput);
+            clearMsParamArray(input.inpParamArray, 0); // 0 -> do not free external structure.
+        }};
+
+        const auto rep_instance_iter = url.query.find("rep-instance");
+        if (rep_instance_iter != std::end(url.query)) {
+            addKeyVal(&input.condInput, "rule-engine-plugin-instance", rep_instance_iter->second.c_str());
+        }
+
+        MsParamArray param_array{};
+        //MsParamArray* mspa_ptr = &param_array;
+        input.inpParamArray = &param_array;
+
+        MsParamArray* out_param_array{};
+
+        irods::experimental::client_connection conn;
+
+        if (const auto ec = rcExecMyRule(static_cast<RcComm*>(conn), &input, &out_param_array); ec < 0) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", ec},
+                }}
+            }.dump();
+        }
+        else {
+            json stdout_output;
+            json stderr_output;
+
+            if (auto* msp = getMsParamByType(out_param_array, ExecCmdOut_PI); msp) {
+                if (const auto* exec_out = static_cast<ExecCmdOut*>(msp->inOutStruct); exec_out) {
+                    if (exec_out->stdoutBuf.buf) {
+                        stdout_output = static_cast<const char*>(exec_out->stdoutBuf.buf);
+                        fmt::print("{}: stdout_output = [{}]\n", __func__, stdout_output.get_ref<const std::string&>());
+                    }
+
+                    if (exec_out->stderrBuf.buf) {
+                        stderr_output = static_cast<const char*>(exec_out->stderrBuf.buf);
+                        fmt::print("{}: stderr_output = [{}]\n", __func__, stderr_output.get_ref<const std::string&>());
+                    }
+                }
+            }
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", ec},
+                }},
+                {"stdout", stdout_output},
+                {"stderr", stderr_output}
+            }.dump();
+        }
+    }
+    else if (op_iter->second == "remove_delay_rule") {
+        const auto rule_id_iter = url.query.find("rule_id");
+        if (rule_id_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [rule_id] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+
+            RuleExecDeleteInput input{};
+            std::strncpy(input.ruleExecId, rule_id_iter->second.c_str(), sizeof(RuleExecDeleteInput::ruleExecId));
+
+            const auto ec = rcRuleExecDel(static_cast<RcComm*>(conn), &input);
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", ec},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
+    }
+    else if (op_iter->second == "modify_delay_rule") {
+    }
+    else if (op_iter->second == "list_rule_engines") {
+        ExecMyRuleInp input{};
+
+        irods::at_scope_exit clear_kvp{[&input] {
+            clearKeyVal(&input.condInput);
+            clearMsParamArray(input.inpParamArray, 0); // 0 -> do not free external structure.
+        }};
+
+        addKeyVal(&input.condInput, AVAILABLE_KW, "");
+
+        MsParamArray param_array{};
+        //MsParamArray* mspa_ptr = &param_array;
+        input.inpParamArray = &param_array;
+
+        MsParamArray* out_param_array{};
+
+        irods::experimental::client_connection conn;
+
+        if (const auto ec = rcExecMyRule(static_cast<RcComm*>(conn), &input, &out_param_array); ec < 0) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", ec},
+                }}
+            }.dump();
+        }
+        else {
+            json stdout_output;
+            json stderr_output;
+
+            if (auto* msp = getMsParamByType(out_param_array, ExecCmdOut_PI); msp) {
+                if (const auto* exec_out = static_cast<ExecCmdOut*>(msp->inOutStruct); exec_out) {
+                    if (exec_out->stdoutBuf.buf) {
+                        stdout_output = static_cast<const char*>(exec_out->stdoutBuf.buf);
+                        fmt::print("{}: stdout_output = [{}]\n", __func__, stdout_output.get_ref<const std::string&>());
+                    }
+
+                    if (exec_out->stderrBuf.buf) {
+                        stderr_output = static_cast<const char*>(exec_out->stderrBuf.buf);
+                        fmt::print("{}: stderr_output = [{}]\n", __func__, stderr_output.get_ref<const std::string&>());
+                    }
+                }
+            }
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", ec},
+                }},
+                {"stdout", stdout_output},
+                {"stderr", stderr_output}
+            }.dump();
+        }
+    }
+    else if (op_iter->second == "list_delay_rules") {
+        const auto all_rules_iter = url.query.find("all_rules");
+        if (all_rules_iter == std::end(url.query)) {
+            // TODO
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+
+            const auto gql = fmt::format(
+                "select "
+                "RULE_EXEC_ID, "
+                "RULE_EXEC_NAME, "
+                "RULE_EXEC_REI_FILE_PATH, "
+                "RULE_EXEC_USER_NAME, "
+                "RULE_EXEC_ADDRESS, "
+                "RULE_EXEC_TIME, "
+                "RULE_EXEC_FREQUENCY, "
+                "RULE_EXEC_PRIORITY, "
+                "RULE_EXEC_ESTIMATED_EXE_TIME, "
+                "RULE_EXEC_NOTIFICATION_ADDR, "
+                "RULE_EXEC_LAST_EXE_TIME, "
+                "RULE_EXEC_STATUS, "
+                "RULE_EXEC_CONTEXT "
+                "where RULE_EXEC_USER_NAME = '{}'",
+                *username);
+
+            json::array_t row;
+            json::array_t rows;
+
+            for (auto&& r : irods::query{static_cast<RcComm*>(conn), gql}) {
+                for (auto&& c : r) {
+                    row.push_back(c);
+                }
+
+                rows.push_back(row);
+                row.clear();
+            }
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }},
+                {"rows", rows}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
+    }
+    else {
+        fmt::print("{}: Invalid operation [{}].\n", __func__, op_iter->second);
+        res.result(http::status::bad_request);
+    }
+
+    res.prepare_payload();
+
+    return res;
+}
+
 const std::unordered_map<std::string_view, request_handler> req_handlers{
     {"/irods-rest/0.9.5/auth",         handle_auth},
     {"/irods-rest/0.9.5/collections",  handle_collections},
@@ -1527,7 +1725,7 @@ const std::unordered_map<std::string_view, request_handler> req_handlers{
     {"/irods-rest/0.9.5/metadata",     handle_metadata},
     {"/irods-rest/0.9.5/query",        handle_query},
     {"/irods-rest/0.9.5/resources",    handle_resources},
-    //{"/irods-rest/0.9.5/rules",        "/rules"},
+    {"/irods-rest/0.9.5/rules",        handle_rules},
     //{"/irods-rest/0.9.5/tickets",      "/tickets"},
     //{"/irods-rest/0.9.5/users",        "/users"},
     //{"/irods-rest/0.9.5/groups",       "/groups"},
@@ -1549,8 +1747,6 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     // Print the components of the request URL.
     fmt::print("method            : {}\n", req.method_string());
     fmt::print("version           : {}\n", req.version());
-    // TODO Use libcurl - curl_easy_unescape to decode URL (at least until Boost.URL is available).
-    // See https://curl.se/libcurl/c/curl_easy_unescape.html.
     fmt::print("target            : {}\n", req.target());
     fmt::print("keep alive        : {}\n", req.keep_alive());
     fmt::print("has content length: {}\n", req.has_content_length());
