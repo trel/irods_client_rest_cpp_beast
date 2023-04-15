@@ -60,9 +60,17 @@ curl -H "authorization: Bearer $bearer_token" "${base_url}/metadata?op=atomic_ex
         ]
     }' | jq
 
-curl -H "authorization: Bearer $bearer_token" "${base_url}/rules?op=execute&rep-instance=irods_rule_engine_plugin-irods_rule_language-instance" ${curl_opts} | jq
-curl -H "authorization: Bearer $bearer_token" "${base_url}/rules?op=list_rule_engines" ${curl_opts} | jq
-curl -H "authorization: Bearer $bearer_token" "${base_url}/rules?op=list_delay_rules" ${curl_opts} | jq
+curl -G -H "authorization: Bearer $bearer_token" "${base_url}/rules" \
+    --data-urlencode 'op=execute' \
+    --data-urlencode 'rep-instance=irods_rule_engine_plugin-irods_rule_language-instance' \
+    --data-urlencode 'rule-text=delay("<EF>60</EF><INST_NAME>irods_rule_engine_plugin-irods_rule_language-instance</INST_NAME>") { writeLine("serverLog", "REST API!!!"); }' \
+    ${curl_opts} | jq
+curl -G -H "authorization: Bearer $bearer_token" "${base_url}/rules" \
+    --data-urlencode 'op=list_rule_engines' \
+    ${curl_opts} | jq
+curl -G -H "authorization: Bearer $bearer_token" "${base_url}/rules" \
+    --data-urlencode 'op=list_delay_rules' \
+    ${curl_opts} | jq
 
 curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
     --data-urlencode 'op=touch' \
@@ -90,4 +98,9 @@ curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
     --data-urlencode 'lpath=/tempZone/home/kory/goo' \
     --data-urlencode 'entity-name=rods' \
     --data-urlencode 'permission=read_object' \
+    $curl_opts | jq
+curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+    --data-urlencode 'op=read' \
+    --data-urlencode 'lpath=/tempZone/home/kory/foo' \
+    --data-urlencode 'count=1000' \
     $curl_opts | jq

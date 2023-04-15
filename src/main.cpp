@@ -52,6 +52,7 @@
 #include <utility>
 #include <unordered_map>
 #include <fstream>
+#include <span>
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
@@ -777,42 +778,113 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         // TODO Should a client be allowed to target a leaf resource?
 
         try {
-            irods::experimental::client_connection conn;
+            // TODO While dstream makes reading/writing simple, using it means we lose the
+            // ability to know why an operation failed. This is because dstream or the transport
+            // doesn't expose the internal details for a failure. And IOStreams don't throw exceptions
+            // unless they are configured to do so, which leads to very ugly/weird code.
+            //
+            // With that said, this operation can only report what it thinks may have happened. The
+            // client will have to contact the iRODS administrator to have them check the logs.
+            //
+            // Alternatively, we can make C API calls and get the exact reasons for a failure. This is
+            // more work, but will allow the client to make better decisions about what to do next.
 
             namespace io = irods::experimental::io;
 
+            irods::experimental::client_connection conn;
             io::client::native_transport tp{conn};
             io::idstream in{tp, lpath_iter->second};
 
             if (!in) {
-                // TODO
+                fmt::print("{}: Could not open data object [{}] for read.\n", __func__, lpath_iter->second);
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
+                    }},
+                    // TODO REST API internal error. Do we need REST API error codes to
+                    // indicate the issue was not iRODS related (we never reached out to iRODS)?
+                    {"http_api_error_code", -1}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
+                    {"http_api_error_message", "Open error."}
+                }.dump();
+                res.prepare_payload();
+
+                return res;
             }
 
+            // TODO This needs to be clamped to a max size set by the administrator.
+            // Should this be required?
             auto iter = url.query.find("offset");
             if (iter != std::end(url.query)) {
                 try {
                     in.seekg(std::stoll(iter->second));
                 }
                 catch (const std::exception& e) {
-                    // TODO
+                    fmt::print("{}: Could not seek to position [{}] in data object [{}].\n", __func__, iter->second, lpath_iter->second);
+
+                    res.body() = json{
+                        {"irods_response", {
+                            {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
+                        }},
+                        // TODO REST API internal error. Do we need REST API error codes to
+                        // indicate the issue was not iRODS related (we never reached out to iRODS)?
+                        {"http_api_error_code", -2}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
+                        {"http_api_error_message", "Seek error."}
+                    }.dump();
+                    res.prepare_payload();
+
+                    return res;
                 }
             }
 
             std::vector<char> buffer;
 
+            // TODO This needs to be clamped to a max size set by the administrator.
+            // Should this be required?
             iter = url.query.find("count");
             if (iter != std::end(url.query)) {
                 try {
                     buffer.resize(std::stoi(iter->second));
                 }
                 catch (const std::exception& e) {
-                    // TODO
+                    fmt::print("{}: Could not initialize read buffer to size [{}] for data object [{}].\n", __func__, iter->second, lpath_iter->second);
+
+                    res.body() = json{
+                        {"irods_response", {
+                            {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
+                        }},
+                        // TODO REST API internal error. Do we need REST API error codes to
+                        // indicate the issue was not iRODS related (we never reached out to iRODS)?
+                        {"http_api_error_code", -3}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
+                        {"http_api_error_message", "Buffer error."}
+                    }.dump();
+                    res.prepare_payload();
+
+                    return res;
                 }
             }
             else {
                 buffer.resize(8192);
             }
 
+            // TODO Given a specific number of bytes to read, we can define a loop that reads the
+            // requested number of bytes using a fixed size buffer. Obviously, this means multiple
+            // read operations are required, but that isn't a problem. The big win for doing this is
+            // that we protect the application from exhausting all memory because a client decided
+            // to execute multiple reads with a count of N GB buffers.
+            //
+            // Something else to think about is moving stream operation API calls to a separate
+            // thread pool. If there are 10000 clients all performing reads and writes, and all these
+            // operations happen within the same threads that are servicing HTTP requests, it is
+            // easy to see how new HTTP requests can be blocked due to existing IO operations being
+            // serviced.
+            //
+            // ---
+            //
+            // Keeping this as is isn't so bad if we can keep the number of read operations to one.
+            // The issue with the comment above the separator is we have to store the data in memory
+            // or use the chunked encoding. Boost.Beast does support chunked encoding and provides
+            // examples showing how to do it.
             in.read(buffer.data(), buffer.size());
 
             res.body() = json{
@@ -820,7 +892,9 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
                     {"error_code", 0}
                 }},
                 {"bytes_read", in.gcount()},
-                {"data", buffer}
+                // data will be returned as a buffer of bytes (i.e. integers). The nlohmann JSON
+                // library will not view the range as a string. This is what we want.
+                {"data", std::span(buffer.data(), in.gcount())}
             }.dump();
         }
         catch (const irods::exception& e) {
@@ -906,6 +980,7 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         }
 
         try {
+            // TODO This should be part of the replica library.
             DataObjInp input{};
             irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
             std::strncpy(input.objPath, lpath_iter->second.c_str(), sizeof(DataObjInp::objPath));
@@ -950,6 +1025,7 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         }
 
         try {
+            // TODO This should be part of the replica library.
             DataObjInp input{};
             irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
             std::strncpy(input.objPath, lpath_iter->second.c_str(), sizeof(DataObjInp::objPath));
@@ -1098,11 +1174,13 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
                     {"error_code", 0},
                 }},
                 {"type", to_type_string(status.type())},
-                //{"inheritance_enabled", status.is_inheritance_enabled()},
                 {"permissions", perms},
                 // TODO Should these be returned upon request?
                 // What should be included under replicas? Data ID, physical path, replica status, replica number? What else?
-                {"replicas", json::array_t{}}
+                {"replicas", json::array_t{}},
+                // TODO Notice these require additional network calls. Could be avoided by using GenQuery, perhaps.
+                {"size", fs::client::data_object_size(conn, lpath_iter->second)},
+                {"checksum", fs::client::data_object_checksum(conn, lpath_iter->second)}
             }.dump();
         }
         catch (const fs::filesystem_error& e) {
@@ -1152,6 +1230,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         try {
             irods::experimental::client_connection conn;
 
+            // TODO This type of check needs to apply to all operations in /data-objects and /collections
+            // that take a logical path.
             if (!fs::client::is_data_object(conn, lpath_iter->second)) {
                 fmt::print("{}: Not a data object.\n", __func__);
                 http::response<http::string_body> res{http::status::bad_request, _req.version()};
@@ -2085,14 +2165,26 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
     if (op_iter->second == "execute") {
         // TODO Wrap all of this in a try-catch block.
 
-        ExecMyRuleInp input{};
+        const auto rule_text_iter = url.query.find("rule-text");
+        if (rule_text_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [rule-text] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
 
-        std::strncpy(input.myRule, "@external rule { writeLine('stdout', 'DID IT'); }", sizeof(ExecMyRuleInp::myRule));
+        ExecMyRuleInp input{};
 
         irods::at_scope_exit clear_kvp{[&input] {
             clearKeyVal(&input.condInput);
             clearMsParamArray(input.inpParamArray, 0); // 0 -> do not free external structure.
         }};
+
+        const auto rule_text = fmt::format("@external rule {{ {} }}", rule_text_iter->second);
+        std::strncpy(input.myRule, rule_text.c_str(), sizeof(ExecMyRuleInp::myRule));
 
         const auto rep_instance_iter = url.query.find("rep-instance");
         if (rep_instance_iter != std::end(url.query)) {
@@ -2100,26 +2192,19 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
         }
 
         MsParamArray param_array{};
-        //MsParamArray* mspa_ptr = &param_array;
-        input.inpParamArray = &param_array;
-        std::strncpy(input.outParamDesc, "ruleExecOut", sizeof(input.outParamDesc));
+        input.inpParamArray = &param_array; // TODO Need to accept INPUT params.
+        std::strncpy(input.outParamDesc, "ruleExecOut", sizeof(input.outParamDesc)); // TODO Need to accept OUTPUT params.
 
         MsParamArray* out_param_array{};
 
+        json stdout_output;
+        json stderr_output;
+
         irods::experimental::client_connection conn;
+        const auto ec = rcExecMyRule(static_cast<RcComm*>(conn), &input, &out_param_array);
 
-        if (const auto ec = rcExecMyRule(static_cast<RcComm*>(conn), &input, &out_param_array); ec < 0) {
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", ec},
-                }}
-            }.dump();
-        }
-        else {
-            json stdout_output;
-            json stderr_output;
-
-            if (auto* msp = getMsParamByType(out_param_array, ExecCmdOut_PI); msp) {
+        if (ec >= 0) {
+            if (auto* msp = getMsParamByType(out_param_array, ExecCmdOut_MS_T); msp) {
                 if (const auto* exec_out = static_cast<ExecCmdOut*>(msp->inOutStruct); exec_out) {
                     if (exec_out->stdoutBuf.buf) {
                         stdout_output = static_cast<const char*>(exec_out->stdoutBuf.buf);
@@ -2133,19 +2218,26 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
                 }
             }
 
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", ec},
-                }},
-                {"stdout", stdout_output},
-                {"stderr", stderr_output}
-            }.dump();
+            if (auto* msp = getMsParamByLabel(out_param_array, "ruleExecOut"); msp) {
+                fmt::print("{}: ruleExecOut = [{}]\n", __func__, (char*) msp->inOutStruct);
+            }
         }
+
+        // TODO Probably not needed.
+        //printErrorStack(static_cast<RcComm*>(conn)->rError);
+
+        res.body() = json{
+            {"irods_response", {
+                {"error_code", ec},
+            }},
+            {"stdout", stdout_output},
+            {"stderr", stderr_output}
+        }.dump();
     }
     else if (op_iter->second == "remove_delay_rule") {
         const auto rule_id_iter = url.query.find("rule-id");
         if (rule_id_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [rule_id] parameter.\n", __func__);
+            fmt::print("{}: Missing [rule-id] parameter.\n", __func__);
             http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
             res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
             res.set(http::field::content_type, "text/plain");
@@ -2155,11 +2247,10 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
         }
 
         try {
-            irods::experimental::client_connection conn;
-
             RuleExecDeleteInput input{};
             std::strncpy(input.ruleExecId, rule_id_iter->second.c_str(), sizeof(RuleExecDeleteInput::ruleExecId));
 
+            irods::experimental::client_connection conn;
             const auto ec = rcRuleExecDel(static_cast<RcComm*>(conn), &input);
 
             res.body() = json{
@@ -2169,7 +2260,6 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
             }.dump();
         }
         catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
             res.body() = json{
                 {"irods_response", {
                     {"error_code", e.code()},
@@ -2178,7 +2268,6 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
             }.dump();
         }
         catch (const std::exception& e) {
-            res.result(http::status::bad_request);
             res.body() = json{
                 {"irods_response", {
                     {"error_code", SYS_LIBRARY_ERROR},
@@ -2200,46 +2289,34 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
         addKeyVal(&input.condInput, AVAILABLE_KW, "");
 
         MsParamArray param_array{};
-        //MsParamArray* mspa_ptr = &param_array;
         input.inpParamArray = &param_array;
 
         MsParamArray* out_param_array{};
 
         irods::experimental::client_connection conn;
 
-        if (const auto ec = rcExecMyRule(static_cast<RcComm*>(conn), &input, &out_param_array); ec < 0) {
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", ec},
-                }}
-            }.dump();
-        }
-        else {
-            json stdout_output;
-            json stderr_output;
+        const auto ec = rcExecMyRule(static_cast<RcComm*>(conn), &input, &out_param_array);
 
-            if (auto* msp = getMsParamByType(out_param_array, ExecCmdOut_PI); msp) {
-                if (const auto* exec_out = static_cast<ExecCmdOut*>(msp->inOutStruct); exec_out) {
-                    if (exec_out->stdoutBuf.buf) {
-                        stdout_output = static_cast<const char*>(exec_out->stdoutBuf.buf);
-                        fmt::print("{}: stdout_output = [{}]\n", __func__, stdout_output.get_ref<const std::string&>());
-                    }
+        std::vector<std::string> plugin_instances;
 
-                    if (exec_out->stderrBuf.buf) {
-                        stderr_output = static_cast<const char*>(exec_out->stderrBuf.buf);
-                        fmt::print("{}: stderr_output = [{}]\n", __func__, stderr_output.get_ref<const std::string&>());
-                    }
-                }
+        if (ec >= 0) {
+            if (const auto* es = static_cast<RcComm*>(conn)->rError; es && es->len > 0) {
+                boost::split(plugin_instances, es->errMsg[0]->msg, boost::is_any_of("\n"));
             }
 
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", ec},
-                }},
-                {"stdout", stdout_output},
-                {"stderr", stderr_output}
-            }.dump();
+            plugin_instances.erase(std::begin(plugin_instances)); // Remove unnecessary header.
+            plugin_instances.pop_back(); // Remove empty line as a result of splitting the string via a newline.
+
+            // Remove leading and trailing whitespace.
+            std::for_each(std::begin(plugin_instances), std::end(plugin_instances), [](auto& _v) { boost::trim(_v); });
         }
+
+        res.body() = json{
+            {"irods_response", {
+                {"error_code", ec},
+            }},
+            {"rule_engine_plugin_instances", plugin_instances},
+        }.dump();
     }
     else if (op_iter->second == "list_delay_rules") {
         const auto all_rules_iter = url.query.find("all-rules");
@@ -2248,8 +2325,6 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
         }
 
         try {
-            irods::experimental::client_connection conn;
-
             const auto gql = fmt::format(
                 "select "
                 "RULE_EXEC_ID, "
@@ -2264,12 +2339,18 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
                 "RULE_EXEC_NOTIFICATION_ADDR, "
                 "RULE_EXEC_LAST_EXE_TIME, "
                 "RULE_EXEC_STATUS, "
+#if 0
                 "RULE_EXEC_CONTEXT "
                 "where RULE_EXEC_USER_NAME = '{}'",
+#else
+                "RULE_EXEC_CONTEXT",
+#endif
                 *username);
 
             json::array_t row;
             json::array_t rows;
+
+            irods::experimental::client_connection conn;
 
             for (auto&& r : irods::query{static_cast<RcComm*>(conn), gql}) {
                 for (auto&& c : r) {
@@ -2288,7 +2369,6 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
             }.dump();
         }
         catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
             res.body() = json{
                 {"irods_response", {
                     {"error_code", e.code()},
@@ -2297,7 +2377,6 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
             }.dump();
         }
         catch (const std::exception& e) {
-            res.result(http::status::bad_request);
             res.body() = json{
                 {"irods_response", {
                     {"error_code", SYS_LIBRARY_ERROR},
@@ -2326,6 +2405,7 @@ const std::unordered_map<std::string_view, request_handler> req_handlers{
     {"/irods-rest/0.9.5/resources",    handle_resources},
     {"/irods-rest/0.9.5/rules",        handle_rules},
     //{"/irods-rest/0.9.5/tickets",      "/tickets"},
+    //{"/irods-rest/0.9.5/users-groups", "/users"},
     //{"/irods-rest/0.9.5/users",        "/users"},
     //{"/irods-rest/0.9.5/groups",       "/groups"},
     //{"/irods-rest/0.9.5/zones",        "/zones"}
