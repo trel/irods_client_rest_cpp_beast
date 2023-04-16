@@ -108,7 +108,7 @@ auto decode(const std::string_view _v) -> std::string
     return result;
 }
 
-auto parse_url(const http::request<http::string_body>& _req) -> url
+auto parse_url(const std::string& _url) -> url
 {
     // TODO Show how to parse URLs using libcurl.
     // See https://curl.se/libcurl/c/parseurl.html for an example.
@@ -119,8 +119,7 @@ auto parse_url(const http::request<http::string_body>& _req) -> url
     }
 
     // Include a bogus prefix. We only care about the path and query parts of the URL.
-    const auto url_to_parse = fmt::format("http://ignored{}", _req.target());
-    if (const auto ec = curl_url_set(curl, CURLUPART_URL, url_to_parse.c_str(), 0); ec) {
+    if (const auto ec = curl_url_set(curl, CURLUPART_URL, _url.c_str(), 0); ec) {
         // TODO Report error.
         fmt::print("error: {}\n", ec);
     }
@@ -183,6 +182,11 @@ auto parse_url(const http::request<http::string_body>& _req) -> url
     }
 
     return url;
+}
+
+auto parse_url(const http::request<http::string_body>& _req) -> url
+{
+    return parse_url(fmt::format("http://ignored{}", _req.target()));
 }
 
 auto handle_auth(const http::request<http::string_body>& _req) -> http::response<http::string_body>
@@ -1358,7 +1362,7 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
 
 auto handle_metadata(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
-    if (_req.method() != http::verb::get && _req.method() != http::verb::post) {
+    if (_req.method() != http::verb::post) {
         fmt::print("{}: Incorrect HTTP method.\n", __func__);
         http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);

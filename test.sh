@@ -158,10 +158,9 @@ curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
 #   - https://reqbin.com/Article/HttpPost
 #
 
-curl -H "authorization: Bearer $bearer_token" "${base_url}/metadata" \
+curl -H "authorization: Bearer $bearer_token" -H 'content-type: text/plain' "${base_url}/metadata" \
     -d 'op=atomic_execute' \
-    -d \
-    '{
+    -d 'data={
         "entity_name": "/tempZone/home/kory",
         "entity_type": "collection",
         "operations": [
@@ -181,10 +180,9 @@ curl -H "authorization: Bearer $bearer_token" "${base_url}/metadata" \
 # The API plugin should mention the name of the property that caused the operation to fail.
 # Obviously not great, but not urgent either. Still trying to decide if this is worth fixing
 # in 4.2.12. Nothing's broken, it's just not convenient to read.
-curl -H "authorization: Bearer $bearer_token" "${base_url}/metadata" \
+curl -H "authorization: Bearer $bearer_token" -H 'content-type: text/plain' "${base_url}/metadata" \
     -d 'op=atomic_execute' \
-    -d \
-    '{
+    -d 'data={
         "entity_name": "/tempZone/home/kory",
         "entity_type": "file",
         "operations": [
@@ -197,7 +195,7 @@ curl -H "authorization: Bearer $bearer_token" "${base_url}/metadata" \
         ]
     }' \
     ${curl_opts} | jq
-
+exit
 #
 # /rules
 #
