@@ -2395,6 +2395,151 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
     return res;
 }
 
+auto handle_users_groups(const http::request<http::string_body>& _req) -> http::response<http::string_body>
+{
+    if (_req.method() != http::verb::get && _req.method() != http::verb::post) {
+        fmt::print("{}: Incorrect HTTP method.\n", __func__);
+        http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    //
+    // Extract the Bearer token from the Authorization header.
+    //
+
+    const auto& hdrs = _req.base();
+    const auto iter = hdrs.find("authorization");
+    if (iter == std::end(hdrs)) {
+        fmt::print("{}: Missing authorization header.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    fmt::print("{}: Authorization value: [{}]\n", __func__, iter->value());
+
+    auto pos = iter->value().find("Bearer ");
+    if (std::string_view::npos == pos) {
+        fmt::print("{}: Malformed authorization header.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    std::string bearer_token{iter->value().substr(pos + 7)};
+    boost::trim(bearer_token);
+    fmt::print("{}: Bearer token: [{}]\n", __func__, bearer_token);
+
+    // Verify the bearer token is known to the server. If not, return an error.
+    const std::string* username{};
+    {
+        const auto iter = authenticated_client_info.find(bearer_token);
+        if (iter == std::end(authenticated_client_info)) {
+            fmt::print("{}: Could not find bearer token matching [{}].\n", __func__, bearer_token);
+            http::response<http::string_body> res{http::status::unauthorized, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        username = &iter->second.username;
+    }
+
+    //
+    // At this point, we know the user has authorization to perform this operation.
+    //
+
+    const auto url = parse_url(_req);
+
+    const auto op_iter = url.query.find("op");
+    if (op_iter == std::end(url.query)) {
+        fmt::print("{}: Missing [op] parameter.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    http::response<http::string_body> res{http::status::ok, _req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/plain");
+    res.keep_alive(_req.keep_alive());
+
+    if (op_iter->second == "create_user") {
+        const auto rule_text_iter = url.query.find("rule-text");
+        if (rule_text_iter == std::end(url.query)) {
+            //fmt::print("{}: Missing [rule-text] parameter.\n", __func__);
+            //http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            //res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            //res.set(http::field::content_type, "text/plain");
+            //res.set(http::field::content_length, "0");
+            //res.keep_alive(_req.keep_alive());
+            //return res;
+        }
+
+        res.body() = json{
+            {"irods_response", {
+                {"error_code", ec},
+            }}
+        }.dump();
+    }
+    else if (op_iter->second == "remove_user") {
+    }
+    else if (op_iter->second == "set_password") {
+    }
+    else if (op_iter->second == "set_user_type") {
+    }
+    else if (op_iter->second == "add_user_auth") {
+    }
+    else if (op_iter->second == "remove_user_auth") {
+    }
+    else if (op_iter->second == "create_group") {
+    }
+    else if (op_iter->second == "remove_group") {
+    }
+    else if (op_iter->second == "add_to_group") {
+    }
+    else if (op_iter->second == "remove_from_group") {
+    }
+    else if (op_iter->second == "list_users") {
+    }
+    else if (op_iter->second == "list_groups") {
+    }
+    else if (op_iter->second == "members") {
+    }
+    else if (op_iter->second == "is_member_of_group") {
+    }
+    else if (op_iter->second == "stat") {
+        // TODO
+        // Include the following:
+        // - id
+        // - type
+        // - auth names
+    }
+    else {
+        fmt::print("{}: Invalid operation [{}].\n", __func__, op_iter->second);
+        res.result(http::status::bad_request);
+    }
+
+    res.prepare_payload();
+
+    return res;
+}
+
 const std::unordered_map<std::string_view, request_handler> req_handlers{
     {"/irods-rest/0.9.5/auth",         handle_auth},
     {"/irods-rest/0.9.5/collections",  handle_collections},
@@ -2405,7 +2550,7 @@ const std::unordered_map<std::string_view, request_handler> req_handlers{
     {"/irods-rest/0.9.5/resources",    handle_resources},
     {"/irods-rest/0.9.5/rules",        handle_rules},
     //{"/irods-rest/0.9.5/tickets",      "/tickets"},
-    //{"/irods-rest/0.9.5/users-groups", "/users"},
+    {"/irods-rest/0.9.5/users-groups", handle_users_groups},
     //{"/irods-rest/0.9.5/users",        "/users"},
     //{"/irods-rest/0.9.5/groups",       "/groups"},
     //{"/irods-rest/0.9.5/zones",        "/zones"}
