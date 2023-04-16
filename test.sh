@@ -1,12 +1,12 @@
 #! /bin/bash
 
-username="$1"
-password="$2"
+irods_username="$1"
+irods_password="$2"
 
 set -x
 
 base_url='http://localhost:9000/irods-rest/0.9.5'
-creds=$(echo -n ${username}:${password} | base64)
+creds=$(echo -n ${irods_username}:${irods_password} | base64)
 bearer_token=$(curl -X POST -s -H "authorization: Basic $creds" "${base_url}/auth")
 curl_opts='-s'
 
