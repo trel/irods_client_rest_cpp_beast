@@ -1368,6 +1368,10 @@ auto handle_metadata(const http::request<http::string_body>& _req) -> http::resp
         return res;
     }
 
+    // TODO HTTP POST requests will pass the input arguments via the body.
+    // All handlers that require POST will need to be tweaked.
+    fmt::print("{}: request body = [{}]\n", __func__, _req.body());
+
     //
     // Extract the Bearer token from the Authorization header.
     //
@@ -2441,7 +2445,7 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
     fmt::print("{}: Bearer token: [{}]\n", __func__, bearer_token);
 
     // Verify the bearer token is known to the server. If not, return an error.
-    const std::string* username{};
+    [[maybe_unused]] const std::string* username{};
     {
         const auto iter = authenticated_client_info.find(bearer_token);
         if (iter == std::end(authenticated_client_info)) {
@@ -2479,25 +2483,137 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
     res.set(http::field::content_type, "text/plain");
     res.keep_alive(_req.keep_alive());
 
+    namespace ia = irods::experimental::administration;
+
     if (op_iter->second == "create_user") {
-        const auto rule_text_iter = url.query.find("rule-text");
-        if (rule_text_iter == std::end(url.query)) {
-            //fmt::print("{}: Missing [rule-text] parameter.\n", __func__);
-            //http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            //res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            //res.set(http::field::content_type, "text/plain");
-            //res.set(http::field::content_length, "0");
-            //res.keep_alive(_req.keep_alive());
-            //return res;
+        const auto name_iter = url.query.find("name");
+        if (name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
         }
 
-        res.body() = json{
-            {"irods_response", {
-                {"error_code", ec},
-            }}
-        }.dump();
+        const auto zone_iter = url.query.find("zone");
+        if (zone_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [zone] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        auto user_type = ia::user_type::rodsuser;
+        const auto user_type_iter = url.query.find("user-type");
+        if (user_type_iter != std::end(url.query) && user_type_iter->second != "rodsuser") {
+            if (user_type_iter->second == "rodsadmin") {
+                user_type = ia::user_type::rodsadmin;
+            }
+            else if (user_type_iter->second == "groupadmin") {
+                user_type = ia::user_type::groupadmin;
+            }
+            else {
+                fmt::print("{}: Invalid user-type.\n", __func__);
+                http::response<http::string_body> res{http::status::bad_request, _req.version()};
+                res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+                res.set(http::field::content_type, "text/plain");
+                res.set(http::field::content_length, "0");
+                res.keep_alive(_req.keep_alive());
+                return res;
+            }
+        }
+
+        // TODO This can be derived if the REST API provides a way to know what zone it
+        // is connected to. For example, the config file can define the local zone and then
+        // we can use that to compare whether the client is attempting to create a local or
+        // remote user.
+        auto zone_type = ia::zone_type::local;
+        const auto remote_iter = url.query.find("remote_user");
+        if (remote_iter != std::end(url.query) && remote_iter->second == "1") {
+            zone_type = ia::zone_type::remote;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+            ia::client::add_user(conn, ia::user{name_iter->second, zone_iter->second}, user_type, zone_type);
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
     }
     else if (op_iter->second == "remove_user") {
+        const auto name_iter = url.query.find("name");
+        if (name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        const auto zone_iter = url.query.find("zone");
+        if (zone_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [zone] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+            ia::client::remove_user(conn, ia::user{name_iter->second, zone_iter->second});
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
     }
     else if (op_iter->second == "set_password") {
     }
@@ -2508,27 +2624,356 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
     else if (op_iter->second == "remove_user_auth") {
     }
     else if (op_iter->second == "create_group") {
+        const auto name_iter = url.query.find("name");
+        if (name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+            ia::client::add_group(conn, ia::group{name_iter->second});
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
     }
     else if (op_iter->second == "remove_group") {
+        const auto name_iter = url.query.find("name");
+        if (name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+            ia::client::remove_group(conn, ia::group{name_iter->second});
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
     }
     else if (op_iter->second == "add_to_group") {
+        const auto user_iter = url.query.find("user");
+        if (user_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [user] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        const auto group_iter = url.query.find("group");
+        if (group_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [group] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+
+            const auto zone_iter = url.query.find("zone");
+            if (zone_iter != std::end(url.query)) {
+                ia::client::add_user_to_group(conn, ia::group{group_iter->second}, ia::user{user_iter->second, zone_iter->second});
+            }
+            else {
+                ia::client::add_user_to_group(conn, ia::group{group_iter->second}, ia::user{user_iter->second});
+            }
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
     }
     else if (op_iter->second == "remove_from_group") {
+        const auto user_iter = url.query.find("user");
+        if (user_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [user] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        const auto group_iter = url.query.find("group");
+        if (group_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [group] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+
+            const auto zone_iter = url.query.find("zone");
+            if (zone_iter != std::end(url.query)) {
+                ia::client::remove_user_from_group(conn, ia::group{group_iter->second}, ia::user{user_iter->second, zone_iter->second});
+            }
+            else {
+                ia::client::remove_user_from_group(conn, ia::group{group_iter->second}, ia::user{user_iter->second});
+            }
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
     }
-    else if (op_iter->second == "list_users") {
+    else if (op_iter->second == "users") {
+        try {
+            irods::experimental::client_connection conn;
+            const auto users = ia::client::users(conn);
+
+            std::vector<json> v;
+            v.reserve(users.size());
+
+            for (auto&& u : users) {
+                v.push_back({
+                    {"name", u.name},
+                    {"zone", u.zone}
+                });
+            }
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0}
+                }},
+                {"users", v}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
     }
-    else if (op_iter->second == "list_groups") {
+    else if (op_iter->second == "groups") {
+        try {
+            irods::experimental::client_connection conn;
+            auto groups = ia::client::groups(conn);
+
+            std::vector<std::string> v;
+            v.reserve(groups.size());
+
+            for (auto&& g : groups) {
+                v.push_back(std::move(g.name));
+            }
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0}
+                }},
+                {"groups", v}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
     }
     else if (op_iter->second == "members") {
     }
     else if (op_iter->second == "is_member_of_group") {
     }
     else if (op_iter->second == "stat") {
-        // TODO
-        // Include the following:
-        // - id
-        // - type
-        // - auth names
+        const auto name_iter = url.query.find("name");
+        if (name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+
+            json info{
+                {"irods_response", {
+                    {"error_code", 0},
+                }},
+                {"exists", false}
+            };
+
+            // If the zone parameter is provided, we're likely dealing with a user. Otherwise,
+            // we don't know what we're identifying.
+            const auto zone_iter = url.query.find("zone");
+            if (zone_iter != std::end(url.query)) {
+                const ia::user user{name_iter->second, zone_iter->second};
+                if (const auto id = ia::client::id(conn, user); id) {
+                    info.update({
+                        {"exists", true},
+                        {"id", *id},
+                        {"type", ia::to_c_str(*ia::client::type(conn, user))}
+                    });
+                }
+
+                res.body() = info.dump();
+                res.prepare_payload();
+                return res;
+            }
+
+            // The client did not include a zone so we are required to test if the name
+            // identifies a user or group.
+
+            const ia::user user{name_iter->second};
+            if (const auto id = ia::client::id(conn, user); id) {
+                info.update({
+                    {"exists", true},
+                    {"id", *id},
+                    {"local_unique_name", ia::client::local_unique_name(conn, user)},
+                    {"type", ia::to_c_str(*ia::client::type(conn, user))}
+                });
+            }
+
+            const ia::group group{name_iter->second};
+            if (const auto id = ia::client::id(conn, group); id) {
+                info.update({
+                    {"exists", true},
+                    {"id", *id},
+                    {"type", "rodsgroup"}
+                });
+            }
+
+            res.body() = info.dump();
+        }
+        catch (const irods::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
     }
     else {
         fmt::print("{}: Invalid operation [{}].\n", __func__, op_iter->second);
@@ -2551,8 +2996,6 @@ const std::unordered_map<std::string_view, request_handler> req_handlers{
     {"/irods-rest/0.9.5/rules",        handle_rules},
     //{"/irods-rest/0.9.5/tickets",      "/tickets"},
     {"/irods-rest/0.9.5/users-groups", handle_users_groups},
-    //{"/irods-rest/0.9.5/users",        "/users"},
-    //{"/irods-rest/0.9.5/groups",       "/groups"},
     //{"/irods-rest/0.9.5/zones",        "/zones"}
 };
 
