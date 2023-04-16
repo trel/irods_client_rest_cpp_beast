@@ -151,10 +151,13 @@ curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
 # /metadata
 #
 
-# This curl calls are broken at the moment due to POST requests sending data via the HTTP
-# request body. The handler will need to be adjusted for this. If the request was changed
-# to use -G and --data-urlencode (instead of -d), the request would work, but the input values
-# would be exposed on the request URL.
+# These curl calls are broken at the moment due to POST requests sending data via the HTTP
+# request body. The handler will need to be adjusted for this. For more info, see the following:
+#
+#   - https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/POST
+#   - https://reqbin.com/Article/HttpPost
+#
+
 curl -H "authorization: Bearer $bearer_token" "${base_url}/metadata" \
     -d 'op=atomic_execute' \
     -d \
