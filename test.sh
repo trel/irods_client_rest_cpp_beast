@@ -10,6 +10,11 @@ creds=$(echo -n ${irods_username}:${irods_password} | base64)
 bearer_token=$(curl -X POST -s -H "authorization: Basic $creds" "${base_url}/auth")
 curl_opts='-s'
 
+# The following curl documentation is a good reference for seeing how to do certain things.
+#
+#   - https://curl.se/docs/manual.html
+#
+
 #
 # /collections
 #
@@ -151,16 +156,9 @@ curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
 # /metadata
 #
 
-# These curl calls are broken at the moment due to POST requests sending data via the HTTP
-# request body. The handler will need to be adjusted for this. For more info, see the following:
-#
-#   - https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/POST
-#   - https://reqbin.com/Article/HttpPost
-#
-
-curl -H "authorization: Bearer $bearer_token" -H 'content-type: text/plain' "${base_url}/metadata" \
-    -d 'op=atomic_execute' \
-    -d 'data={
+curl -H "authorization: Bearer $bearer_token" "${base_url}/metadata" \
+    --data-urlencode 'op=atomic_execute' \
+    --data-urlencode 'data={
         "entity_name": "/tempZone/home/kory",
         "entity_type": "collection",
         "operations": [
@@ -176,13 +174,13 @@ curl -H "authorization: Bearer $bearer_token" -H 'content-type: text/plain' "${b
 
 # Notice the value for "entity_type" below.
 # The iRODS server rejects "file" correct, however, the error message isn't
-# good at all. It results in the following cryptic message: "std::map::at:  invalid key"
+# good at all. It results in the following cryptic message: "map::at:  key not found"
 # The API plugin should mention the name of the property that caused the operation to fail.
 # Obviously not great, but not urgent either. Still trying to decide if this is worth fixing
 # in 4.2.12. Nothing's broken, it's just not convenient to read.
 curl -H "authorization: Bearer $bearer_token" -H 'content-type: text/plain' "${base_url}/metadata" \
-    -d 'op=atomic_execute' \
-    -d 'data={
+    --data-urlencode 'op=atomic_execute' \
+    --data-urlencode 'data={
         "entity_name": "/tempZone/home/kory",
         "entity_type": "file",
         "operations": [
@@ -195,7 +193,7 @@ curl -H "authorization: Bearer $bearer_token" -H 'content-type: text/plain' "${b
         ]
     }' \
     ${curl_opts} | jq
-exit
+
 #
 # /rules
 #

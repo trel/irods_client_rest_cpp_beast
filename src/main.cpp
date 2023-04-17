@@ -108,6 +108,39 @@ auto decode(const std::string_view _v) -> std::string
     return result;
 }
 
+auto to_argument_list(const std::string_view& _urlencoded_string) -> std::unordered_map<std::string, std::string>
+{
+    std::unordered_map<std::string, std::string> kvps;
+
+    // I really wish Boost.URL was part of Boost 1.78. Things would be so much easier.
+    // Sadly, we have to release an updated Boost external to get it.
+    try {
+        std::vector<std::string> tokens;
+        boost::split(tokens, _urlencoded_string, boost::is_any_of("&"));
+
+        std::vector<std::string> kvp;
+
+        for (auto&& t : tokens) {
+            boost::split(kvp, t, boost::is_any_of("="));
+
+            if (kvp.size() == 2) {
+                kvps.insert_or_assign(std::move(kvp[0]), decode(kvp[1]));
+            }
+            else if (kvp.size() == 1) {
+                kvps.insert_or_assign(std::move(kvp[0]), "");
+            }
+
+            kvp.clear();
+        }
+    }
+    catch (const std::exception& e) {
+        // TODO
+        fmt::print("exception: {}\n", e.what());
+    }
+
+    return kvps;
+}
+
 auto parse_url(const std::string& _url) -> url
 {
     // TODO Show how to parse URLs using libcurl.
@@ -116,12 +149,13 @@ auto parse_url(const std::string& _url) -> url
 
     if (!curl) {
         // TODO Report internal server error.
+        fmt::print("{}: Could not initialize libcurl.\n", __func__);
     }
 
     // Include a bogus prefix. We only care about the path and query parts of the URL.
     if (const auto ec = curl_url_set(curl, CURLUPART_URL, _url.c_str(), 0); ec) {
         // TODO Report error.
-        fmt::print("error: {}\n", ec);
+        fmt::print("{}: curl_url_set error: {}\n", __func__, ec);
     }
 
     url url;
@@ -137,7 +171,7 @@ auto parse_url(const std::string& _url) -> url
     }
     else {
         // TODO Report error.
-        fmt::print("error: {}\n", ec);
+        fmt::print("{}: curl_url_get(CURLUPART_PATH) error: {}\n", __func__, ec);
     }
 
     // Extract the query.
@@ -147,38 +181,13 @@ auto parse_url(const std::string& _url) -> url
     char* query{};
     if (const auto ec = curl_url_get(curl, CURLUPART_QUERY, &query, 0); ec == 0) {
         if (query) {
-            // I really wish Boost.URL was part of Boost 1.78. Things would be so much easier.
-            // Sadly, we have to release an updated Boost external to get it.
-            try {
-                std::vector<std::string> tokens;
-                boost::split(tokens, query, boost::is_any_of("&"));
-
-                std::vector<std::string> kvp;
-                
-                for (auto&& t : tokens) {
-                    boost::split(kvp, t, boost::is_any_of("="));
-
-                    if (kvp.size() == 2) {
-                        url.query.insert_or_assign(std::move(kvp[0]), decode(kvp[1]));
-                    }
-                    else if (kvp.size() == 1) {
-                        url.query.insert_or_assign(std::move(kvp[0]), "");
-                    }
-
-                    kvp.clear();
-                }
-            }
-            catch (const std::exception& e) {
-                // TODO
-                fmt::print("exception: {}\n", e.what());
-            }
-
+            url.query = to_argument_list(query);
             curl_free(query);
         }
     }
     else {
         // TODO
-        fmt::print("error: {}\n", ec);
+        fmt::print("{}: curl_url_get(CURLUPART_QUERY) error: {}\n", __func__, ec);
     }
 
     return url;
@@ -1372,10 +1381,6 @@ auto handle_metadata(const http::request<http::string_body>& _req) -> http::resp
         return res;
     }
 
-    // TODO HTTP POST requests will pass the input arguments via the body.
-    // All handlers that require POST will need to be tweaked.
-    fmt::print("{}: request body = [{}]\n", __func__, _req.body());
-
     //
     // Extract the Bearer token from the Authorization header.
     //
@@ -1430,10 +1435,17 @@ auto handle_metadata(const http::request<http::string_body>& _req) -> http::resp
     // At this point, we know the user has authorization to perform this operation.
     //
 
-    const auto url = parse_url(_req);
+    // Decode the body of the POST request.
+    // It will contain the JSON data representing the metadata operations to apply.
+    //
+    // TODO Any handler operations that can result in the catalog changing will need to
+    // be updated to require POST. The function below is key to supporting this because
+    // it splits the body of the request into key-value pairs and then decodes the values
+    // so they can be sent to iRODS.
+    const auto args = to_argument_list(_req.body());
 
-    const auto op_iter = url.query.find("op");
-    if (op_iter == std::end(url.query)) {
+    const auto op_iter = args.find("op");
+    if (op_iter == std::end(args)) {
         fmt::print("{}: Missing [op] parameter.\n", __func__);
         http::response<http::string_body> res{http::status::bad_request, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -1457,13 +1469,22 @@ auto handle_metadata(const http::request<http::string_body>& _req) -> http::resp
     // However, this one endpoint already covers all iRODS entities.
     if (op_iter->second == "atomic_execute") {
         try {
-            irods::experimental::client_connection conn;
+            const auto data_iter = args.find("data");
+            if (data_iter == std::end(args)) {
+                fmt::print("{}: Missing [data] parameter.\n", __func__);
+                http::response<http::string_body> res{http::status::bad_request, _req.version()};
+                res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+                res.set(http::field::content_type, "text/plain");
+                res.set(http::field::content_length, "0");
+                res.keep_alive(_req.keep_alive());
+                return res;
+            }
 
-            const auto& atomic_ops = _req.body();
             char* output{};
             irods::at_scope_exit_unsafe free_output{[&output] { std::free(output); }};
 
-            const auto ec = rc_atomic_apply_metadata_operations(static_cast<RcComm*>(conn), atomic_ops.c_str(), &output);
+            irods::experimental::client_connection conn;
+            const auto ec = rc_atomic_apply_metadata_operations(static_cast<RcComm*>(conn), data_iter->second.c_str(), &output);
 
             json error_info;
             if (output) {
