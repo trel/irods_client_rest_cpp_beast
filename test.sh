@@ -246,8 +246,9 @@ test_rules_endpoint()
 
 test_data_objects_endpoint()
 {
-    # Create a new empty data object.
     data_object='/tempZone/home/kory/http_file.txt'
+
+    # Create a new empty data object.
     curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
         --data-urlencode 'op=touch' \
         --data-urlencode "lpath=$data_object" \
@@ -266,8 +267,38 @@ test_data_objects_endpoint()
         --data-urlencode 'count=20' \
         --data-urlencode 'bytes=here are those bytes' \
         $curl_opts | jq
+
     ils -l $data_object
     istream read $data_object
+
+    pw_data_object='/tempZone/home/kory/pwfile.txt'
+    pw_handle=$(curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        --data-urlencode 'op=parallel-write-init' \
+        --data-urlencode "lpath=$pw_data_object" \
+        --data-urlencode 'stream-count=2' \
+        $curl_opts | jq -r .parallel_write_handle)
+    echo "Parallel Write Handle = [${pw_handle}]."
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        --data-urlencode 'op=write' \
+        --data-urlencode "lpath=$pw_data_object" \
+        --data-urlencode 'count=6' \
+        --data-urlencode 'bytes=hello ' \
+        --data-urlencode "parallel-write-handle=$pw_handle" \
+        $curl_opts | jq
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        --data-urlencode 'op=write' \
+        --data-urlencode "lpath=$pw_data_object" \
+        --data-urlencode 'offset=6' \
+        --data-urlencode 'count=6' \
+        --data-urlencode 'bytes=world!' \
+        --data-urlencode "parallel-write-handle=$pw_handle" \
+        $curl_opts | jq
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        --data-urlencode 'op=parallel-write-shutdown' \
+        --data-urlencode "parallel-write-handle=$pw_handle" \
+        $curl_opts | jq
+    istream read $pw_data_object
+
     # Stat the data object again to show that the size was updated.
     curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
         --data-urlencode 'op=stat' \

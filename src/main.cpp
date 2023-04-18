@@ -78,18 +78,36 @@ struct basic_auth_credentials
     // TODO Store an expiration timestamp here.
 };
 
-std::unordered_map<std::string, basic_auth_credentials> authenticated_client_info;
+struct parallel_write_stream
+{
+    irods::experimental::client_connection conn{irods::experimental::defer_connection};
+    std::unique_ptr<irods::experimental::io::client::native_transport> tp;
+    irods::experimental::io::odstream out;
+};
 
-auto generate_uuid() -> std::string
+struct parallel_write_context
+{
+    std::string logical_path;
+    std::vector<std::shared_ptr<parallel_write_stream>> streams;
+};
+
+std::unordered_map<std::string, basic_auth_credentials> authenticated_client_info;
+std::unordered_map<std::string, parallel_write_context> parallel_write_contexts;
+
+template <typename Map>
+auto generate_uuid(const Map& _map) -> std::string
 {
     std::string uuid;
     uuid.reserve(36); // NOLINT(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
     uuid = to_string(boost::uuids::random_generator{}());
+    fmt::print("{}: Starting UUID = [{}].\n", __func__, uuid);
 
-    while (authenticated_client_info.find(uuid) != std::end(authenticated_client_info)) {
+    while (_map.find(uuid) != std::end(_map)) {
         uuid = to_string(boost::uuids::random_generator{}());
+        fmt::print("{}: Generated UUID = [{}].\n", __func__, uuid);
     }
 
+    fmt::print("{}: Returning UUID = [{}].\n", __func__, uuid);
     return uuid;
 }
 
@@ -331,7 +349,7 @@ auto handle_auth(const http::request<http::string_body>& _req) -> http::response
     // operation. Perhaps they shouldn't be extended at all.
     //
     // Research this.
-    const auto bearer_token = generate_uuid();
+    const auto bearer_token = generate_uuid(authenticated_client_info);
     authenticated_client_info.insert({bearer_token, {.username = std::move(username)}});
 
     // TODO Parse the header value and determine if the user is allowed to access.
@@ -775,13 +793,15 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
 
     const auto lpath_iter = args.find("lpath");
     if (lpath_iter == std::end(args)) {
-        fmt::print("{}: Missing [lpath] parameter.\n", __func__);
-        http::response<http::string_body> res{http::status::bad_request, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        if (op_iter->second != "write" && !args.contains("parallel-write-handle")) {
+            fmt::print("{}: Missing [lpath] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
     }
 
     http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -950,11 +970,52 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         try {
             fmt::print("{}: Opening data object [{}] for write.\n", __func__, lpath_iter->second);
 
-            irods::experimental::client_connection conn;
-            io::client::native_transport tp{conn};
-            io::odstream out{tp, lpath_iter->second};
+            std::unique_ptr<irods::experimental::client_connection> conn;
+            std::unique_ptr<io::client::native_transport> tp;
 
-            if (!out) {
+            std::unique_ptr<io::odstream> out;
+            io::odstream* out_ptr{};
+
+            const auto parallel_write_handle_iter = args.find("parallel-write-handle"); 
+            if (parallel_write_handle_iter != std::end(args)) {
+                fmt::print("{}: (write) Parallel Write Handle = [{}].\n", __func__, parallel_write_handle_iter->second);
+
+                auto iter = parallel_write_contexts.find(parallel_write_handle_iter->second);
+                if (iter == std::end(parallel_write_contexts)) {
+                    fmt::print("{}: Invalid handle for parallel write.\n", __func__);
+                    http::response<http::string_body> res{http::status::ok, _req.version()};
+                    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+                    res.set(http::field::content_type, "text/plain");
+                    res.set(http::field::content_length, "0");
+                    res.keep_alive(_req.keep_alive());
+                    return res;
+                }
+
+                //
+                // We've found a matching handle!
+                //
+
+                // TODO How do we pick a stream?
+                //
+                // Should the client have to worry about this? It's easy to let them target a specific stream.
+                // It's also more deterministic.
+                //
+                // TODO This counter needs to be part of the parallel_write_stream.
+                static int idx = 0;
+                fmt::print("{}: (write) Parallel Write - stream index = [{}].\n", __func__, idx);
+                out_ptr = &iter->second.streams[idx]->out;
+                ++idx;
+                idx %= iter->second.streams.size();
+            }
+            else {
+                fmt::print("{}: (write) Initializing for single buffer write.\n", __func__);
+                conn = std::make_unique<irods::experimental::client_connection>();
+                tp = std::make_unique<io::client::native_transport>(*conn);
+                out = std::make_unique<io::odstream>(*tp, lpath_iter->second);
+                out_ptr = out.get();
+            }
+
+            if (!*out_ptr) {
                 fmt::print("{}: Could not open data object [{}] for write.\n", __func__, lpath_iter->second);
 
                 res.body() = json{
@@ -971,13 +1032,13 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
                 return res;
             }
 
-            fmt::print("{}: Setting offset for write.\n", __func__);
             // TODO This needs to be clamped to a max size set by the administrator.
             // Should this be required?
             auto iter = args.find("offset");
             if (iter != std::end(args)) {
+                fmt::print("{}: Setting offset for write.\n", __func__);
                 try {
-                    out.seekp(std::stoll(iter->second));
+                    out_ptr->seekp(std::stoll(iter->second));
                 }
                 catch (const std::exception& e) {
                     fmt::print("{}: Could not seek to position [{}] in data object [{}].\n", __func__, iter->second, lpath_iter->second);
@@ -999,6 +1060,9 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
 
             // TODO This needs to be clamped to a max size set by the administrator.
             // Should this be required?
+            //
+            // The Content-Type header cannot be used for this because it is used to describe the size
+            // of the request body. ALL parameters are passed via the request body when using POST.
             iter = args.find("count");
             if (iter == std::end(args)) {
                 fmt::print("{}: Missing [count] parameter.\n", __func__);
@@ -1016,7 +1080,7 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
                 return res;
             }
 
-            out.write(iter->second.data(), count);
+            out_ptr->write(iter->second.data(), count);
 
             res.body() = json{
                 {"irods_response", {
@@ -1049,6 +1113,153 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         // 4. Return transfer handle to client.
         //
         // The client is now free to call the write operation as much as they want.
+
+        const auto stream_count_iter = args.find("stream-count");
+        if (stream_count_iter == std::end(args)) {
+            fmt::print("{}: Missing [stream-count] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        namespace io = irods::experimental::io;
+
+        fmt::print("{}: Opening initial output stream to [{}].\n", __func__, lpath_iter->second);
+
+        // Open the first stream.
+        irods::experimental::client_connection conn;
+        auto tp = std::make_unique<io::client::native_transport>(conn);
+        io::odstream out{*tp, lpath_iter->second};
+
+        fmt::print("{}: Checking if output stream is open for [{}].\n", __func__, lpath_iter->second);
+        if (!out) {
+            fmt::print("{}: Could not open initial output stream to [{}].\n", __func__, lpath_iter->second);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
+                }},
+                // TODO REST API internal error. Do we need REST API error codes to
+                // indicate the issue was not iRODS related (we never reached out to iRODS)?
+                {"http_api_error_code", -1}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
+                {"http_api_error_message", "Open error."}
+            }.dump();
+            res.prepare_payload();
+            return res;
+        }
+
+        fmt::print("{}: Output stream for [{}] is open.\n", __func__, lpath_iter->second);
+        fmt::print("{}: Generating transfer handle.\n", __func__);
+        auto transfer_handle = generate_uuid(parallel_write_contexts);
+        fmt::print("{}: (init) Parallel Write Handle = [{}].\n", __func__, transfer_handle);
+
+        auto [iter, insertion_result] = parallel_write_contexts.insert({transfer_handle, {.logical_path = lpath_iter->second}});
+        fmt::print("{}: (init) Checking if parallel_write_context was inserted successfully.\n", __func__);
+        if (!insertion_result) {
+            fmt::print("{}: Could not initialize parallel write context for [{}].\n", __func__, lpath_iter->second);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
+                }},
+                // TODO REST API internal error. Do we need REST API error codes to
+                // indicate the issue was not iRODS related (we never reached out to iRODS)?
+                {"http_api_error_code", -2}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
+                {"http_api_error_message", "Parallel write initialization error."}
+            }.dump();
+            res.prepare_payload();
+            return res;
+        }
+        fmt::print("{}: (init) parallel_write_context was inserted successfully. Initializing output streams.\n", __func__);
+
+        // Initialize the first stream.
+        auto& streams = iter->second.streams;
+        fmt::print("{}: (init) Resizing stream container to hold [{}] streams.\n", __func__, stream_count_iter->second);
+        streams.resize(std::stoi(stream_count_iter->second));
+#if 0
+        streams.push_back(std::move(parallel_write_stream{
+            .conn = std::move(conn),
+            .tp = std::move(tp)
+        }));
+#else
+        //streams.emplace_back();
+        //streams.back().conn = std::move(conn);
+        //streams.back().tp = std::move(tp);
+        //streams.back().out = {*streams.back().tp, lpath_iter->second};
+        fmt::print("{}: (init) Initializing stream [0].\n", __func__);
+        streams[0] = std::make_shared<parallel_write_stream>();
+        fmt::print("{}: (init) Allocated memory for stream [0].\n", __func__);
+        fmt::print("{}: (init) Moving client connection into place for stream [0].\n", __func__);
+        streams[0]->conn = std::move(conn);
+        fmt::print("{}: (init) Moving transport into place for stream [0].\n", __func__);
+        streams[0]->tp = std::move(tp);
+        fmt::print("{}: (init) Constructing odstream for stream [0].\n", __func__);
+        //streams[0]->out = {*streams.back()->tp, lpath_iter->second};
+        //streams[0]->out = {*streams[0]->tp, lpath_iter->second};
+        streams[0]->out = std::move(out);
+#endif
+
+        if (!streams[0]->out) {
+            fmt::print("{}: (init) Could not open stream [0].\n", __func__);
+            parallel_write_contexts.erase(iter);
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+#if 0
+        const auto& replica_token = streams.back()->out.replica_token();
+        fmt::print("{}: (init) First stream - replica token = [{}].\n", __func__, replica_token.value);
+        const auto& replica_number = streams.back()->out.replica_number();
+        fmt::print("{}: (init) First stream - replica number = [{}].\n", __func__, replica_number.value);
+#else
+        const auto& replica_token = streams[0]->out.replica_token();
+        fmt::print("{}: (init) First stream - replica token = [{}].\n", __func__, replica_token.value);
+        const auto& replica_number = streams[0]->out.replica_number();
+        fmt::print("{}: (init) First stream - replica number = [{}].\n", __func__, replica_number.value);
+#endif
+
+        for (auto i = 1ull; i < streams.size(); ++i) {
+            fmt::print("{}: (init) Initializing stream [{}].\n", __func__, i);
+            fmt::print("{}: (init) Initializing client connection for stream [{}].\n", __func__, i);
+            irods::experimental::client_connection sibling_conn;
+            fmt::print("{}: (init) Initializing transport for stream [{}].\n", __func__, i);
+            auto sibling_tp = std::make_unique<io::client::native_transport>(sibling_conn);
+            fmt::print("{}: (init) Constructing odstream for stream [{}].\n", __func__, i);
+            io::odstream sibling_out{*sibling_tp, replica_token, lpath_iter->second, replica_number, std::ios::out};
+
+#if 0
+            streams.push_back(std::move(parallel_write_stream{
+                .conn = std::move(sibling_conn),
+                .tp = std::move(sibling_tp),
+                .out = std::move(sibling_out)
+            }));
+#else
+            //streams.emplace_back();
+            //streams.back().conn = std::move(sibling_conn);
+            //streams.back().tp = std::move(sibling_tp);
+            //streams.back().out = std::move(sibling_out);
+            fmt::print("{}: (init) Allocating parallel_write_stream for stream [{}].\n", __func__, i);
+            streams[i] = std::make_shared<parallel_write_stream>();
+            fmt::print("{}: (init) Moving client connection into parallel_write_stream for stream [{}].\n", __func__, i);
+            streams[i]->conn = std::move(sibling_conn);
+            fmt::print("{}: (init) Moving transport into parallel_write_stream for stream [{}].\n", __func__, i);
+            streams[i]->tp = std::move(sibling_tp);
+            fmt::print("{}: (init) Moving odstream into parallel_write_stream for stream [{}].\n", __func__, i);
+            streams[i]->out = std::move(sibling_out);
+#endif
+        }
+
+        res.body() = json{
+            {"irods_response", {
+                {"error_code", 0},
+            }},
+            {"parallel_write_handle", transfer_handle}
+        }.dump();
     }
     else if (op_iter->second == "parallel-write-shutdown") {
         // TODO
@@ -1056,6 +1267,48 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         // 2. Close all streams in reverse order.
         // 3. Disassociate the transfer handle and PTC.
         // 4. Free resources.
+
+        const auto parallel_write_handle_iter = args.find("parallel-write-handle");
+        if (parallel_write_handle_iter == std::end(args)) {
+            fmt::print("{}: Missing [parallel-write-handle] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        fmt::print("{}: (shutdown) Parallel Write Handle = [{}].\n", __func__, parallel_write_handle_iter->second);
+
+        const auto pw_iter = parallel_write_contexts.find(parallel_write_handle_iter->second);
+        if (pw_iter != std::end(parallel_write_contexts)) {
+            // Ignore the first stream. It must be closed last so that replication resources
+            // are triggered correctly.
+            auto end = std::prev(std::rend(pw_iter->second.streams));
+
+            io::on_close_success close_input{};
+            close_input.update_size = false;
+            close_input.update_status = false;
+            close_input.compute_checksum = false;
+            close_input.send_notifications = false;
+            close_input.preserve_replica_state_table = false;
+
+            for (auto iter = std::rbegin(pw_iter->second.streams); iter != end; ++iter) {
+                (*iter)->out.close(&close_input);
+            }
+
+            // Allow the first stream to update the catalog.
+            pw_iter->second.streams.front()->out.close();
+
+            parallel_write_contexts.erase(pw_iter);
+        }
+
+        res.body() = json{
+            {"irods_response", {
+                {"error_code", 0},
+            }}
+        }.dump();
     }
     else if (op_iter->second == "replicate") {
         const auto dst_resc_iter = args.find("dst-resource");
