@@ -17,6 +17,7 @@
 #include <irods/rodsKeyWdDef.h>
 #include <irods/ruleExecDel.h>
 #include <irods/touch.h>
+#include <irods/ticket_administration.hpp>
 #include <irods/user_administration.hpp>
 
 #include <irods/transport/default_transport.hpp>
@@ -444,6 +445,9 @@ auto handle_collections(const http::request<http::string_body>& _req) -> http::r
     }
 
     http::response<http::string_body> res{http::status::ok, _req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/plain");
+    res.keep_alive(_req.keep_alive());
 
     namespace fs = irods::experimental::filesystem;
 
@@ -678,9 +682,6 @@ auto handle_collections(const http::request<http::string_body>& _req) -> http::r
         }
     }
 
-    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    res.set(http::field::content_type, "text/plain");
-    res.keep_alive(_req.keep_alive());
     res.prepare_payload();
     return res;
 }
@@ -751,10 +752,18 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
     // At this point, we know the user has authorization to perform this operation.
     //
 
-    const auto url = parse_url(_req);
+    std::unordered_map<std::string, std::string> args;
 
-    const auto op_iter = url.query.find("op");
-    if (op_iter == std::end(url.query)) {
+    if (_req.method() == http::verb::get) {
+        args = std::move(parse_url(_req).query);
+    }
+    else if (_req.method() == http::verb::post) {
+        fmt::print("{}: body = [{}].\n", __func__, _req.body());
+        args = to_argument_list(_req.body());
+    }
+
+    const auto op_iter = args.find("op");
+    if (op_iter == std::end(args)) {
         fmt::print("{}: Missing [op] parameter.\n", __func__);
         http::response<http::string_body> res{http::status::bad_request, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -764,8 +773,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         return res;
     }
 
-    const auto lpath_iter = url.query.find("lpath");
-    if (lpath_iter == std::end(url.query)) {
+    const auto lpath_iter = args.find("lpath");
+    if (lpath_iter == std::end(args)) {
         fmt::print("{}: Missing [lpath] parameter.\n", __func__);
         http::response<http::string_body> res{http::status::bad_request, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -779,6 +788,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
     res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
     res.set(http::field::content_type, "text/plain");
     res.keep_alive(_req.keep_alive());
+
+    namespace io = irods::experimental::io;
 
     if (op_iter->second == "read") {
         // TODO Inputs:
@@ -801,8 +812,6 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
             //
             // Alternatively, we can make C API calls and get the exact reasons for a failure. This is
             // more work, but will allow the client to make better decisions about what to do next.
-
-            namespace io = irods::experimental::io;
 
             irods::experimental::client_connection conn;
             io::client::native_transport tp{conn};
@@ -827,8 +836,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
 
             // TODO This needs to be clamped to a max size set by the administrator.
             // Should this be required?
-            auto iter = url.query.find("offset");
-            if (iter != std::end(url.query)) {
+            auto iter = args.find("offset");
+            if (iter != std::end(args)) {
                 try {
                     in.seekg(std::stoll(iter->second));
                 }
@@ -854,8 +863,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
 
             // TODO This needs to be clamped to a max size set by the administrator.
             // Should this be required?
-            iter = url.query.find("count");
-            if (iter != std::end(url.query)) {
+            iter = args.find("count");
+            if (iter != std::end(args)) {
                 try {
                     buffer.resize(std::stoi(iter->second));
                 }
@@ -907,7 +916,7 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
                 {"bytes_read", in.gcount()},
                 // data will be returned as a buffer of bytes (i.e. integers). The nlohmann JSON
                 // library will not view the range as a string. This is what we want.
-                {"data", std::span(buffer.data(), in.gcount())}
+                {"bytes", std::span(buffer.data(), in.gcount())}
             }.dump();
         }
         catch (const irods::exception& e) {
@@ -939,7 +948,75 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         // TODO Should a client be allowed to target a leaf resource?
 
         try {
+            fmt::print("{}: Opening data object [{}] for write.\n", __func__, lpath_iter->second);
+
             irods::experimental::client_connection conn;
+            io::client::native_transport tp{conn};
+            io::odstream out{tp, lpath_iter->second};
+
+            if (!out) {
+                fmt::print("{}: Could not open data object [{}] for write.\n", __func__, lpath_iter->second);
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
+                    }},
+                    // TODO REST API internal error. Do we need REST API error codes to
+                    // indicate the issue was not iRODS related (we never reached out to iRODS)?
+                    {"http_api_error_code", -1}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
+                    {"http_api_error_message", "Open error."}
+                }.dump();
+                res.prepare_payload();
+
+                return res;
+            }
+
+            fmt::print("{}: Setting offset for write.\n", __func__);
+            // TODO This needs to be clamped to a max size set by the administrator.
+            // Should this be required?
+            auto iter = args.find("offset");
+            if (iter != std::end(args)) {
+                try {
+                    out.seekp(std::stoll(iter->second));
+                }
+                catch (const std::exception& e) {
+                    fmt::print("{}: Could not seek to position [{}] in data object [{}].\n", __func__, iter->second, lpath_iter->second);
+
+                    res.body() = json{
+                        {"irods_response", {
+                            {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
+                        }},
+                        // TODO REST API internal error. Do we need REST API error codes to
+                        // indicate the issue was not iRODS related (we never reached out to iRODS)?
+                        {"http_api_error_code", -2}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
+                        {"http_api_error_message", "Seek error."}
+                    }.dump();
+                    res.prepare_payload();
+
+                    return res;
+                }
+            }
+
+            // TODO This needs to be clamped to a max size set by the administrator.
+            // Should this be required?
+            iter = args.find("count");
+            if (iter == std::end(args)) {
+                fmt::print("{}: Missing [count] parameter.\n", __func__);
+                res.result(http::status::bad_request);
+                res.prepare_payload();
+                return res;
+            }
+            const auto count = std::stoll(std::string{iter->second});
+
+            iter = args.find("bytes");
+            if (iter == std::end(args)) {
+                fmt::print("{}: Missing [bytes] parameter.\n", __func__);
+                res.result(http::status::bad_request);
+                res.prepare_payload();
+                return res;
+            }
+
+            out.write(iter->second.data(), count);
 
             res.body() = json{
                 {"irods_response", {
@@ -981,8 +1058,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         // 4. Free resources.
     }
     else if (op_iter->second == "replicate") {
-        const auto dst_resc_iter = url.query.find("dst-resource");
-        if (dst_resc_iter == std::end(url.query)) {
+        const auto dst_resc_iter = args.find("dst-resource");
+        if (dst_resc_iter == std::end(args)) {
             fmt::print("{}: Missing [dst-resource] parameter.\n", __func__);
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -1026,8 +1103,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         }
     }
     else if (op_iter->second == "trim") {
-        const auto resc_iter = url.query.find("resource");
-        if (resc_iter == std::end(url.query)) {
+        const auto resc_iter = args.find("resource");
+        if (resc_iter == std::end(args)) {
             fmt::print("{}: Missing [resource] parameter.\n", __func__);
             http::response<http::string_body> res{http::status::bad_request, _req.version()};
             res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -1044,7 +1121,7 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
             std::strncpy(input.objPath, lpath_iter->second.c_str(), sizeof(DataObjInp::objPath));
             addKeyVal(&input.condInput, RESC_NAME_KW, resc_iter->second.c_str());
 
-            if (const auto iter = url.query.find("admin"); iter != std::end(url.query) && iter->second == "1") {
+            if (const auto iter = args.find("admin"); iter != std::end(args) && iter->second == "1") {
                 addKeyVal(&input.condInput, ADMIN_KW, "");
             }
 
@@ -1075,8 +1152,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         }
     }
     else if (op_iter->second == "set-permission") {
-        const auto entity_name_iter = url.query.find("entity-name");
-        if (entity_name_iter == std::end(url.query)) {
+        const auto entity_name_iter = args.find("entity-name");
+        if (entity_name_iter == std::end(args)) {
             fmt::print("{}: Missing [entity-name] parameter.\n", __func__);
             http::response<http::string_body> res{http::status::bad_request, _req.version()};
             res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -1086,8 +1163,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
             return res;
         }
 
-        const auto perm_iter = url.query.find("permission");
-        if (perm_iter == std::end(url.query)) {
+        const auto perm_iter = args.find("permission");
+        if (perm_iter == std::end(args)) {
             fmt::print("{}: Missing [permission] parameter.\n", __func__);
             http::response<http::string_body> res{http::status::bad_request, _req.version()};
             res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -1102,8 +1179,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         try {
             irods::experimental::client_connection conn;
 
-            const auto admin_mode_iter = url.query.find("admin");
-            if (admin_mode_iter != std::end(url.query) && admin_mode_iter->second == "1") {
+            const auto admin_mode_iter = args.find("admin");
+            if (admin_mode_iter != std::end(args) && admin_mode_iter->second == "1") {
                 fs::client::permissions(fs::admin, conn, lpath_iter->second, entity_name_iter->second, fs::perms::own);
             }
             else {
@@ -1257,7 +1334,7 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
 
             fs::remove_options opts = fs::remove_options::none;
 
-            if (const auto iter = url.query.find("no-trash"); iter != std::end(url.query) && iter->second == "1") {
+            if (const auto iter = args.find("no-trash"); iter != std::end(args) && iter->second == "1") {
                 opts = fs::remove_options::no_trash;
             }
 
@@ -1293,13 +1370,13 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
         try {
             json::object_t options;
 
-            auto opt_iter = url.query.find("no-create");
-            if (opt_iter != std::end(url.query)) {
+            auto opt_iter = args.find("no-create");
+            if (opt_iter != std::end(args)) {
                 options["no_create"] = (opt_iter->second == "1");
             }
 
-            opt_iter = url.query.find("replica-number");
-            if (opt_iter != std::end(url.query)) {
+            opt_iter = args.find("replica-number");
+            if (opt_iter != std::end(args)) {
                 try {
                     options["replica_number"] = std::stoi(opt_iter->second);
                 }
@@ -1308,13 +1385,13 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
                 }
             }
 
-            opt_iter = url.query.find("leaf-resource");
-            if (opt_iter != std::end(url.query)) {
+            opt_iter = args.find("leaf-resource");
+            if (opt_iter != std::end(args)) {
                 options["leaf_resource_name"] = opt_iter->second;
             }
 
-            opt_iter = url.query.find("seconds-since-epoch");
-            if (opt_iter != std::end(url.query)) {
+            opt_iter = args.find("seconds-since-epoch");
+            if (opt_iter != std::end(args)) {
                 try {
                     options["seconds_since_epoch"] = std::stoi(opt_iter->second);
                 }
@@ -1323,8 +1400,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
                 }
             }
 
-            opt_iter = url.query.find("reference");
-            if (opt_iter != std::end(url.query)) {
+            opt_iter = args.find("reference");
+            if (opt_iter != std::end(args)) {
                 options["reference"] = opt_iter->second;
             }
 
@@ -2306,6 +2383,7 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
         }
     }
     else if (op_iter->second == "modify_delay_rule") {
+        // TODO
     }
     else if (op_iter->second == "list_rule_engines") {
         ExecMyRuleInp input{};
@@ -2641,12 +2719,16 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
         }
     }
     else if (op_iter->second == "set_password") {
+        // TODO
     }
     else if (op_iter->second == "set_user_type") {
+        // TODO
     }
     else if (op_iter->second == "add_user_auth") {
+        // TODO
     }
     else if (op_iter->second == "remove_user_auth") {
+        // TODO
     }
     else if (op_iter->second == "create_group") {
         const auto name_iter = url.query.find("name");
@@ -2916,8 +2998,10 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
         }
     }
     else if (op_iter->second == "members") {
+        // TODO
     }
     else if (op_iter->second == "is_member_of_group") {
+        // TODO
     }
     else if (op_iter->second == "stat") {
         const auto name_iter = url.query.find("name");
@@ -3010,6 +3094,257 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
     return res;
 }
 
+auto handle_tickets(const http::request<http::string_body>& _req) -> http::response<http::string_body>
+{
+    if (_req.method() != http::verb::get && _req.method() != http::verb::post) {
+        fmt::print("{}: Incorrect HTTP method.\n", __func__);
+        http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    //
+    // Extract the Bearer token from the Authorization header.
+    //
+
+    const auto& hdrs = _req.base();
+    const auto iter = hdrs.find("authorization");
+    if (iter == std::end(hdrs)) {
+        fmt::print("{}: Missing authorization header.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    fmt::print("{}: Authorization value: [{}]\n", __func__, iter->value());
+
+    auto pos = iter->value().find("Bearer ");
+    if (std::string_view::npos == pos) {
+        fmt::print("{}: Malformed authorization header.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    std::string bearer_token{iter->value().substr(pos + 7)};
+    boost::trim(bearer_token);
+    fmt::print("{}: Bearer token: [{}]\n", __func__, bearer_token);
+
+    // Verify the bearer token is known to the server. If not, return an error.
+    [[maybe_unused]] const std::string* username{};
+    {
+        const auto iter = authenticated_client_info.find(bearer_token);
+        if (iter == std::end(authenticated_client_info)) {
+            fmt::print("{}: Could not find bearer token matching [{}].\n", __func__, bearer_token);
+            http::response<http::string_body> res{http::status::unauthorized, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        username = &iter->second.username;
+    }
+
+    //
+    // At this point, we know the user has authorization to perform this operation.
+    //
+
+    const auto url = parse_url(_req);
+
+    const auto op_iter = url.query.find("op");
+    if (op_iter == std::end(url.query)) {
+        fmt::print("{}: Missing [op] parameter.\n", __func__);
+        http::response<http::string_body> res{http::status::bad_request, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_length, "0");
+        res.keep_alive(_req.keep_alive());
+        return res;
+    }
+
+    http::response<http::string_body> res{http::status::ok, _req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/plain");
+    res.keep_alive(_req.keep_alive());
+
+    namespace ia = irods::experimental::administration;
+
+    if (op_iter->second == "create") {
+        const auto lpath_iter = url.query.find("lpath");
+        if (lpath_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [lpath] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            auto ticket_type = ia::ticket::ticket_type::read;
+            const auto type_iter = url.query.find("type");
+            if (type_iter != std::end(url.query)) {
+                if (type_iter->second == "write") {
+                    ticket_type = ia::ticket::ticket_type::write;
+                }
+                else if (type_iter->second != "read") {
+                    fmt::print("{}: Missing [lpath] parameter.\n", __func__);
+                    http::response<http::string_body> res{http::status::bad_request, _req.version()};
+                    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+                    res.set(http::field::content_type, "text/plain");
+                    res.set(http::field::content_length, "0");
+                    res.keep_alive(_req.keep_alive());
+                    return res;
+                }
+            }
+
+            irods::experimental::client_connection conn;
+            const auto ticket = ia::ticket::client::create_ticket(conn, ticket_type, lpath_iter->second);
+
+            auto constraint_iter = url.query.find("use-count");
+            if (constraint_iter != std::end(url.query)) {
+                const auto count = std::stoi(constraint_iter->second);
+                ia::ticket::client::set_ticket_constraint(conn, ticket, ia::ticket::use_count_constraint{count});
+            }
+            else {
+                ia::ticket::client::set_ticket_constraint(conn, ticket, ia::ticket::use_count_constraint{0});
+            }
+
+            constraint_iter = url.query.find("write-data-object-count");
+            if (constraint_iter != std::end(url.query)) {
+                const auto count = std::stoi(constraint_iter->second);
+                ia::ticket::client::set_ticket_constraint(conn, ticket, ia::ticket::n_writes_to_data_object_constraint{count});
+            }
+            else {
+                ia::ticket::client::set_ticket_constraint(conn, ticket, ia::ticket::n_writes_to_data_object_constraint{0});
+            }
+
+            constraint_iter = url.query.find("write-byte-count");
+            if (constraint_iter != std::end(url.query)) {
+                const auto count = std::stoi(constraint_iter->second);
+                ia::ticket::client::set_ticket_constraint(conn, ticket, ia::ticket::n_write_bytes_constraint{count});
+            }
+            else {
+                ia::ticket::client::set_ticket_constraint(conn, ticket, ia::ticket::n_write_bytes_constraint{0});
+            }
+
+            constraint_iter = url.query.find("seconds-until-expiration");
+            if (constraint_iter != std::end(url.query)) {
+                // TODO Not yet supported by the ticket administration library.
+            }
+
+            constraint_iter = url.query.find("users");
+            if (constraint_iter != std::end(url.query)) {
+                std::vector<std::string> users;
+                boost::split(users, constraint_iter->second, boost::is_any_of(","));
+                for (const auto& user : users) {
+                    ia::ticket::client::add_ticket_constraint(conn, ticket, ia::ticket::user_constraint{user});
+                }
+            }
+
+            constraint_iter = url.query.find("groups");
+            if (constraint_iter != std::end(url.query)) {
+                std::vector<std::string> groups;
+                boost::split(groups, constraint_iter->second, boost::is_any_of(","));
+                for (const auto& group : groups) {
+                    ia::ticket::client::add_ticket_constraint(conn, ticket, ia::ticket::group_constraint{group});
+                }
+            }
+
+            constraint_iter = url.query.find("hosts");
+            if (constraint_iter != std::end(url.query)) {
+                std::vector<std::string> hosts;
+                boost::split(hosts, constraint_iter->second, boost::is_any_of(","));
+                for (const auto& host : hosts) {
+                    ia::ticket::client::add_ticket_constraint(conn, ticket, ia::ticket::host_constraint{host});
+                }
+            }
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }},
+                {"ticket", ticket}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
+    }
+    else if (op_iter->second == "remove") {
+        const auto name_iter = url.query.find("name");
+        if (name_iter == std::end(url.query)) {
+            fmt::print("{}: Missing [name] parameter.\n", __func__);
+            http::response<http::string_body> res{http::status::bad_request, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "text/plain");
+            res.set(http::field::content_length, "0");
+            res.keep_alive(_req.keep_alive());
+            return res;
+        }
+
+        try {
+            irods::experimental::client_connection conn;
+            ia::ticket::client::delete_ticket(conn, name_iter->second);
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", SYS_LIBRARY_ERROR},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
+    }
+    else {
+        fmt::print("{}: Invalid operation [{}].\n", __func__, op_iter->second);
+        res.result(http::status::bad_request);
+    }
+
+    res.prepare_payload();
+
+    return res;
+}
+
 const std::unordered_map<std::string_view, request_handler> req_handlers{
     {"/irods-rest/0.9.5/auth",         handle_auth},
     {"/irods-rest/0.9.5/collections",  handle_collections},
@@ -3019,7 +3354,7 @@ const std::unordered_map<std::string_view, request_handler> req_handlers{
     {"/irods-rest/0.9.5/query",        handle_query},
     {"/irods-rest/0.9.5/resources",    handle_resources},
     {"/irods-rest/0.9.5/rules",        handle_rules},
-    //{"/irods-rest/0.9.5/tickets",      "/tickets"},
+    {"/irods-rest/0.9.5/tickets",      handle_tickets},
     {"/irods-rest/0.9.5/users-groups", handle_users_groups},
     //{"/irods-rest/0.9.5/zones",        "/zones"}
 };
