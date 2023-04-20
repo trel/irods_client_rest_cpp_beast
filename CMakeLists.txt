@@ -41,6 +41,8 @@ endif()
 
 add_compile_options(-Wall -Wextra -Werror -Wpedantic)
 
+add_subdirectory(src)
+
 set(EXECUTABLE_NAME "irods_client_rest_cpp_beast")
 
 add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/src/main.cpp)
@@ -63,11 +65,16 @@ target_include_directories(
   ${IRODS_INCLUDE_DIRS}
   ${IRODS_EXTERNALS_FULLPATH_BOOST}/include
   ${IRODS_EXTERNALS_FULLPATH_FMT}/include
-  CURL::libcurl)
+  ${IRODS_EXTERNALS_FULLPATH_SPDLOG}/include
+  CURL::libcurl
+  ${CMAKE_SOURCE_DIR}/src
+  ${CMAKE_SOURCE_DIR}/src/endpoints
+  ${CMAKE_SOURCE_DIR}/src/endpoints/authentication)
 
 target_link_libraries(
   ${EXECUTABLE_NAME}
   PRIVATE
   irods_client
   ${IRODS_EXTERNALS_FULLPATH_FMT}/lib/libfmt.so
-  CURL::libcurl)
+  CURL::libcurl
+  $<TARGET_OBJECTS:authentication>)

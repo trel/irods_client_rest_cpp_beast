@@ -6,7 +6,7 @@ irods_password="$2"
 set -x
 
 base_url='http://localhost:9000/irods-rest/0.9.5'
-bearer_token=$(curl -X POST --user "${irods_username}:${irods_password}" -s "${base_url}/auth")
+bearer_token=$(curl -X POST --user "${irods_username}:${irods_password}" -s "${base_url}/authenticate")
 curl_opts='-s'
 
 # The following curl documentation is a good reference for seeing how to do certain things.
@@ -31,7 +31,7 @@ test_collections_endpoint()
         --data-urlencode 'lpath=/tempZone/home/kory' \
         $curl_opts | jq
 }
-#test_collections_endpoint
+test_collections_endpoint
 
 #
 # /query
@@ -45,7 +45,7 @@ test_query_endpoint()
         --data-urlencode 'query=select COLL_NAME, DATA_NAME' \
         ${curl_opts} | jq
 }
-#test_query_endpoint
+test_query_endpoint
 
 #
 # /resources
@@ -161,7 +161,7 @@ test_resource_endpoint()
         --data-urlencode 'name=ufs1' \
         ${curl_opts} | jq
 }
-#test_resource_endpoint
+test_resource_endpoint
 
 #
 # /metadata
@@ -329,7 +329,7 @@ test_data_objects_endpoint()
         --data-urlencode "lpath=$data_object" \
         $curl_opts | jq
 }
-test_data_objects_endpoint
+#test_data_objects_endpoint
 
 #
 # /users-groups
