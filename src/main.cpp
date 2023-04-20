@@ -78,13 +78,6 @@ struct url
     std::unordered_map<std::string, std::string> query;
 };
 
-struct basic_auth_credentials
-{
-    std::string username;
-    std::string password; // TODO Probably not needed.
-    // TODO Store an expiration timestamp here.
-};
-
 struct parallel_write_stream
 {
     irods::experimental::client_connection conn{irods::experimental::defer_connection};
@@ -98,131 +91,7 @@ struct parallel_write_context
     std::vector<std::shared_ptr<parallel_write_stream>> streams;
 };
 
-std::unordered_map<std::string, basic_auth_credentials> authenticated_client_info;
 std::unordered_map<std::string, parallel_write_context> parallel_write_contexts;
-
-template <typename Map>
-auto generate_uuid(const Map& _map) -> std::string
-{
-    std::string uuid;
-    uuid.reserve(36); // NOLINT(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
-    uuid = to_string(boost::uuids::random_generator{}());
-    fmt::print("{}: Starting UUID = [{}].\n", __func__, uuid);
-
-    while (_map.find(uuid) != std::end(_map)) {
-        uuid = to_string(boost::uuids::random_generator{}());
-        fmt::print("{}: Generated UUID = [{}].\n", __func__, uuid);
-    }
-
-    fmt::print("{}: Returning UUID = [{}].\n", __func__, uuid);
-    return uuid;
-}
-
-auto decode(const std::string_view _v) -> std::string
-{
-    std::string result;
-    int decoded_length = -1;
-
-    if (auto* decoded = curl_easy_unescape(nullptr, _v.data(), _v.size(), &decoded_length); decoded) {
-        result = decoded;
-        curl_free(decoded);
-    }
-    else {
-        result.assign(_v);
-    }
-
-    return result;
-}
-
-auto to_argument_list(const std::string_view& _urlencoded_string) -> std::unordered_map<std::string, std::string>
-{
-    std::unordered_map<std::string, std::string> kvps;
-
-    // I really wish Boost.URL was part of Boost 1.78. Things would be so much easier.
-    // Sadly, we have to release an updated Boost external to get it.
-    try {
-        std::vector<std::string> tokens;
-        boost::split(tokens, _urlencoded_string, boost::is_any_of("&"));
-
-        std::vector<std::string> kvp;
-
-        for (auto&& t : tokens) {
-            boost::split(kvp, t, boost::is_any_of("="));
-
-            if (kvp.size() == 2) {
-                kvps.insert_or_assign(std::move(kvp[0]), decode(kvp[1]));
-            }
-            else if (kvp.size() == 1) {
-                kvps.insert_or_assign(std::move(kvp[0]), "");
-            }
-
-            kvp.clear();
-        }
-    }
-    catch (const std::exception& e) {
-        // TODO
-        fmt::print("exception: {}\n", e.what());
-    }
-
-    return kvps;
-}
-
-auto parse_url(const std::string& _url) -> url
-{
-    // TODO Show how to parse URLs using libcurl.
-    // See https://curl.se/libcurl/c/parseurl.html for an example.
-    auto* curl = curl_url();
-
-    if (!curl) {
-        // TODO Report internal server error.
-        fmt::print("{}: Could not initialize libcurl.\n", __func__);
-    }
-
-    // Include a bogus prefix. We only care about the path and query parts of the URL.
-    if (const auto ec = curl_url_set(curl, CURLUPART_URL, _url.c_str(), 0); ec) {
-        // TODO Report error.
-        fmt::print("{}: curl_url_set error: {}\n", __func__, ec);
-    }
-
-    url url;
-
-    // Extract the path.
-    // This is what we use to route requests to the various endpoints.
-    char* path{};
-    if (const auto ec = curl_url_get(curl, CURLUPART_PATH, &path, 0); ec == 0) {
-        if (path) {
-            url.path = path;
-            curl_free(path);
-        }
-    }
-    else {
-        // TODO Report error.
-        fmt::print("{}: curl_url_get(CURLUPART_PATH) error: {}\n", __func__, ec);
-    }
-
-    // Extract the query.
-    // ChatGPT states that the values in the key value pairs must escape embedded equal signs.
-    // This allows the HTTP server to parse the query string correctly. Therefore, we don't have
-    // to protect against that case. The client must send the correct URL escaped input.
-    char* query{};
-    if (const auto ec = curl_url_get(curl, CURLUPART_QUERY, &query, 0); ec == 0) {
-        if (query) {
-            url.query = to_argument_list(query);
-            curl_free(query);
-        }
-    }
-    else {
-        // TODO
-        fmt::print("{}: curl_url_get(CURLUPART_QUERY) error: {}\n", __func__, ec);
-    }
-
-    return url;
-}
-
-auto parse_url(const http::request<http::string_body>& _req) -> url
-{
-    return parse_url(fmt::format("http://ignored{}", _req.target()));
-}
 
 auto handle_collections(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
@@ -243,28 +112,18 @@ auto handle_collections(const http::request<http::string_body>& _req) -> http::r
     // At this point, we know the user has authorization to perform this operation.
     //
 
-    const auto url = parse_url(_req);
+    const auto url = irods::http::parse_url(_req);
 
     const auto op_iter = url.query.find("op");
     if (op_iter == std::end(url.query)) {
-        fmt::print("{}: Missing [op] parameter.\n", __func__);
-        http::response<http::string_body> res{http::status::bad_request, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Missing [op] parameter.", __func__);
+        return irods::http::fail(http::status::bad_request);
     }
 
     const auto lpath_iter = url.query.find("lpath");
     if (lpath_iter == std::end(url.query)) {
-        fmt::print("{}: Missing [lpath] parameter.\n", __func__);
-        http::response<http::string_body> res{http::status::bad_request, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Missing [lpath] parameter.", __func__);
+        return irods::http::fail(http::status::bad_request);
     }
 
     http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -365,13 +224,8 @@ auto handle_collections(const http::request<http::string_body>& _req) -> http::r
     else if (op_iter->second == "rename") {
         const auto new_lpath_iter = url.query.find("new-lpath");
         if (new_lpath_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [new_lpath] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [new-lpath] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         try {
@@ -395,24 +249,14 @@ auto handle_collections(const http::request<http::string_body>& _req) -> http::r
     else if (op_iter->second == "set-permission") {
         const auto entity_name_iter = url.query.find("entity-name");
         if (entity_name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [entity-name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [entity-name] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         const auto perm_iter = url.query.find("permission");
         if (perm_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [permission] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [permission] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         try {
@@ -512,13 +356,8 @@ auto handle_collections(const http::request<http::string_body>& _req) -> http::r
 auto handle_data_objects(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
     if (_req.method() != http::verb::get && _req.method() != http::verb::post) {
-        fmt::print("{}: Incorrect HTTP method.\n", __func__);
-        http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Incorrect HTTP method.", __func__);
+        return irods::http::fail(http::status::method_not_allowed);
     }
 
     const auto result = irods::http::resolve_client_identity(_req);
@@ -536,34 +375,24 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
     std::unordered_map<std::string, std::string> args;
 
     if (_req.method() == http::verb::get) {
-        args = std::move(parse_url(_req).query);
+        args = std::move(irods::http::parse_url(_req).query);
     }
     else if (_req.method() == http::verb::post) {
-        fmt::print("{}: body = [{}].\n", __func__, _req.body());
-        args = to_argument_list(_req.body());
+        log::info("{}: body = [{}].", __func__, _req.body());
+        args = irods::http::to_argument_list(_req.body());
     }
 
     const auto op_iter = args.find("op");
     if (op_iter == std::end(args)) {
-        fmt::print("{}: Missing [op] parameter.\n", __func__);
-        http::response<http::string_body> res{http::status::bad_request, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Missing [op] parameter.", __func__);
+        return irods::http::fail(http::status::bad_request);
     }
 
     const auto lpath_iter = args.find("lpath");
     if (lpath_iter == std::end(args)) {
         if (op_iter->second != "write" && !args.contains("parallel-write-handle")) {
-            fmt::print("{}: Missing [lpath] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [lpath] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
     }
 
@@ -745,13 +574,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
 
                 auto iter = parallel_write_contexts.find(parallel_write_handle_iter->second);
                 if (iter == std::end(parallel_write_contexts)) {
-                    fmt::print("{}: Invalid handle for parallel write.\n", __func__);
-                    http::response<http::string_body> res{http::status::ok, _req.version()};
-                    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-                    res.set(http::field::content_type, "text/plain");
-                    res.set(http::field::content_length, "0");
-                    res.keep_alive(_req.keep_alive());
-                    return res;
+                    log::error("{}: Invalid handle for parallel write.", __func__);
+                    return irods::http::fail(res, http::status::ok);
                 }
 
                 //
@@ -837,10 +661,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
 
             iter = args.find("bytes");
             if (iter == std::end(args)) {
-                fmt::print("{}: Missing [bytes] parameter.\n", __func__);
-                res.result(http::status::bad_request);
-                res.prepare_payload();
-                return res;
+                log::error("{}: Missing [bytes] parameter.", __func__);
+                return irods::http::fail(res, http::status::bad_request);
             }
 
             out_ptr->write(iter->second.data(), count);
@@ -879,13 +701,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
 
         const auto stream_count_iter = args.find("stream-count");
         if (stream_count_iter == std::end(args)) {
-            fmt::print("{}: Missing [stream-count] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::ok, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [stream-count] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         namespace io = irods::experimental::io;
@@ -915,7 +732,7 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
 
         fmt::print("{}: Output stream for [{}] is open.\n", __func__, lpath_iter->second);
         fmt::print("{}: Generating transfer handle.\n", __func__);
-        auto transfer_handle = generate_uuid(parallel_write_contexts);
+        auto transfer_handle = irods::generate_uuid(parallel_write_contexts);
         fmt::print("{}: (init) Parallel Write Handle = [{}].\n", __func__, transfer_handle);
 
         auto [iter, insertion_result] = parallel_write_contexts.insert({transfer_handle, {.logical_path = lpath_iter->second}});
@@ -1033,13 +850,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
 
         const auto parallel_write_handle_iter = args.find("parallel-write-handle");
         if (parallel_write_handle_iter == std::end(args)) {
-            fmt::print("{}: Missing [parallel-write-handle] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::ok, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [parallel-write-handle] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         fmt::print("{}: (shutdown) Parallel Write Handle = [{}].\n", __func__, parallel_write_handle_iter->second);
@@ -1076,13 +888,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
     else if (op_iter->second == "replicate") {
         const auto dst_resc_iter = args.find("dst-resource");
         if (dst_resc_iter == std::end(args)) {
-            fmt::print("{}: Missing [dst-resource] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::ok, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [dst-resource] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         try {
@@ -1121,13 +928,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
     else if (op_iter->second == "trim") {
         const auto resc_iter = args.find("resource");
         if (resc_iter == std::end(args)) {
-            fmt::print("{}: Missing [resource] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [resource] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         try {
@@ -1170,24 +972,14 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
     else if (op_iter->second == "set-permission") {
         const auto entity_name_iter = args.find("entity-name");
         if (entity_name_iter == std::end(args)) {
-            fmt::print("{}: Missing [entity-name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [entity-name] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         const auto perm_iter = args.find("permission");
         if (perm_iter == std::end(args)) {
-            fmt::print("{}: Missing [permission] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [permission] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         namespace fs = irods::experimental::filesystem;
@@ -1339,13 +1131,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
             // TODO This type of check needs to apply to all operations in /data-objects and /collections
             // that take a logical path.
             if (!fs::client::is_data_object(conn, lpath_iter->second)) {
-                fmt::print("{}: Not a data object.\n", __func__);
-                http::response<http::string_body> res{http::status::bad_request, _req.version()};
-                res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-                res.set(http::field::content_type, "text/plain");
-                res.set(http::field::content_length, "0");
-                res.keep_alive(_req.keep_alive());
-                return res;
+                log::error("{}: Logical path does not point to a data object.", __func__);
+                return irods::http::fail(http::status::bad_request);
             }
 
             fs::remove_options opts = fs::remove_options::none;
@@ -1465,13 +1252,8 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
 auto handle_metadata(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
     if (_req.method() != http::verb::post) {
-        fmt::print("{}: Incorrect HTTP method.\n", __func__);
-        http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Incorrect HTTP method.", __func__);
+        return irods::http::fail(http::status::method_not_allowed);
     }
 
     const auto result = irods::http::resolve_client_identity(_req);
@@ -1493,17 +1275,12 @@ auto handle_metadata(const http::request<http::string_body>& _req) -> http::resp
     // be updated to require POST. The function below is key to supporting this because
     // it splits the body of the request into key-value pairs and then decodes the values
     // so they can be sent to iRODS.
-    const auto args = to_argument_list(_req.body());
+    const auto args = irods::http::to_argument_list(_req.body());
 
     const auto op_iter = args.find("op");
     if (op_iter == std::end(args)) {
-        fmt::print("{}: Missing [op] parameter.\n", __func__);
-        http::response<http::string_body> res{http::status::bad_request, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Missing [op] parameter.", __func__);
+        return irods::http::fail(http::status::bad_request);
     }
 
     http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -1522,13 +1299,8 @@ auto handle_metadata(const http::request<http::string_body>& _req) -> http::resp
         try {
             const auto data_iter = args.find("data");
             if (data_iter == std::end(args)) {
-                fmt::print("{}: Missing [data] parameter.\n", __func__);
-                http::response<http::string_body> res{http::status::bad_request, _req.version()};
-                res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-                res.set(http::field::content_type, "text/plain");
-                res.set(http::field::content_length, "0");
-                res.keep_alive(_req.keep_alive());
-                return res;
+                log::error("{}: Missing [data] parameter.", __func__);
+                return irods::http::fail(http::status::bad_request);
             }
 
             char* output{};
@@ -1581,13 +1353,8 @@ auto handle_metadata(const http::request<http::string_body>& _req) -> http::resp
 auto handle_query(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
     if (_req.method() != http::verb::get) {
-        fmt::print("{}: Incorrect HTTP method.\n", __func__);
-        http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Incorrect HTTP method.", __func__);
+        return irods::http::fail(http::status::method_not_allowed);
     }
 
     const auto result = irods::http::resolve_client_identity(_req);
@@ -1602,17 +1369,12 @@ auto handle_query(const http::request<http::string_body>& _req) -> http::respons
     // At this point, we know the user has authorization to perform this operation.
     //
 
-    const auto url = parse_url(_req);
+    const auto url = irods::http::parse_url(_req);
 
     const auto op_iter = url.query.find("op");
     if (op_iter == std::end(url.query)) {
-        fmt::print("{}: Missing [op] parameter.\n", __func__);
-        http::response<http::string_body> res{http::status::bad_request, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Missing [op] parameter.", __func__);
+        return irods::http::fail(http::status::bad_request);
     }
 
     http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -1623,13 +1385,16 @@ auto handle_query(const http::request<http::string_body>& _req) -> http::respons
     if (op_iter->second == "execute") {
         const auto query_iter = url.query.find("query");
         if (query_iter == std::end(url.query)) {
-            // TODO Required
+            log::error("{}: Missing [query] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
-
+#if 0
         const auto query_type_iter = url.query.find("query-type");
         if (query_type_iter != std::end(url.query)) {
+            log::error("{}: Missing [query-type] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
-
+#endif
         // TODO GenQuery2 is definitely the right answer for this simply because of
         // pagination features such as OFFSET and LIMIT. We can make that a runtime
         // configuration option.
@@ -1676,11 +1441,14 @@ auto handle_query(const http::request<http::string_body>& _req) -> http::respons
         }
     }
     else if (op_iter->second == "list_genquery_columns") {
-        // TODO These are likely defined in a C array.
-        // GenQuery2 doesn't expose these. Perhaps the REST API doesn't need to either.
+        // TODO GenQuery2 doesn't expose these. Perhaps the REST API doesn't need to either.
+        log::error("{}: Operation not implemented.", __func__);
+        return irods::http::fail(http::status::not_implemented);
     }
     else if (op_iter->second == "list_specific_queries") {
         // TODO Look at iquest's implementation.
+        log::error("{}: Operation not implemented.", __func__);
+        return irods::http::fail(http::status::not_implemented);
     }
     else {
         fmt::print("{}: Invalid operator [{}].\n", __func__, op_iter->second);
@@ -1695,13 +1463,8 @@ auto handle_query(const http::request<http::string_body>& _req) -> http::respons
 auto handle_resources(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
     if (_req.method() != http::verb::get && _req.method() != http::verb::post) {
-        fmt::print("{}: Incorrect HTTP method.\n", __func__);
-        http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Incorrect HTTP method.", __func__);
+        return irods::http::fail(http::status::method_not_allowed);
     }
 
     const auto result = irods::http::resolve_client_identity(_req);
@@ -1716,17 +1479,12 @@ auto handle_resources(const http::request<http::string_body>& _req) -> http::res
     // At this point, we know the user has authorization to perform this operation.
     //
 
-    const auto url = parse_url(_req);
+    const auto url = irods::http::parse_url(_req);
 
     const auto op_iter = url.query.find("op");
     if (op_iter == std::end(url.query)) {
-        fmt::print("{}: Missing [op] parameter.\n", __func__);
-        http::response<http::string_body> res{http::status::bad_request, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Missing [op] parameter.", __func__);
+        return irods::http::fail(http::status::method_not_allowed);
     }
 
     http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -1739,24 +1497,14 @@ auto handle_resources(const http::request<http::string_body>& _req) -> http::res
     if (op_iter->second == "create") {
         const auto name_iter = url.query.find("name");
         if (name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [name] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         const auto type_iter = url.query.find("type");
         if (type_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [type] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [type] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         try {
@@ -1810,13 +1558,8 @@ auto handle_resources(const http::request<http::string_body>& _req) -> http::res
     else if (op_iter->second == "remove") {
         const auto name_iter = url.query.find("name");
         if (name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [name] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         try {
@@ -1850,17 +1593,14 @@ auto handle_resources(const http::request<http::string_body>& _req) -> http::res
     }
     else if (op_iter->second == "modify") {
         // TODO
+        log::error("{}: Operation not implemented.", __func__);
+        return irods::http::fail(http::status::not_implemented);
     }
     else if (op_iter->second == "stat") {
         const auto name_iter = url.query.find("name");
         if (name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [name] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         try {
@@ -1921,24 +1661,14 @@ auto handle_resources(const http::request<http::string_body>& _req) -> http::res
     else if (op_iter->second == "add_child") {
         const auto parent_name_iter = url.query.find("parent-name");
         if (parent_name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [parent-name] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         const auto child_name_iter = url.query.find("child-name");
         if (child_name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [child-name] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         try {
@@ -1980,24 +1710,14 @@ auto handle_resources(const http::request<http::string_body>& _req) -> http::res
     else if (op_iter->second == "remove_child") {
         const auto parent_name_iter = url.query.find("parent-name");
         if (parent_name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [parent-name] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         const auto child_name_iter = url.query.find("child-name");
         if (child_name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [child-name] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         try {
@@ -2032,13 +1752,8 @@ auto handle_resources(const http::request<http::string_body>& _req) -> http::res
     else if (op_iter->second == "rebalance") {
         const auto name_iter = url.query.find("name");
         if (name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [name] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         try {
@@ -2083,13 +1798,8 @@ auto handle_resources(const http::request<http::string_body>& _req) -> http::res
 auto handle_rules(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
     if (_req.method() != http::verb::get && _req.method() != http::verb::post) {
-        fmt::print("{}: Incorrect HTTP method.\n", __func__);
-        http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Incorrect HTTP method.", __func__);
+        return irods::http::fail(http::status::method_not_allowed);
     }
 
     const auto result = irods::http::resolve_client_identity(_req);
@@ -2104,17 +1814,12 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
     // At this point, we know the user has authorization to perform this operation.
     //
 
-    const auto url = parse_url(_req);
+    const auto url = irods::http::parse_url(_req);
 
     const auto op_iter = url.query.find("op");
     if (op_iter == std::end(url.query)) {
-        fmt::print("{}: Missing [op] parameter.\n", __func__);
-        http::response<http::string_body> res{http::status::bad_request, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Missing [op] parameter.", __func__);
+        return irods::http::fail(http::status::bad_request);
     }
 
     http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -2127,13 +1832,8 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
 
         const auto rule_text_iter = url.query.find("rule-text");
         if (rule_text_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [rule-text] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [rule-text] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         ExecMyRuleInp input{};
@@ -2197,13 +1897,8 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
     else if (op_iter->second == "remove_delay_rule") {
         const auto rule_id_iter = url.query.find("rule-id");
         if (rule_id_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [rule-id] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [rule-id] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         try {
@@ -2238,6 +1933,8 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
     }
     else if (op_iter->second == "modify_delay_rule") {
         // TODO
+        log::error("{}: Operation not implemented.", __func__);
+        return irods::http::fail(http::status::not_implemented);
     }
     else if (op_iter->second == "list_rule_engines") {
         ExecMyRuleInp input{};
@@ -2281,8 +1978,10 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
     }
     else if (op_iter->second == "list_delay_rules") {
         const auto all_rules_iter = url.query.find("all-rules");
-        if (all_rules_iter == std::end(url.query)) {
+        if (all_rules_iter != std::end(url.query)) {
             // TODO
+            //log::error("{}: Operation not implemented.", __func__);
+            //return irods::http::fail(http::status::not_implemented);
         }
 
         try {
@@ -2359,13 +2058,8 @@ auto handle_rules(const http::request<http::string_body>& _req) -> http::respons
 auto handle_users_groups(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
     if (_req.method() != http::verb::get && _req.method() != http::verb::post) {
-        fmt::print("{}: Incorrect HTTP method.\n", __func__);
-        http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Incorrect HTTP method.", __func__);
+        return irods::http::fail(http::status::method_not_allowed);
     }
 
     const auto result = irods::http::resolve_client_identity(_req);
@@ -2380,17 +2074,12 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
     // At this point, we know the user has authorization to perform this operation.
     //
 
-    const auto url = parse_url(_req);
+    const auto url = irods::http::parse_url(_req);
 
     const auto op_iter = url.query.find("op");
     if (op_iter == std::end(url.query)) {
-        fmt::print("{}: Missing [op] parameter.\n", __func__);
-        http::response<http::string_body> res{http::status::bad_request, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Missing [op] parameter.", __func__);
+        return irods::http::fail(http::status::bad_request);
     }
 
     http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -2403,24 +2092,14 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
     if (op_iter->second == "create_user") {
         const auto name_iter = url.query.find("name");
         if (name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [name] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         const auto zone_iter = url.query.find("zone");
         if (zone_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [zone] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [zone] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         auto user_type = ia::user_type::rodsuser;
@@ -2433,13 +2112,8 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
                 user_type = ia::user_type::groupadmin;
             }
             else {
-                fmt::print("{}: Invalid user-type.\n", __func__);
-                http::response<http::string_body> res{http::status::bad_request, _req.version()};
-                res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-                res.set(http::field::content_type, "text/plain");
-                res.set(http::field::content_length, "0");
-                res.keep_alive(_req.keep_alive());
-                return res;
+                log::error("{}: Invalid user-type.", __func__);
+                return irods::http::fail(res, http::status::bad_request);
             }
         }
 
@@ -2483,24 +2157,14 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
     else if (op_iter->second == "remove_user") {
         const auto name_iter = url.query.find("name");
         if (name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [name] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         const auto zone_iter = url.query.find("zone");
         if (zone_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [zone] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [zone] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         try {
@@ -2545,13 +2209,8 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
     else if (op_iter->second == "create_group") {
         const auto name_iter = url.query.find("name");
         if (name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [name] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         try {
@@ -2584,13 +2243,8 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
     else if (op_iter->second == "remove_group") {
         const auto name_iter = url.query.find("name");
         if (name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [name] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         try {
@@ -2623,24 +2277,14 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
     else if (op_iter->second == "add_to_group") {
         const auto user_iter = url.query.find("user");
         if (user_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [user] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [user] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         const auto group_iter = url.query.find("group");
         if (group_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [group] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [group] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         try {
@@ -2680,24 +2324,14 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
     else if (op_iter->second == "remove_from_group") {
         const auto user_iter = url.query.find("user");
         if (user_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [user] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [user] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         const auto group_iter = url.query.find("group");
         if (group_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [group] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [group] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         try {
@@ -2818,13 +2452,8 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
     else if (op_iter->second == "stat") {
         const auto name_iter = url.query.find("name");
         if (name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [name] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         try {
@@ -2909,6 +2538,9 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
 auto handle_tickets(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
     if (_req.method() != http::verb::get && _req.method() != http::verb::post) {
+        // TODO
+            log::error("{}: Missing [name] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         fmt::print("{}: Incorrect HTTP method.\n", __func__);
         http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -2930,7 +2562,7 @@ auto handle_tickets(const http::request<http::string_body>& _req) -> http::respo
     // At this point, we know the user has authorization to perform this operation.
     //
 
-    const auto url = parse_url(_req);
+    const auto url = irods::http::parse_url(_req);
 
     const auto op_iter = url.query.find("op");
     if (op_iter == std::end(url.query)) {
@@ -3150,7 +2782,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     fmt::print("chunked           : {}\n", req.chunked());
     fmt::print("needs eof         : {}\n", req.need_eof());
 
-    const auto url = parse_url(req);
+    const auto url = irods::http::parse_url(req); // TODO We should only look at the URL path here.
     const auto iter = req_handlers.find(url.path);
 
     if (iter == std::end(req_handlers)) {

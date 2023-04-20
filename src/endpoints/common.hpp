@@ -37,7 +37,7 @@ namespace irods::http
     enum class authorization_scheme
     {
         basic = 0,
-        oidc
+        open_id_connect
     }; // enum class authorization_scheme
 
     struct authenticated_client_info
@@ -56,6 +56,7 @@ namespace irods::http
         _response.set(boost::beast::http::field::content_type, "text/plain"); // TODO
         _response.set(boost::beast::http::field::content_length, "0");
         _response.body() = _error_msg;
+        _response.prepare_payload();
         return _response;
     } // fail
 
@@ -127,13 +128,13 @@ namespace irods::http
 
         if (!curl) {
             // TODO Report internal server error.
-            log::error("{}: Could not initialize libcurl.\n", __func__);
+            log::error("{}: Could not initialize libcurl.", __func__);
         }
 
         // Include a bogus prefix. We only care about the path and query parts of the URL.
         if (const auto ec = curl_url_set(curl.get(), CURLUPART_URL, _url.c_str(), 0); ec) {
             // TODO Report error.
-            log::error("{}: curl_url_set error: {}\n", __func__, ec);
+            log::error("{}: curl_url_set error: {}", __func__, ec);
         }
 
         url url;
@@ -151,7 +152,7 @@ namespace irods::http
         }
         else {
             // TODO Report error.
-            log::error("{}: curl_url_get(CURLUPART_PATH) error: {}\n", __func__, ec);
+            log::error("{}: curl_url_get(CURLUPART_PATH) error: {}", __func__, ec);
         }
 
         // Extract the query.
@@ -167,7 +168,7 @@ namespace irods::http
         }
         else {
             // TODO
-            log::error("{}: curl_url_get(CURLUPART_QUERY) error: {}\n", __func__, ec);
+            log::error("{}: curl_url_get(CURLUPART_QUERY) error: {}", __func__, ec);
         }
 
         return url;
