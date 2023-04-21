@@ -68,8 +68,7 @@ target_include_directories(
   ${IRODS_EXTERNALS_FULLPATH_SPDLOG}/include
   CURL::libcurl
   ${CMAKE_SOURCE_DIR}/src
-  ${CMAKE_SOURCE_DIR}/src/endpoints
-  ${CMAKE_SOURCE_DIR}/src/endpoints/authentication)
+  ${CMAKE_SOURCE_DIR}/src/endpoints)
 
 target_link_libraries(
   ${EXECUTABLE_NAME}
@@ -78,4 +77,12 @@ target_link_libraries(
   ${IRODS_EXTERNALS_FULLPATH_FMT}/lib/libfmt.so
   CURL::libcurl
   $<TARGET_OBJECTS:authentication>
-  $<TARGET_OBJECTS:collections>)
+  $<TARGET_OBJECTS:collections>
+  #$<TARGET_OBJECTS:config>
+  $<TARGET_OBJECTS:data_objects>
+  $<TARGET_OBJECTS:metadata>
+  $<TARGET_OBJECTS:query>
+  $<TARGET_OBJECTS:resources>
+  $<TARGET_OBJECTS:rules>
+  $<TARGET_OBJECTS:tickets>
+  $<TARGET_OBJECTS:users_groups>)

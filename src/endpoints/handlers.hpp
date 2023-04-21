@@ -23,7 +23,7 @@ namespace irods::http::handler
 
     auto tickets(const request_type& _request) -> response_type;
 
-    auto users_gropus(const request_type& _request) -> response_type;
+    auto users_groups(const request_type& _request) -> response_type;
 } // namespace irods::http::handler
 
 #endif // IRODS_HTTP_API_HANDLERS_HPP

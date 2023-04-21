@@ -102,20 +102,20 @@ test_resource_endpoint()
         --data-urlencode 'name=demoResc' \
         ${curl_opts} | jq
     # Create a replication resource.
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
         --data-urlencode 'op=create' \
         --data-urlencode 'name=repl_resc' \
         --data-urlencode 'type=replication' \
         ${curl_opts} | jq
     # Create two unixfilesystem resources.
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
         --data-urlencode 'op=create' \
         --data-urlencode 'name=ufs0' \
         --data-urlencode 'type=unixfilesystem' \
         --data-urlencode "host=$(hostname)" \
         --data-urlencode 'vault-path=/tmp/ufs0' \
         ${curl_opts} | jq
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
         --data-urlencode 'op=create' \
         --data-urlencode 'name=ufs1' \
         --data-urlencode 'type=unixfilesystem' \
@@ -136,12 +136,12 @@ test_resource_endpoint()
         --data-urlencode 'name=ufs1' \
         ${curl_opts} | jq
     # Make the unixfilesystem resources a child of the replication resource
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
         --data-urlencode 'op=add_child' \
         --data-urlencode 'parent-name=repl_resc' \
         --data-urlencode 'child-name=ufs0' \
         ${curl_opts} | jq
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
         --data-urlencode 'op=add_child' \
         --data-urlencode 'parent-name=repl_resc' \
         --data-urlencode 'child-name=ufs1' \
@@ -157,12 +157,12 @@ test_resource_endpoint()
         --data-urlencode 'name=ufs1' \
         ${curl_opts} | jq
     # Remove the unixfilesystem resources from the replication resource.
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
         --data-urlencode 'op=remove_child' \
         --data-urlencode 'parent-name=repl_resc' \
         --data-urlencode 'child-name=ufs0' \
         ${curl_opts} | jq
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
         --data-urlencode 'op=remove_child' \
         --data-urlencode 'parent-name=repl_resc' \
         --data-urlencode 'child-name=ufs1' \
@@ -178,15 +178,15 @@ test_resource_endpoint()
         --data-urlencode 'name=ufs1' \
         ${curl_opts} | jq
     # Delete all resources created by this script.
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
         --data-urlencode 'op=remove' \
         --data-urlencode 'name=ufs0' \
         ${curl_opts} | jq
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
         --data-urlencode 'op=remove' \
         --data-urlencode 'name=ufs1' \
         ${curl_opts} | jq
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
         --data-urlencode 'op=remove' \
         --data-urlencode 'name=repl_resc' \
         ${curl_opts} | jq
@@ -262,13 +262,13 @@ test_rules_endpoint()
         --data-urlencode 'op=list_rule_engines' \
         ${curl_opts} | jq
     # Execute a rule against a specific REP.
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/rules" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/rules" \
         --data-urlencode 'op=execute' \
         --data-urlencode 'rep-instance=irods_rule_engine_plugin-irods_rule_language-instance' \
         --data-urlencode 'rule-text=writeLine("serverLog", "REST API!!!")' \
         ${curl_opts} | jq
     # Schedule a delay rule.
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/rules" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/rules" \
         --data-urlencode 'op=execute' \
         --data-urlencode 'rep-instance=irods_rule_engine_plugin-irods_rule_language-instance' \
         --data-urlencode 'rule-text=delay("<EF>60</EF><INST_NAME>irods_rule_engine_plugin-irods_rule_language-instance</INST_NAME>") { writeLine("serverLog", "REST API!!!"); }' \
@@ -289,7 +289,7 @@ test_data_objects_endpoint()
     data_object='/tempZone/home/kory/http_file.txt'
 
     # Create a new empty data object.
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
         --data-urlencode 'op=touch' \
         --data-urlencode "lpath=$data_object" \
         $curl_opts | jq
@@ -313,7 +313,7 @@ test_data_objects_endpoint()
 
     pw_data_object='/tempZone/home/kory/pwfile.txt'
     pw_handle=$(curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
-        --data-urlencode 'op=parallel-write-init' \
+        --data-urlencode 'op=parallel_write_init' \
         --data-urlencode "lpath=$pw_data_object" \
         --data-urlencode 'stream-count=2' \
         $curl_opts | jq -r .parallel_write_handle)
@@ -334,7 +334,7 @@ test_data_objects_endpoint()
         --data-urlencode "parallel-write-handle=$pw_handle" \
         $curl_opts | jq
     curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
-        --data-urlencode 'op=parallel-write-shutdown' \
+        --data-urlencode 'op=parallel_write_shutdown' \
         --data-urlencode "parallel-write-handle=$pw_handle" \
         $curl_opts | jq
     istream read $pw_data_object
@@ -345,8 +345,8 @@ test_data_objects_endpoint()
         --data-urlencode "lpath=$data_object" \
         $curl_opts | jq
     # Give rods permission to read the data object.
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
-        --data-urlencode 'op=set-permission' \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        --data-urlencode 'op=set_permission' \
         --data-urlencode "lpath=$data_object" \
         --data-urlencode 'entity-name=rods' \
         --data-urlencode 'permission=read_object' \
@@ -358,7 +358,7 @@ test_data_objects_endpoint()
         --data-urlencode 'count=1000' \
         $curl_opts | jq
     # Permanently remove the new data object (no trash).
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
         --data-urlencode 'op=remove' \
         --data-urlencode 'no-trash=1' \
         --data-urlencode "lpath=$data_object" \
@@ -367,6 +367,33 @@ test_data_objects_endpoint()
     curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
         --data-urlencode 'op=stat' \
         --data-urlencode "lpath=$data_object" \
+        $curl_opts | jq
+}
+
+#
+# /tickets
+#
+
+test_tickets_endpoint()
+{
+    # Create a ticket for a collection.
+    ticket_string=$(curl -H "authorization: Bearer $bearer_token" "${base_url}/tickets" \
+        --data-urlencode 'op=create' \
+        --data-urlencode 'lpath=/tempZone/home/kory' \
+        --data-urlencode 'type=write' \
+        --data-urlencode 'use-count=250' \
+        --data-urlencode 'write-data-object-count=100' \
+        --data-urlencode 'write-byte-count=4096' \
+        --data-urlencode 'seconds-until-expiration=3600' \
+        --data-urlencode 'users=kory,rods' \
+        --data-urlencode 'groups=public' \
+        --data-urlencode 'hosts=kdd-ws' \
+        $curl_opts | jq -r '.ticket')
+    # TODO Stat the ticket.
+    # Remove the ticket.
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/tickets" \
+        --data-urlencode 'op=remove' \
+        --data-urlencode "name=$ticket_string" \
         $curl_opts | jq
 }
 
@@ -400,27 +427,28 @@ test_users_groups_endpoint()
         --data-urlencode 'op=groups' \
         $curl_opts | jq
     # Create a new group.
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/users-groups" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/users-groups" \
         --data-urlencode 'op=create_group' \
         --data-urlencode 'name=http_group' \
         $curl_opts | jq
     # Add a user to the new group.
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/users-groups" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/users-groups" \
         --data-urlencode 'op=add_to_group' \
         --data-urlencode 'group=http_group' \
         --data-urlencode 'user=kory' \
         $curl_opts | jq
     # Remove the new group.
-    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/users-groups" \
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/users-groups" \
         --data-urlencode 'op=remove_group' \
         --data-urlencode 'name=http_group' \
         $curl_opts | jq
 }
 
 test_collections_endpoint
-#test_data_objects_endpoint
-#test_metadata_endpoint
-#test_query_endpoint
-#test_resource_endpoint
-#test_rules_endpoint
-#test_users_groups_endpoint
+test_data_objects_endpoint
+test_metadata_endpoint
+test_query_endpoint
+test_resource_endpoint
+test_rules_endpoint
+test_tickets_endpoint
+test_users_groups_endpoint

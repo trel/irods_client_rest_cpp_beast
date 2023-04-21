@@ -1,4 +1,4 @@
-set(IRODS_HTTP_ENDPOINT authentication)
+set(IRODS_HTTP_ENDPOINT resources)
 
 add_library(
   ${IRODS_HTTP_ENDPOINT}
