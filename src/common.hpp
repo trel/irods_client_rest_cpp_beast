@@ -3,6 +3,8 @@
 
 #include "log.hpp"
 
+#include <irods/filesystem/object_status.hpp>
+#include <irods/filesystem/permissions.hpp>
 #include <irods/process_stash.hpp>
 
 #include <boost/any.hpp>
@@ -60,6 +62,11 @@ namespace irods::http
         return _response;
     } // fail
 
+    inline auto fail(response_type& _response, status_type _status) -> response_type
+    {
+        return fail(_response, _status, "");
+    } // fail
+
     inline auto fail(status_type _status, const std::string_view _error_msg) -> response_type
     {
         response_type r{_status, 11};
@@ -91,6 +98,10 @@ namespace irods::http
     // TODO Create a better name.
     inline auto to_argument_list(const std::string_view& _urlencoded_string) -> std::unordered_map<std::string, std::string>
     {
+        if (_urlencoded_string.empty()) {
+            return {};
+        }
+
         std::unordered_map<std::string, std::string> kvps;
 
         std::vector<std::string> tokens;
@@ -113,6 +124,37 @@ namespace irods::http
 
         return kvps;
     } // to_argument_list
+
+    inline auto get_url_path(const std::string& _url) -> std::optional<std::string>
+    {
+        namespace log = irods::http::log;
+
+        std::unique_ptr<CURLU, void(*)(CURLU*)> curl{curl_url(), curl_url_cleanup};
+
+        if (!curl) {
+            log::error("{}: Could not initialize libcurl.", __func__);
+            return std::nullopt;
+        }
+
+        if (const auto ec = curl_url_set(curl.get(), CURLUPART_URL, _url.c_str(), 0); ec) {
+            log::error("{}: curl_url_set error: {}", __func__, ec);
+            return std::nullopt;
+        }
+
+        using curl_string = std::unique_ptr<char, void(*)(void*)>;
+
+        // Extract the path.
+        // This is what we use to route requests to the various endpoints.
+        char* path{};
+        if (const auto ec = curl_url_get(curl.get(), CURLUPART_PATH, &path, 0); ec == 0) {
+            curl_string cpath{path, curl_free};
+            return path;
+        }
+        else {
+            log::error("{}: curl_url_get(CURLUPART_PATH) error: {}", __func__, ec);
+            return std::nullopt;
+        }
+    } // get_url_path
 
     struct url
     {
@@ -239,6 +281,80 @@ namespace irods
 
         return uuid;
     } // generate_uuid
+
+    inline auto to_permission_string(const irods::experimental::filesystem::perms _p) -> const char*
+    {
+        using irods::experimental::filesystem::perms;
+
+        switch (_p) {
+            case perms::null:            return "null";
+            case perms::read_metadata:   return "read_metadata";
+            case perms::read_object:     return "read_object";
+            case perms::read:            return "read_object";
+            case perms::create_metadata: return "create_metadata";
+            case perms::modify_metadata: return "modify_metadata";
+            case perms::delete_metadata: return "delete_metadata";
+            case perms::create_object:   return "create_object";
+            case perms::modify_object:   return "modify_object";
+            case perms::write:           return "modify_object";
+            case perms::delete_object:   return "delete_object";
+            case perms::own:             return "own";
+            default:                     return "?"; // TODO std::unreachable() or __builtin_unreachable()
+        }
+    } // to_permission_string
+
+    inline auto to_permission_enum(const std::string_view _s) -> std::optional<irods::experimental::filesystem::perms>
+    {
+        using irods::experimental::filesystem::perms;
+
+        // clang-format off
+        if (_s == "null")            { return perms::null; }
+        if (_s == "read_metadata")   { return perms::read_metadata; }
+        if (_s == "read_object")     { return perms::read_object; }
+        if (_s == "red")             { return perms::read; }
+        if (_s == "create_metadata") { return perms::create_metadata; }
+        if (_s == "modify_metadata") { return perms::modify_metadata; }
+        if (_s == "delete_metadata") { return perms::delete_metadata; }
+        if (_s == "create_object")   { return perms::create_object; }
+        if (_s == "modify_object")   { return perms::modify_object; }
+        if (_s == "write")           { return perms::write; }
+        if (_s == "delete_object")   { return perms::delete_object; }
+        if (_s == "own")             { return perms::own; }
+        // clang-format on
+
+        return std::nullopt;
+    } // to_permission_enum
+
+    inline auto to_object_type_string(const irods::experimental::filesystem::object_type _t) -> const char*
+    {
+        using irods::experimental::filesystem::object_type;
+
+        switch (_t) {
+            case object_type::collection:         return "collection";
+            case object_type::data_object:        return "data_object";
+            case object_type::none:               return "none";
+            case object_type::not_found:          return "not_found";
+            case object_type::special_collection: return "special_collection";
+            case object_type::unknown:            return "unknown";
+            default:                              return "?";
+        }
+    } // to_object_type_string
+
+    inline auto to_object_type_enum(const std::string_view _s) -> std::optional<irods::experimental::filesystem::object_type>
+    {
+        using irods::experimental::filesystem::object_type;
+
+        // clang-format off
+        if (_s == "collection")         { return object_type::collection; }
+        if (_s == "data_object")        { return object_type::data_object; }
+        if (_s == "none")               { return object_type::none; }
+        if (_s == "not_found")          { return object_type::not_found; }
+        if (_s == "special_collection") { return object_type::special_collection; }
+        if (_s == "unknown")            { return object_type::unknown; }
+        // clang-format on
+
+        return std::nullopt;
+    } // to_object_type_enum
 } // namespace irods
 
 #endif // IRODS_HTTP_API_ENDPOINT_COMMON_HPP

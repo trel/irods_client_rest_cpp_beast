@@ -30,8 +30,52 @@ test_collections_endpoint()
         --data-urlencode 'op=list' \
         --data-urlencode 'lpath=/tempZone/home/kory' \
         $curl_opts | jq
+    # Create a new collection.
+    new_collection='/tempZone/home/kory/created_by_http_api.c'
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/collections" \
+        --data-urlencode 'op=create' \
+        --data-urlencode "lpath=$new_collection" \
+        $curl_opts | jq
+    # Stat the new collection.
+    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/collections" \
+        --data-urlencode 'op=stat' \
+        --data-urlencode "lpath=$new_collection" \
+        $curl_opts | jq
+    # Give the rods user read permission on the collection.
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/collections" \
+        --data-urlencode 'op=set-permission' \
+        --data-urlencode "lpath=$new_collection" \
+        --data-urlencode 'entity-name=rods' \
+        --data-urlencode 'permission=read_object' \
+        $curl_opts | jq
+    # Stat the collection.
+    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/collections" \
+        --data-urlencode 'op=stat' \
+        --data-urlencode "lpath=$new_collection" \
+        $curl_opts | jq
+    # Rename the new collection.
+    new_collection_name="${new_collection}.renamed"
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/collections" \
+        --data-urlencode 'op=rename' \
+        --data-urlencode "old-lpath=$new_collection" \
+        --data-urlencode "new-lpath=$new_collection_name" \
+        $curl_opts | jq
+    # Show that the old collection name no longer exists.
+    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/collections" \
+        --data-urlencode 'op=stat' \
+        --data-urlencode "lpath=$new_collection" \
+        $curl_opts | jq
+    # Show that the new collection name exists now.
+    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/collections" \
+        --data-urlencode 'op=stat' \
+        --data-urlencode "lpath=$new_collection_name" \
+        $curl_opts | jq
+    # Remove the collection.
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/collections" \
+        --data-urlencode 'op=remove' \
+        --data-urlencode "lpath=$new_collection_name" \
+        $curl_opts | jq
 }
-test_collections_endpoint
 
 #
 # /query
@@ -45,7 +89,6 @@ test_query_endpoint()
         --data-urlencode 'query=select COLL_NAME, DATA_NAME' \
         ${curl_opts} | jq
 }
-test_query_endpoint
 
 #
 # /resources
@@ -161,7 +204,6 @@ test_resource_endpoint()
         --data-urlencode 'name=ufs1' \
         ${curl_opts} | jq
 }
-test_resource_endpoint
 
 #
 # /metadata
@@ -207,7 +249,6 @@ test_metadata_endpoint()
         }' \
         ${curl_opts} | jq
 }
-#test_metadata_endpoint
 
 #
 # /rules
@@ -238,7 +279,6 @@ test_rules_endpoint()
         ${curl_opts} | jq
     iqdel -a
 }
-#test_rules_endpoint
 
 #
 # /data-objects
@@ -329,7 +369,6 @@ test_data_objects_endpoint()
         --data-urlencode "lpath=$data_object" \
         $curl_opts | jq
 }
-#test_data_objects_endpoint
 
 #
 # /users-groups
@@ -377,4 +416,11 @@ test_users_groups_endpoint()
         --data-urlencode 'name=http_group' \
         $curl_opts | jq
 }
+
+test_collections_endpoint
+#test_data_objects_endpoint
+#test_metadata_endpoint
+#test_query_endpoint
+#test_resource_endpoint
+#test_rules_endpoint
 #test_users_groups_endpoint

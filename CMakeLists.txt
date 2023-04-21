@@ -77,4 +77,5 @@ target_link_libraries(
   irods_client
   ${IRODS_EXTERNALS_FULLPATH_FMT}/lib/libfmt.so
   CURL::libcurl
-  $<TARGET_OBJECTS:authentication>)
+  $<TARGET_OBJECTS:authentication>
+  $<TARGET_OBJECTS:collections>)

@@ -1,5 +1,5 @@
-#include "authentication.hpp"
 #include "common.hpp"
+#include "handlers.hpp"
 #include "log.hpp"
 
 #include <irods/atomic_apply_metadata_operations.h>
@@ -92,266 +92,6 @@ struct parallel_write_context
 };
 
 std::unordered_map<std::string, parallel_write_context> parallel_write_contexts;
-
-auto handle_collections(const http::request<http::string_body>& _req) -> http::response<http::string_body>
-{
-    if (_req.method() != http::verb::get) {
-        log::error("{}: Incorrect HTTP method.", __func__);
-        return irods::http::fail(http::status::method_not_allowed);
-    }
-
-    const auto result = irods::http::resolve_client_identity(_req);
-    if (result.response) {
-        return *result.response;
-    }
-
-    const auto* client_info = result.client_info;
-    log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
-
-    //
-    // At this point, we know the user has authorization to perform this operation.
-    //
-
-    const auto url = irods::http::parse_url(_req);
-
-    const auto op_iter = url.query.find("op");
-    if (op_iter == std::end(url.query)) {
-        log::error("{}: Missing [op] parameter.", __func__);
-        return irods::http::fail(http::status::bad_request);
-    }
-
-    const auto lpath_iter = url.query.find("lpath");
-    if (lpath_iter == std::end(url.query)) {
-        log::error("{}: Missing [lpath] parameter.", __func__);
-        return irods::http::fail(http::status::bad_request);
-    }
-
-    http::response<http::string_body> res{http::status::ok, _req.version()};
-    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    res.set(http::field::content_type, "text/plain");
-    res.keep_alive(_req.keep_alive());
-
-    namespace fs = irods::experimental::filesystem;
-
-    // TODO This must be a proxied connection.
-    irods::experimental::client_connection conn;
-
-    if (op_iter->second == "create") {
-        try {
-            fs::client::create_collection(conn, lpath_iter->second);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0}
-                }}
-            }.dump();
-        }
-        catch (const fs::filesystem_error& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code().value()},
-                    {"error_message", e.what()}
-                }}
-            }.dump();
-        }
-    }
-    else if (op_iter->second == "remove") {
-        try {
-            fs::remove_options opts = fs::remove_options::none;
-
-            const auto no_trash_iter = url.query.find("no-trash");
-            if (no_trash_iter != std::end(url.query) && no_trash_iter->second == "1") {
-                opts = fs::remove_options::no_trash;
-            }
-
-            const auto recursive_iter = url.query.find("recurse");
-            if (recursive_iter != std::end(url.query) && recursive_iter->second == "1") {
-                fs::client::remove_all(conn, lpath_iter->second, opts);
-            }
-            else {
-                fs::client::remove(conn, lpath_iter->second, opts);
-            }
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0}
-                }}
-            }.dump();
-        }
-        catch (const fs::filesystem_error& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code().value()},
-                    {"error_message", e.what()}
-                }}
-            }.dump();
-        }
-    }
-    else if (op_iter->second == "list") {
-        try {
-            json entries;
-
-            const auto recursive_iter = url.query.find("recurse");
-            if (recursive_iter != std::end(url.query) && recursive_iter->second == "1") {
-                for (auto&& e : fs::client::recursive_collection_iterator{conn, lpath_iter->second}) {
-                    entries.push_back(e.path().c_str());
-                }
-            }
-            else {
-                for (auto&& e : fs::client::collection_iterator{conn, lpath_iter->second}) {
-                    entries.push_back(e.path().c_str());
-                }
-            }
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }},
-                {"entries", entries}
-            }.dump();
-        }
-        catch (const fs::filesystem_error& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code().value()},
-                    {"error_message", e.what()}
-                }}
-            }.dump();
-        }
-    }
-    else if (op_iter->second == "rename") {
-        const auto new_lpath_iter = url.query.find("new-lpath");
-        if (new_lpath_iter == std::end(url.query)) {
-            log::error("{}: Missing [new-lpath] parameter.", __func__);
-            return irods::http::fail(res, http::status::bad_request);
-        }
-
-        try {
-            fs::client::rename(conn, lpath_iter->second, new_lpath_iter->second);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }}
-            }.dump();
-        }
-        catch (const fs::filesystem_error& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code().value()},
-                    {"error_message", e.what()}
-                }}
-            }.dump();
-        }
-    }
-    else if (op_iter->second == "set-permission") {
-        const auto entity_name_iter = url.query.find("entity-name");
-        if (entity_name_iter == std::end(url.query)) {
-            log::error("{}: Missing [entity-name] parameter.", __func__);
-            return irods::http::fail(res, http::status::bad_request);
-        }
-
-        const auto perm_iter = url.query.find("permission");
-        if (perm_iter == std::end(url.query)) {
-            log::error("{}: Missing [permission] parameter.", __func__);
-            return irods::http::fail(res, http::status::bad_request);
-        }
-
-        try {
-            const auto admin_mode_iter = url.query.find("admin");
-            if (admin_mode_iter != std::end(url.query) && admin_mode_iter->second == "1") {
-                fs::client::permissions(fs::admin, conn, lpath_iter->second, entity_name_iter->second, fs::perms::own);
-            }
-            else {
-                fs::client::permissions(conn, lpath_iter->second, entity_name_iter->second, fs::perms::own);
-            }
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }}
-            }.dump();
-        }
-        catch (const fs::filesystem_error& e) {
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code().value()},
-                    {"error_message", e.what()}
-                }}
-            }.dump();
-        }
-    }
-    else if (op_iter->second == "stat") {
-        try {
-            const auto status = fs::client::status(conn, lpath_iter->second);
-
-            const auto to_permission_string = [](const fs::perms _p)
-            {
-                switch (_p) {
-                    case fs::perms::null:            return "null";
-                    case fs::perms::read_metadata:   return "read_metadata";
-                    case fs::perms::read_object:     return "read_object";
-                    case fs::perms::read:            return "read_object";
-                    case fs::perms::create_metadata: return "create_metadata";
-                    case fs::perms::modify_metadata: return "modify_metadata";
-                    case fs::perms::delete_metadata: return "delete_metadata";
-                    case fs::perms::create_object:   return "create_object";
-                    case fs::perms::modify_object:   return "modify_object";
-                    case fs::perms::write:           return "modify_object";
-                    case fs::perms::delete_object:   return "delete_object";
-                    case fs::perms::own:             return "own";
-                    default:                         return "?"; // TODO std::unreachable() or __builtin_unreachable()
-                }
-            };
-
-            const auto to_type_string = [](const fs::object_type _t)
-            {
-                switch (_t) {
-                    case fs::object_type::collection:         return "collection";
-                    case fs::object_type::data_object:        return "data_object";
-                    case fs::object_type::none:               return "none";
-                    case fs::object_type::not_found:          return "not_found";
-                    case fs::object_type::special_collection: return "special_collection";
-                    case fs::object_type::unknown:            return "unknown";
-                    default:                                  return "?";
-                }
-            };
-
-            json perms;
-            for (auto&& ep : status.permissions()) {
-                perms.push_back(json{
-                    {"name", ep.name},
-                    {"zone", ep.zone},
-                    {"type", ep.type},
-                    {"perm", to_permission_string(ep.prms)},
-                });
-            }
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }},
-                {"type", to_type_string(status.type())},
-                {"inheritance_enabled", status.is_inheritance_enabled()},
-                {"permissions", perms}
-            }.dump();
-        }
-        catch (const fs::filesystem_error& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code().value()},
-                    {"error_message", e.what()}
-                }}
-            }.dump();
-        }
-    }
-
-    res.prepare_payload();
-    return res;
-}
 
 auto handle_data_objects(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
@@ -1025,45 +765,13 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
             irods::experimental::client_connection conn;
             const auto status = fs::client::status(conn, lpath_iter->second);
 
-            const auto to_permission_string = [](const fs::perms _p)
-            {
-                switch (_p) {
-                    case fs::perms::null:            return "null";
-                    case fs::perms::read_metadata:   return "read_metadata";
-                    case fs::perms::read_object:     return "read_object";
-                    case fs::perms::read:            return "read_object";
-                    case fs::perms::create_metadata: return "create_metadata";
-                    case fs::perms::modify_metadata: return "modify_metadata";
-                    case fs::perms::delete_metadata: return "delete_metadata";
-                    case fs::perms::create_object:   return "create_object";
-                    case fs::perms::modify_object:   return "modify_object";
-                    case fs::perms::write:           return "modify_object";
-                    case fs::perms::delete_object:   return "delete_object";
-                    case fs::perms::own:             return "own";
-                    default:                         return "?"; // TODO std::unreachable() or __builtin_unreachable()
-                }
-            };
-
-            const auto to_type_string = [](const fs::object_type _t)
-            {
-                switch (_t) {
-                    case fs::object_type::collection:         return "collection";
-                    case fs::object_type::data_object:        return "data_object";
-                    case fs::object_type::none:               return "none";
-                    case fs::object_type::not_found:          return "not_found";
-                    case fs::object_type::special_collection: return "special_collection";
-                    case fs::object_type::unknown:            return "unknown";
-                    default:                                  return "?";
-                }
-            };
-
             json perms;
             for (auto&& ep : status.permissions()) {
                 perms.push_back(json{
                     {"name", ep.name},
                     {"zone", ep.zone},
                     {"type", ep.type},
-                    {"perm", to_permission_string(ep.prms)},
+                    {"perm", irods::to_permission_string(ep.prms)},
                 });
             }
 
@@ -1071,7 +779,7 @@ auto handle_data_objects(const http::request<http::string_body>& _req) -> http::
                 {"irods_response", {
                     {"error_code", 0},
                 }},
-                {"type", to_type_string(status.type())},
+                {"type", irods::to_object_type_string(status.type())},
                 {"permissions", perms},
                 // TODO Should these be returned upon request?
                 // What should be included under replicas? Data ID, physical path, replica status, replica number? What else?
@@ -2538,16 +2246,8 @@ auto handle_users_groups(const http::request<http::string_body>& _req) -> http::
 auto handle_tickets(const http::request<http::string_body>& _req) -> http::response<http::string_body>
 {
     if (_req.method() != http::verb::get && _req.method() != http::verb::post) {
-        // TODO
-            log::error("{}: Missing [name] parameter.", __func__);
-            return irods::http::fail(res, http::status::bad_request);
-        fmt::print("{}: Incorrect HTTP method.\n", __func__);
-        http::response<http::string_body> res{http::status::method_not_allowed, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Incorrect HTTP method.", __func__);
+        return irods::http::fail(http::status::method_not_allowed);
     }
 
     const auto result = irods::http::resolve_client_identity(_req);
@@ -2566,13 +2266,8 @@ auto handle_tickets(const http::request<http::string_body>& _req) -> http::respo
 
     const auto op_iter = url.query.find("op");
     if (op_iter == std::end(url.query)) {
-        fmt::print("{}: Missing [op] parameter.\n", __func__);
-        http::response<http::string_body> res{http::status::bad_request, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.set(http::field::content_length, "0");
-        res.keep_alive(_req.keep_alive());
-        return res;
+        log::error("{}: Missing [op] parameter.", __func__);
+        return irods::http::fail(http::status::bad_request);
     }
 
     http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -2585,13 +2280,8 @@ auto handle_tickets(const http::request<http::string_body>& _req) -> http::respo
     if (op_iter->second == "create") {
         const auto lpath_iter = url.query.find("lpath");
         if (lpath_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [lpath] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [lpath] parameter.", __func__);
+            return irods::http::fail(http::status::bad_request);
         }
 
         try {
@@ -2602,13 +2292,8 @@ auto handle_tickets(const http::request<http::string_body>& _req) -> http::respo
                     ticket_type = ia::ticket::ticket_type::write;
                 }
                 else if (type_iter->second != "read") {
-                    fmt::print("{}: Missing [lpath] parameter.\n", __func__);
-                    http::response<http::string_body> res{http::status::bad_request, _req.version()};
-                    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-                    res.set(http::field::content_type, "text/plain");
-                    res.set(http::field::content_length, "0");
-                    res.keep_alive(_req.keep_alive());
-                    return res;
+                    log::error("{}: Missing [type] parameter.", __func__);
+                    return irods::http::fail(http::status::bad_request);
                 }
             }
 
@@ -2701,13 +2386,8 @@ auto handle_tickets(const http::request<http::string_body>& _req) -> http::respo
     else if (op_iter->second == "remove") {
         const auto name_iter = url.query.find("name");
         if (name_iter == std::end(url.query)) {
-            fmt::print("{}: Missing [name] parameter.\n", __func__);
-            http::response<http::string_body> res{http::status::bad_request, _req.version()};
-            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "text/plain");
-            res.set(http::field::content_length, "0");
-            res.keep_alive(_req.keep_alive());
-            return res;
+            log::error("{}: Missing [name] parameter.", __func__);
+            return irods::http::fail(res, http::status::bad_request);
         }
 
         try {
@@ -2748,8 +2428,8 @@ auto handle_tickets(const http::request<http::string_body>& _req) -> http::respo
 }
 
 const std::unordered_map<std::string_view, request_handler> req_handlers{
-    {"/irods-rest/0.9.5/authenticate", irods::http::endpoint::authentication},
-    {"/irods-rest/0.9.5/collections",  handle_collections},
+    {"/irods-rest/0.9.5/authenticate", irods::http::handler::authentication},
+    {"/irods-rest/0.9.5/collections",  irods::http::handler::collections},
     //{"/irods-rest/0.9.5/config",       "/config"},
     {"/irods-rest/0.9.5/data-objects", handle_data_objects},
     {"/irods-rest/0.9.5/metadata",     handle_metadata},
@@ -2766,35 +2446,34 @@ const std::unordered_map<std::string_view, request_handler> req_handlers{
 // contents of the request, so the interface requires the
 // caller to pass a generic lambda for receiving the response.
 template <class Body, class Allocator, class Send>
-void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send)
+auto handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send) -> void
 {
     // Print the headers.
     for (auto&& h : req.base()) {
-        fmt::print(fmt::runtime("header: ({}, {})\n"), h.name_string(), h.value());
+        log::debug("{}: Header: ({}, {})", __func__, h.name_string(), h.value());
     }
 
     // Print the components of the request URL.
-    fmt::print("method            : {}\n", req.method_string());
-    fmt::print("version           : {}\n", req.version());
-    fmt::print("target            : {}\n", req.target());
-    fmt::print("keep alive        : {}\n", req.keep_alive());
-    fmt::print("has content length: {}\n", req.has_content_length());
-    fmt::print("chunked           : {}\n", req.chunked());
-    fmt::print("needs eof         : {}\n", req.need_eof());
+    log::debug("{}: Method: {}", __func__, req.method_string());
+    log::debug("{}: Version: {}", __func__, req.version());
+    log::debug("{}: Target: {}", __func__, req.target());
+    log::debug("{}: Keep Alive: {}", __func__, req.keep_alive());
+    log::debug("{}: Has Content Length: {}", __func__, req.has_content_length());
+    log::debug("{}: Chunked: {}", __func__, req.chunked());
+    log::debug("{}: Needs EOF: {}", __func__, req.need_eof());
 
-    const auto url = irods::http::parse_url(req); // TODO We should only look at the URL path here.
-    const auto iter = req_handlers.find(url.path);
-
-    if (iter == std::end(req_handlers)) {
-        // TODO Invalid path (send bad request error code?).
-        http::response<http::empty_body> res{http::status::bad_request, req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
-        res.keep_alive(req.keep_alive());
-        send(std::move(res));
+    // "host" is used so that get_url_path() can parse the URL.
+    const auto path = irods::http::get_url_path(fmt::format("http://host{}", req.target()));
+    if (!path) {
+        send(std::move(irods::http::fail(http::status::bad_request)));
     }
 
-    send((iter->second)(req));
+    if (const auto iter = req_handlers.find(*path); iter != std::end(req_handlers)) {
+        send((iter->second)(req));
+        return;
+    }
+
+    send(std::move(irods::http::fail(http::status::not_found)));
 }
 
 //------------------------------------------------------------------------------

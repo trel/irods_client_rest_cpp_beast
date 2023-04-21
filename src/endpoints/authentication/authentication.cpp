@@ -1,4 +1,4 @@
-#include "authentication.hpp"
+#include "handlers.hpp"
 
 #include "common.hpp"
 #include "log.hpp"
@@ -10,7 +10,7 @@
 #include <irods/rcConnect.h>
 
 #include <boost/asio.hpp>
-#include <boost/asio/ip/tcp.hpp>
+//#include <boost/asio/ip/tcp.hpp> // TODO Remove
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
 
@@ -24,9 +24,9 @@ namespace http  = beast::http;      // from <boost/beast/http.hpp>
 namespace net   = boost::asio;      // from <boost/asio.hpp>
 // clang-format on
 
-using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp>
+//using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
 
-namespace irods::http::endpoint
+namespace irods::http::handler
 {
     auto authentication(const request_type& _req) -> response_type
     {

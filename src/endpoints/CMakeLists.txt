@@ -1,5 +1,5 @@
 add_subdirectory(authentication)
-#add_subdirectory(collections)
+add_subdirectory(collections)
 #add_subdirectory(config)
 #add_subdirectory(data_objects)
 #add_subdirectory(metadata)
