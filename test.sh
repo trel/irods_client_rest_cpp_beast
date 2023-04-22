@@ -43,7 +43,7 @@ test_collections_endpoint()
         $curl_opts | jq
     # Give the rods user read permission on the collection.
     curl -H "authorization: Bearer $bearer_token" "${base_url}/collections" \
-        --data-urlencode 'op=set-permission' \
+        --data-urlencode 'op=set_permission' \
         --data-urlencode "lpath=$new_collection" \
         --data-urlencode 'entity-name=rods' \
         --data-urlencode 'permission=read_object' \

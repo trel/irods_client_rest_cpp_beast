@@ -97,13 +97,14 @@ namespace
 
     const std::unordered_map<std::string, handler_type> handlers_for_post{
         {"touch", handle_touch_op},
+        {"remove", handle_remove_op},
 
         {"write", handle_write_op},
         {"parallel_write_init", handle_parallel_write_init_op},
         {"parallel_write_shutdown", handle_parallel_write_shutdown_op},
 
-        {"remove", handle_remove_op},
         {"rename", handle_rename_op},
+        //{"copy", handle_copy_op},
 
         {"replicate", handle_replicate_op},
         {"trim", handle_trim_op},
@@ -112,6 +113,12 @@ namespace
         {"unregister", handle_unregister_op},
 
         {"set_permission", handle_set_permission_op}
+
+        //{"calculate_checksum", handle_calculate_checksum},
+        //{"register_checksum", handle_register_checksum},
+        //{"verify_checksum", handle_verify_checksum},
+
+        //{"physical_move", handle_physical_move},
     };
 } // anonymous namespace
 
@@ -1047,7 +1054,9 @@ namespace
                 {"replicas", json::array_t{}},
                 // TODO Notice these require additional network calls. Could be avoided by using GenQuery, perhaps.
                 {"size", fs::client::data_object_size(conn, lpath_iter->second)},
-                {"checksum", fs::client::data_object_checksum(conn, lpath_iter->second)}
+                {"checksum", fs::client::data_object_checksum(conn, lpath_iter->second)},
+                {"registered", fs::client::is_data_object_registered(conn, lpath_iter->second)},
+                {"mtime", fs::client::last_write_time(conn, lpath_iter->second).time_since_epoch().count()}
             }.dump();
         }
         catch (const fs::filesystem_error& e) {

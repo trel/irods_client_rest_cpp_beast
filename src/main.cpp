@@ -327,7 +327,13 @@ private:
 
 int main(int argc, char* argv[])
 {
-    // TODO Load information from a config file.
+    // TODO All of this needs to be wrapped in a try-catch block.
+
+    // TODO For LONG running tasks, see the following:
+    //
+    //   - https://stackoverflow.com/questions/17648725/long-running-blocking-operations-in-boost-asio-handlers
+    //   - https://www.open-std.org/JTC1/SC22/WG21/docs/papers/2012/n3388.pdf
+    //
 
     // Check command line arguments.
     if (argc != 4) {

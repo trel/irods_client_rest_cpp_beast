@@ -64,7 +64,7 @@ namespace
         {"create", handle_create_op},
         {"remove", handle_remove_op},
         {"rename", handle_rename_op},
-        {"set-permission", handle_set_permission_op}
+        {"set_permission", handle_set_permission_op}
     };
 } // anonymous namespace
 
@@ -241,7 +241,10 @@ namespace
                 }},
                 {"type", irods::to_object_type_string(status.type())},
                 {"inheritance_enabled", status.is_inheritance_enabled()},
-                {"permissions", perms}
+                {"permissions", perms},
+                // TODO Notice these require additional network calls. Could be avoided by using GenQuery, perhaps.
+                {"registered", fs::client::is_collection_registered(conn, lpath_iter->second)},
+                {"mtime", fs::client::last_write_time(conn, lpath_iter->second).time_since_epoch().count()}
             }.dump();
         }
         catch (const fs::filesystem_error& e) {
