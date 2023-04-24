@@ -1,6 +1,7 @@
 #include "handlers.hpp"
 
 #include "common.hpp"
+#include "globals.hpp"
 #include "log.hpp"
 #include "session.hpp"
 
@@ -25,7 +26,7 @@
 // clang-format off
 namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
-//namespace net   = boost::asio;      // from <boost/asio.hpp>
+namespace net   = boost::asio;      // from <boost/asio.hpp>
 
 //using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
 
@@ -38,14 +39,17 @@ namespace
 {
     // clang-format off
     using query_arguments_type = decltype(irods::http::url::query); // TODO Could be moved to common.hpp
-    using handler_type         = irods::http::response_type(*)(const irods::http::request_type& _req, const query_arguments_type& _args);
+
+    using handler_type         = void(*)(irods::http::session_pointer_type&, const irods::http::request_type&, const query_arguments_type&);
     // clang-format on
 
     //
     // Handler function prototypes
     //
 
-    auto handle_atomic_execute_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_atomic_execute_op(irods::http::session_pointer_type& _sess_ptr,
+                                  const irods::http::request_type& _req,
+                                  const query_arguments_type& _args) -> void;
 
     //
     // Operation to Handler mappings
@@ -75,7 +79,7 @@ namespace irods::http::handler
             }
 
             if (const auto iter = handlers_for_get.find(op_iter->second); iter != std::end(handlers_for_get)) {
-                return (iter->second)(_req, url.query);
+                return (iter->second)(_sess_ptr, _req, url.query);
             }
         }
         else
@@ -90,7 +94,7 @@ namespace irods::http::handler
             }
 
             if (const auto iter = handlers_for_post.find(op_iter->second); iter != std::end(handlers_for_post)) {
-                return _sess_ptr->send((iter->second)(_req, args));
+                return (iter->second)(_sess_ptr, _req, args);
             }
         }
 
@@ -105,11 +109,13 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_atomic_execute_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_atomic_execute_op(irods::http::session_pointer_type& _sess_ptr,
+                                  const irods::http::request_type& _req,
+                                  const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -120,46 +126,53 @@ namespace
         res.set(http::field::content_type, "text/plain");
         res.keep_alive(_req.keep_alive());
 
-        try {
-            const auto data_iter = _args.find("data");
-            if (data_iter == std::end(_args)) {
-                log::error("{}: Missing [data] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+        const auto data_iter = _args.find("data");
+        if (data_iter == std::end(_args)) {
+            log::error("{}: Missing [data] parameter.", __func__);
+            return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+        }
+
+        log::trace("{}: Scheduling atomic metadata operations on long-running task thread pool.", __func__);
+
+        net::post(*irods::http::globals::thread_pool_bg, [fn = __func__, _sess_ptr, client_info, res = std::move(res), json_input = data_iter->second]() mutable {
+            try {
+                log::trace("{}: Executing metadata operations.", fn);
+
+                char* output{};
+                irods::at_scope_exit_unsafe free_output{[&output] { std::free(output); }};
+
+                auto conn = irods::get_connection(client_info->username);
+                const auto ec = rc_atomic_apply_metadata_operations(static_cast<RcComm*>(conn), json_input.c_str(), &output);
+
+                json error_info;
+                if (output) {
+                    error_info = json::parse(output);
+                }
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", ec}
+                    }},
+                    {"error_info", error_info}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            char* output{};
-            irods::at_scope_exit_unsafe free_output{[&output] { std::free(output); }};
+            res.prepare_payload();
 
-            auto conn = irods::get_connection(client_info->username);
-            const auto ec = rc_atomic_apply_metadata_operations(static_cast<RcComm*>(conn), data_iter->second.c_str(), &output);
-
-            json error_info;
-            if (output) {
-                error_info = json::parse(output);
-            }
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", ec}
-                }},
-                {"error_info", error_info}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        return res;
+            log::trace("{}: Metadata operations complete. Sending response.", fn);
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_atomic_execute_op
 } // anonymous namespace

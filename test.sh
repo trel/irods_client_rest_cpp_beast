@@ -213,18 +213,18 @@ test_metadata_endpoint()
 {
     curl -H "authorization: Bearer $bearer_token" "${base_url}/metadata" \
         --data-urlencode 'op=atomic_execute' \
-        --data-urlencode 'data={
-            "entity_name": "/tempZone/home/$irods_username",
-            "entity_type": "collection",
-            "operations": [
+        --data-urlencode "data={
+            \"entity_name\": \"/tempZone/home/$irods_username\",
+            \"entity_type\": \"collection\",
+            \"operations\": [
                 {
-                    "operation": "add",
-                    "attribute": "source",
-                    "value": "irods-rest-beast",
-                    "units": "c++"
+                    \"operation\": \"add\",
+                    \"attribute\": \"source\",
+                    \"value\": \"irods-http-beast\",
+                    \"units\": \"c++\"
                 }
             ]
-        }' \
+        }" \
         ${curl_opts} | jq
 
     # Notice the value for "entity_type" below.
@@ -444,14 +444,14 @@ test_users_groups_endpoint()
         $curl_opts | jq
 }
 
-test_collections_endpoint
+#test_collections_endpoint
 #test_configuration_endpoint
-test_data_objects_endpoint
+#test_data_objects_endpoint
 test_metadata_endpoint
-test_query_endpoint
-test_resource_endpoint
-test_rules_endpoint
-test_tickets_endpoint
-test_users_groups_endpoint
+#test_query_endpoint
+#test_resource_endpoint
+#test_rules_endpoint
+#test_tickets_endpoint
+#test_users_groups_endpoint
 #test_zones_endpoint
 #test_information_endpoint
