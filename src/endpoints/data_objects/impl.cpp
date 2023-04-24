@@ -1,10 +1,12 @@
 #include "handlers.hpp"
 
 #include "common.hpp"
+#include "globals.hpp"
 #include "log.hpp"
 #include "session.hpp"
 
 #include <irods/client_connection.hpp>
+#include <irods/connection_pool.hpp>
 #include <irods/dataObjRepl.h>
 #include <irods/dataObjTrim.h>
 #include <irods/filesystem.hpp>
@@ -24,6 +26,7 @@
 #include <nlohmann/json.hpp>
 
 #include <span>
+#include <mutex>
 #include <string>
 //#include <string_view>
 #include <unordered_map>
@@ -61,6 +64,16 @@ namespace
     {
         std::string logical_path;
         std::vector<std::shared_ptr<parallel_write_stream>> streams;
+        std::unique_ptr<std::mutex> mtx;
+        int index = 0;
+
+        auto next_stream() -> irods::experimental::io::odstream&
+        {
+            std::scoped_lock lk{*mtx};
+            const auto i = index;
+            index = ++index % streams.size();
+            return streams.at(i)->out;
+        } // next_stream
     }; // struct parallel_write_context
 
     std::unordered_map<std::string, parallel_write_context> parallel_write_contexts;
@@ -357,6 +370,7 @@ namespace
         res.keep_alive(_req.keep_alive());
 
         try {
+            // TODO This is only required if the user did not include a parallel-write-handle.
             const auto lpath_iter = _args.find("lpath");
             if (lpath_iter == std::end(_args)) {
                 log::error("{}: Missing [lpath] parameter.", __func__);
@@ -365,7 +379,8 @@ namespace
 
             log::trace("{}: Opening data object [{}] for write.", __func__, lpath_iter->second);
 
-            std::unique_ptr<irods::experimental::client_connection> conn;
+            //std::unique_ptr<irods::experimental::client_connection> conn;
+            irods::connection_pool::connection_proxy conn;
             std::unique_ptr<io::client::native_transport> tp;
 
             std::unique_ptr<io::odstream> out;
@@ -391,16 +406,15 @@ namespace
                 // It's also more deterministic.
                 //
                 // TODO This counter needs to be part of the parallel_write_stream.
-                static int idx = 0;
-                log::debug("{}: (write) Parallel Write - stream index = [{}].", __func__, idx);
-                out_ptr = &iter->second.streams[idx]->out;
-                ++idx;
-                idx %= iter->second.streams.size();
+                out_ptr = &iter->second.next_stream();
+                log::debug("{}: (write) Parallel Write - stream memory address = [{}].", __func__, fmt::ptr(out_ptr));
             }
             else {
                 log::trace("{}: (write) Initializing for single buffer write.", __func__);
-                conn = std::make_unique<irods::experimental::client_connection>();
-                tp = std::make_unique<io::client::native_transport>(*conn);
+                //conn = std::make_unique<irods::experimental::client_connection>();
+                conn = irods::get_connection(client_info->username);
+                //tp = std::make_unique<io::client::native_transport>(*conn);
+                tp = std::make_unique<io::client::native_transport>(conn);
                 out = std::make_unique<io::odstream>(*tp, lpath_iter->second);
                 out_ptr = out.get();
             }
@@ -569,7 +583,16 @@ namespace
             auto transfer_handle = irods::generate_uuid(parallel_write_contexts);
             log::debug("{}: (init) Parallel Write Handle = [{}].", __func__, transfer_handle);
 
-            auto [iter, insertion_result] = parallel_write_contexts.insert({transfer_handle, {.logical_path = lpath_iter->second}});
+            //parallel_write_context pw_ctx;
+            //pw_ctx.logical_path = lpath_iter->second;
+            //pw_ctx.mtx = std::make_unique<std::mutex>();
+
+            auto [iter, insertion_result] = parallel_write_contexts.emplace(transfer_handle,
+                    parallel_write_context{
+                        .logical_path = lpath_iter->second,
+                        .mtx = std::make_unique<std::mutex>()
+                    });
+            //auto [iter, insertion_result] = parallel_write_contexts.emplace(transfer_handle, parallel_write_context{.logical_path = lpath_iter->second});
             log::trace("{}: (init) Checking if parallel_write_context was inserted successfully.", __func__);
             if (!insertion_result) {
                 log::error("{}: Could not initialize parallel write context for [{}].", __func__, lpath_iter->second);
