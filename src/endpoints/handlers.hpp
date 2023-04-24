@@ -5,25 +5,25 @@
 
 namespace irods::http::handler
 {
-    auto authentication(const request_type& _request) -> response_type;
+    auto authentication(session_pointer_type _session_ptr, const request_type& _request) -> void;
 
-    auto collections(const request_type& _request) -> response_type;
+    auto collections(session_pointer_type _session_ptr, const request_type& _request) -> void;
 
-    auto config(const request_type& _request) -> response_type;
+    auto config(session_pointer_type _session_ptr, const request_type& _request) -> void;
 
-    auto data_objects(const request_type& _request) -> response_type;
+    auto data_objects(session_pointer_type _session_ptr, const request_type& _request) -> void;
 
-    auto metadata(const request_type& _request) -> response_type;
+    auto metadata(session_pointer_type _session_ptr, const request_type& _request) -> void;
 
-    auto query(const request_type& _request) -> response_type;
+    auto query(session_pointer_type _session_ptr, const request_type& _request) -> void;
 
-    auto resources(const request_type& _request) -> response_type;
+    auto resources(session_pointer_type _session_ptr, const request_type& _request) -> void;
 
-    auto rules(const request_type& _request) -> response_type;
+    auto rules(session_pointer_type _session_ptr, const request_type& _request) -> void;
 
-    auto tickets(const request_type& _request) -> response_type;
+    auto tickets(session_pointer_type _session_ptr, const request_type& _request) -> void;
 
-    auto users_groups(const request_type& _request) -> response_type;
+    auto users_groups(session_pointer_type _session_ptr, const request_type& _request) -> void;
 } // namespace irods::http::handler
 
 #endif // IRODS_HTTP_API_HANDLERS_HPP

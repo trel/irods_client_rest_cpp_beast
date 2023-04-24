@@ -3,6 +3,7 @@
 #include "common.hpp"
 #include "globals.hpp"
 #include "log.hpp"
+#include "session.hpp"
 
 #include <irods/base64.hpp>
 #include <irods/client_connection.hpp>
@@ -20,19 +21,19 @@
 #include <vector>
 
 // clang-format off
-namespace beast = boost::beast;     // from <boost/beast.hpp>
-namespace http  = beast::http;      // from <boost/beast/http.hpp>
-namespace net   = boost::asio;      // from <boost/asio.hpp>
+//namespace beast = boost::beast;     // from <boost/beast.hpp>
+//namespace http  = beast::http;      // from <boost/beast/http.hpp>
+//namespace net   = boost::asio;      // from <boost/asio.hpp>
 // clang-format on
 
 //using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
 
 namespace irods::http::handler
 {
-    auto authentication(const request_type& _req) -> response_type
+    auto authentication(session_pointer_type _sess_ptr, const request_type& _req) -> void
     {
         if (_req.method() != boost::beast::http::verb::post) {
-            return fail(status_type::method_not_allowed);
+            return _sess_ptr->send(fail(status_type::method_not_allowed));
         }
 
         // TODO Authentication needs to be implemented as a pluggable interface.
@@ -65,7 +66,7 @@ namespace irods::http::handler
         const auto& hdrs = _req.base();
         const auto iter = hdrs.find("authorization");
         if (iter == std::end(hdrs)) {
-            return fail(status_type::bad_request);
+            return _sess_ptr->send(fail(status_type::bad_request));
         }
 
         log::debug("{}: Authorization value: [{}]", __func__, iter->value());
@@ -76,7 +77,7 @@ namespace irods::http::handler
 
         const auto pos = iter->value().find("Basic ");
         if (std::string_view::npos == pos) {
-            return fail(status_type::bad_request);
+            return _sess_ptr->send(fail(status_type::bad_request));
         }
 
         std::string authorization{iter->value().substr(pos + 6)};
@@ -94,7 +95,7 @@ namespace irods::http::handler
 
         const auto colon = sv.find(':');
         if (colon == std::string_view::npos) {
-            return fail(status_type::unauthorized);
+            return _sess_ptr->send(fail(status_type::unauthorized));
         }
 
         std::string username{sv.substr(0, colon)};
@@ -120,7 +121,7 @@ namespace irods::http::handler
         }
 
         if (!login_successful) {
-            return fail(status_type::unauthorized);
+            return _sess_ptr->send(fail(status_type::unauthorized));
         }
 
         // TODO If login succeeded, generate a token (i.e. JWT) that represents the
@@ -163,6 +164,6 @@ namespace irods::http::handler
         res.body() = std::move(bearer_token);
         res.prepare_payload();
 
-        return res;
+        return _sess_ptr->send(std::move(res));
     } // authentication
 } // namespace irods::http::endpoint

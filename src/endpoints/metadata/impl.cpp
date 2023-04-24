@@ -2,6 +2,7 @@
 
 #include "common.hpp"
 #include "log.hpp"
+#include "session.hpp"
 
 #include <irods/atomic_apply_metadata_operations.h>
 #include <irods/client_connection.hpp>
@@ -24,7 +25,7 @@
 // clang-format off
 namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
-namespace net   = boost::asio;      // from <boost/asio.hpp>
+//namespace net   = boost::asio;      // from <boost/asio.hpp>
 
 //using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
 
@@ -61,7 +62,7 @@ namespace
 namespace irods::http::handler
 {
     // Handles all requests sent to /metadata.
-    auto metadata(const request_type& _req) -> response_type
+    auto metadata(session_pointer_type _sess_ptr, const request_type& _req) -> void
     {
 #if 0
         if (_req.method() == verb_type::get) {
@@ -85,16 +86,16 @@ namespace irods::http::handler
             const auto op_iter = args.find("op");
             if (op_iter == std::end(args)) {
                 log::error("{}: Missing [op] parameter.", __func__);
-                return irods::http::fail(status_type::bad_request);
+                return _sess_ptr->send(irods::http::fail(status_type::bad_request));
             }
 
             if (const auto iter = handlers_for_post.find(op_iter->second); iter != std::end(handlers_for_post)) {
-                return (iter->second)(_req, args);
+                return _sess_ptr->send((iter->second)(_req, args));
             }
         }
 
         log::error("{}: Incorrect HTTP method.", __func__);
-        return irods::http::fail(status_type::method_not_allowed);
+        return _sess_ptr->send(irods::http::fail(status_type::method_not_allowed));
     } // metadata
 } // namespace irods::http::handler
 

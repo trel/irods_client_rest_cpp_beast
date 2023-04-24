@@ -2,6 +2,7 @@
 #include "globals.hpp"
 #include "handlers.hpp"
 #include "log.hpp"
+#include "session.hpp"
 
 #include <irods/connection_pool.hpp>
 #include <irods/rcConnect.h>
@@ -50,10 +51,10 @@ namespace po    = boost::program_options;
 namespace log   = irods::http::log;
 
 using json            = nlohmann::json;
-using request_handler = irods::http::response_type(*)(const irods::http::request_type&);
+//using request_handler = void(*)(const irods::http::request_type&);
 using tcp             = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
 
-const std::unordered_map<std::string_view, request_handler> req_handlers{
+const irods::http::request_handler_map_type req_handlers{
     {"/irods-rest/0.9.5/authenticate", irods::http::handler::authentication},
     {"/irods-rest/0.9.5/collections",  irods::http::handler::collections},
     //{"/irods-rest/0.9.5/config",     irods::http::handler::configuration},
@@ -97,147 +98,15 @@ auto handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     }
 
     if (const auto iter = req_handlers.find(*path); iter != std::end(req_handlers)) {
-        send((iter->second)(req));
+        (iter->second)(req, send);
+        //(iter->second)(req, [&send](auto&& _res) -> void {
+            //send(std::forward<decltype(_res)>(_res));
+        //});
         return;
     }
 
     send(std::move(irods::http::fail(http::status::not_found)));
-}
-
-// Report a failure.
-auto fail(beast::error_code ec, char const* what) -> void
-{
-    log::error("{}: {}: {}", __func__, what, ec.message());
-}
-
-// Handles an HTTP server connection.
-class session : public std::enable_shared_from_this<session>
-{
-    // This is the C++11 equivalent of a generic lambda.
-    // The function object is used to send an HTTP message.
-    struct send_lambda
-    {
-        session& self_;
-
-        explicit send_lambda(session& self)
-            : self_(self)
-        {
-        }
-
-        template <bool isRequest, class Body, class Fields>
-        auto operator()(http::message<isRequest, Body, Fields>&& msg) const -> void
-        {
-            // The lifetime of the message has to extend
-            // for the duration of the async operation so
-            // we use a shared_ptr to manage it.
-            auto sp = std::make_shared<
-                http::message<isRequest, Body, Fields>>(std::move(msg));
-
-            // Store a type-erased version of the shared
-            // pointer in the class to keep it alive.
-            self_.res_ = sp;
-
-            // Write the response
-            http::async_write(
-                self_.stream_,
-                *sp,
-                beast::bind_front_handler(
-                    &session::on_write,
-                    self_.shared_from_this(),
-                    sp->need_eof()));
-        }
-    }; // struct send_lambda
-
-    beast::tcp_stream stream_;
-    beast::flat_buffer buffer_;
-    http::request<http::string_body> req_;
-    std::shared_ptr<void> res_;
-    send_lambda lambda_;
-
-  public:
-    // Take ownership of the stream
-    session(tcp::socket&& socket) // TODO Mark explicit?
-        : stream_(std::move(socket))
-        , lambda_(*this)
-    {
-    } // session (constructor)
-
-    // Start the asynchronous operation
-    auto run() -> void
-    {
-        // We need to be executing within a strand to perform async operations
-        // on the I/O objects in this session. Although not strictly necessary
-        // for single-threaded contexts, this example code is written to be
-        // thread-safe by default.
-        net::dispatch(stream_.get_executor(),
-                      beast::bind_front_handler(
-                          &session::do_read,
-                          shared_from_this()));
-    } // run
-
-    auto do_read() -> void
-    {
-        // Make the request empty before reading,
-        // otherwise the operation behavior is undefined.
-        req_ = {};
-
-        // Set the timeout.
-        stream_.expires_after(std::chrono::seconds(30));
-
-        // Read a request
-        http::async_read(stream_, buffer_, req_,
-            beast::bind_front_handler(
-                &session::on_read,
-                shared_from_this()));
-    } // do_read
-
-    auto on_read(beast::error_code ec, std::size_t bytes_transferred) -> void
-    {
-        boost::ignore_unused(bytes_transferred);
-
-        // This means they closed the connection
-        if (ec == http::error::end_of_stream) {
-            return do_close();
-        }
-
-        if (ec) {
-            return fail(ec, "read");
-        }
-
-        // Send the response
-        handle_request(std::move(req_), lambda_);
-    } // on_read
-
-    auto on_write(bool close, beast::error_code ec, std::size_t bytes_transferred) -> void
-    {
-        boost::ignore_unused(bytes_transferred);
-
-        if (ec) {
-            return fail(ec, "write");
-        }
-
-        if (close) {
-            // This means we should close the connection, usually because
-            // the response indicated the "Connection: close" semantic.
-            return do_close();
-        }
-
-        // We're done with the response so delete it
-        res_ = nullptr;
-
-        // Read another request
-        do_read();
-    } // on_write
-
-    auto do_close() -> void
-    {
-        // Send a TCP shutdown.
-        beast::error_code ec;
-        stream_.socket().shutdown(tcp::socket::shutdown_send, ec);
-
-        // At this point the connection is closed gracefully.
-    } // do_close
-}; // class session
+} // handle_request
 
 // Accepts incoming connections and launches the sessions.
 class listener : public std::enable_shared_from_this<listener>
@@ -255,28 +124,28 @@ class listener : public std::enable_shared_from_this<listener>
         // Open the acceptor
         acceptor_.open(endpoint.protocol(), ec);
         if (ec) {
-            fail(ec, "open");
+            irods::fail(ec, "open");
             return;
         }
 
         // Allow address reuse
         acceptor_.set_option(net::socket_base::reuse_address(true), ec);
         if (ec) {
-            fail(ec, "set_option");
+            irods::fail(ec, "set_option");
             return;
         }
 
         // Bind to the server address
         acceptor_.bind(endpoint, ec);
         if (ec) {
-            fail(ec, "bind");
+            irods::fail(ec, "bind");
             return;
         }
 
         // Start listening for connections
         acceptor_.listen(net::socket_base::max_listen_connections, ec);
         if (ec) {
-            fail(ec, "listen");
+            irods::fail(ec, "listen");
             return;
         }
     } // listener (constructor)
@@ -301,12 +170,12 @@ class listener : public std::enable_shared_from_this<listener>
     auto on_accept(beast::error_code ec, tcp::socket socket) -> void
     {
         if (ec) {
-            fail(ec, "accept");
+            irods::fail(ec, "accept");
             return; // To avoid infinite loop
         }
 
         // Create the session and run it
-        std::make_shared<session>(std::move(socket))->run();
+        std::make_shared<irods::http::session>(std::move(socket), req_handlers)->run();
 
         // Accept another connection
         do_accept();

@@ -33,12 +33,19 @@
 
 namespace irods::http
 {
+    class session;
+
     // clang-format off
     using field_type    = boost::beast::http::field;
     using request_type  = boost::beast::http::request<boost::beast::http::string_body>;
     using response_type = boost::beast::http::response<boost::beast::http::string_body>;
     using status_type   = boost::beast::http::status;
     using verb_type     = boost::beast::http::verb;
+
+    using session_pointer_type = std::shared_ptr<irods::http::session>;
+    using request_handler_type = void(*)(session_pointer_type, const request_type&);
+
+    using request_handler_map_type = std::unordered_map<std::string_view, request_handler_type>;
     // clang-format on
 
     enum class authorization_scheme
@@ -381,6 +388,11 @@ namespace irods
 
         return conn;
     } // get_connection
+
+    inline auto fail(boost::beast::error_code ec, char const* what) -> void
+    {
+        irods::http::log::error("{}: {}: {}", __func__, what, ec.message());
+    } // fail
 } // namespace irods
 
 #endif // IRODS_HTTP_API_ENDPOINT_COMMON_HPP

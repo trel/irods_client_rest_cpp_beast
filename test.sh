@@ -23,15 +23,15 @@ test_collections_endpoint()
     # Stat a collection.
     curl -G -H "authorization: Bearer $bearer_token" "${base_url}/collections" \
         --data-urlencode 'op=stat' \
-        --data-urlencode 'lpath=/tempZone/home/kory' \
+        --data-urlencode "lpath=/tempZone/home/$irods_username" \
         $curl_opts | jq
     # List the contents of a collection.
     curl -G -H "authorization: Bearer $bearer_token" "${base_url}/collections" \
         --data-urlencode 'op=list' \
-        --data-urlencode 'lpath=/tempZone/home/kory' \
+        --data-urlencode 'lpath=/tempZone/home/$irods_username' \
         $curl_opts | jq
     # Create a new collection.
-    new_collection='/tempZone/home/kory/created_by_http_api.c'
+    new_collection="/tempZone/home/$irods_username/created_by_http_api.c"
     curl -H "authorization: Bearer $bearer_token" "${base_url}/collections" \
         --data-urlencode 'op=create' \
         --data-urlencode "lpath=$new_collection" \
@@ -214,7 +214,7 @@ test_metadata_endpoint()
     curl -H "authorization: Bearer $bearer_token" "${base_url}/metadata" \
         --data-urlencode 'op=atomic_execute' \
         --data-urlencode 'data={
-            "entity_name": "/tempZone/home/kory",
+            "entity_name": "/tempZone/home/$irods_username",
             "entity_type": "collection",
             "operations": [
                 {
@@ -235,18 +235,18 @@ test_metadata_endpoint()
     # in 4.2.12. Nothing's broken, it's just not convenient to read.
     curl -H "authorization: Bearer $bearer_token" -H 'content-type: text/plain' "${base_url}/metadata" \
         --data-urlencode 'op=atomic_execute' \
-        --data-urlencode 'data={
-            "entity_name": "/tempZone/home/kory",
-            "entity_type": "file",
-            "operations": [
+        --data-urlencode "data={
+            \"entity_name\": \"/tempZone/home/$irods_username\",
+            \"entity_type\": \"file\",
+            \"operations\": [
                 {
-                    "operation": "add",
-                    "attribute": "source",
-                    "value": "irods-rest-beast",
-                    "units": "c++"
+                    \"operation\": \"add\",
+                    \"attribute\": \"source\",
+                    \"value\": \"irods-rest-beast\",
+                    \"units\": \"c++\"
                 }
             ]
-        }' \
+        }" \
         ${curl_opts} | jq
 }
 
@@ -286,7 +286,7 @@ test_rules_endpoint()
 
 test_data_objects_endpoint()
 {
-    data_object='/tempZone/home/kory/http_file.txt'
+    data_object="/tempZone/home/$irods_username/http_file.txt"
 
     # Create a new empty data object.
     curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
@@ -311,7 +311,7 @@ test_data_objects_endpoint()
     ils -l $data_object
     istream read $data_object
 
-    pw_data_object='/tempZone/home/kory/pwfile.txt'
+    pw_data_object="/tempZone/home/$irods_username/pwfile.txt"
     pw_handle=$(curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
         --data-urlencode 'op=parallel_write_init' \
         --data-urlencode "lpath=$pw_data_object" \
@@ -379,7 +379,7 @@ test_tickets_endpoint()
     # Create a ticket for a collection.
     ticket_string=$(curl -H "authorization: Bearer $bearer_token" "${base_url}/tickets" \
         --data-urlencode 'op=create' \
-        --data-urlencode 'lpath=/tempZone/home/kory' \
+        --data-urlencode "lpath=/tempZone/home/$irods_username" \
         --data-urlencode 'type=write' \
         --data-urlencode 'use-count=250' \
         --data-urlencode 'write-data-object-count=100' \

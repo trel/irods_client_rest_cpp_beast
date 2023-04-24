@@ -2,6 +2,7 @@
 
 #include "common.hpp"
 #include "log.hpp"
+#include "session.hpp"
 
 #include <irods/client_connection.hpp>
 #include <irods/irods_exception.hpp>
@@ -23,7 +24,7 @@
 // clang-format off
 namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
-namespace net   = boost::asio;      // from <boost/asio.hpp>
+//namespace net   = boost::asio;      // from <boost/asio.hpp>
 
 //using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
 
@@ -73,7 +74,7 @@ namespace
 namespace irods::http::handler
 {
     // Handles all requests sent to /resources.
-    auto resources(const request_type& _req) -> response_type
+    auto resources(session_pointer_type _sess_ptr, const request_type& _req) -> void
     {
         if (_req.method() == verb_type::get) {
             const auto url = irods::http::parse_url(_req);
@@ -81,11 +82,11 @@ namespace irods::http::handler
             const auto op_iter = url.query.find("op");
             if (op_iter == std::end(url.query)) {
                 log::error("{}: Missing [op] parameter.", __func__);
-                return irods::http::fail(status_type::bad_request);
+                return _sess_ptr->send(irods::http::fail(status_type::bad_request));
             }
 
             if (const auto iter = handlers_for_get.find(op_iter->second); iter != std::end(handlers_for_get)) {
-                return (iter->second)(_req, url.query);
+                return _sess_ptr->send((iter->second)(_req, url.query));
             }
         }
         else if (_req.method() == verb_type::post) {
@@ -94,16 +95,16 @@ namespace irods::http::handler
             const auto op_iter = args.find("op");
             if (op_iter == std::end(args)) {
                 log::error("{}: Missing [op] parameter.", __func__);
-                return irods::http::fail(status_type::bad_request);
+                return _sess_ptr->send(irods::http::fail(status_type::bad_request));
             }
 
             if (const auto iter = handlers_for_post.find(op_iter->second); iter != std::end(handlers_for_post)) {
-                return (iter->second)(_req, args);
+                return _sess_ptr->send((iter->second)(_req, args));
             }
         }
 
         log::error("{}: Incorrect HTTP method.", __func__);
-        return irods::http::fail(status_type::method_not_allowed);
+        return _sess_ptr->send(irods::http::fail(status_type::method_not_allowed));
     } // resources
 } // namespace irods::http::handler
 
