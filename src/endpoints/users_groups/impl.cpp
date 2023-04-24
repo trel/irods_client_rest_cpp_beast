@@ -184,7 +184,7 @@ namespace
                 zone_type = adm::zone_type::remote;
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             adm::client::add_user(conn, adm::user{name_iter->second, zone_iter->second}, user_type, zone_type);
 
             res.body() = json{
@@ -239,7 +239,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             adm::client::remove_user(conn, adm::user{name_iter->second, zone_iter->second});
 
             res.body() = json{
@@ -456,7 +456,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             adm::client::add_group(conn, adm::group{name_iter->second});
 
             res.body() = json{
@@ -505,7 +505,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             adm::client::remove_group(conn, adm::group{name_iter->second});
 
             res.body() = json{
@@ -560,7 +560,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             const auto zone_iter = _args.find("zone");
             if (zone_iter != std::end(_args)) {
@@ -622,7 +622,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             const auto zone_iter = _args.find("zone");
             if (zone_iter != std::end(_args)) {
@@ -672,7 +672,7 @@ namespace
         res.keep_alive(_req.keep_alive());
 
         try {
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             const auto users = adm::client::users(conn);
 
             std::vector<json> v;
@@ -726,7 +726,7 @@ namespace
         res.keep_alive(_req.keep_alive());
 
         try {
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             auto groups = adm::client::groups(conn);
 
             std::vector<std::string> v;
@@ -867,7 +867,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             json info{
                 {"irods_response", {

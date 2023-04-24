@@ -144,7 +144,7 @@ namespace
             json::array_t row;
             json::array_t rows;
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             for (auto&& r : irods::query{static_cast<RcComm*>(conn), query_iter->second}) {
                 for (auto&& c : r) {

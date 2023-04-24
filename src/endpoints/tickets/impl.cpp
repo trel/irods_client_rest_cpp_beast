@@ -225,7 +225,7 @@ namespace
                 }
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             const auto ticket = adm::ticket::client::create_ticket(conn, ticket_type, lpath_iter->second);
 
             auto constraint_iter = _args.find("use-count");
@@ -335,7 +335,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             adm::ticket::client::delete_ticket(conn, name_iter->second);
 
             res.body() = json{

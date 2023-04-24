@@ -162,7 +162,7 @@ namespace
             json stdout_output;
             json stderr_output;
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             const auto ec = rcExecMyRule(static_cast<RcComm*>(conn), &input, &out_param_array);
 
             if (ec >= 0) {
@@ -239,7 +239,7 @@ namespace
             RuleExecDeleteInput input{};
             std::strncpy(input.ruleExecId, rule_id_iter->second.c_str(), sizeof(RuleExecDeleteInput::ruleExecId));
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             const auto ec = rcRuleExecDel(static_cast<RcComm*>(conn), &input);
 
             res.body() = json{
@@ -304,7 +304,7 @@ namespace
 
             MsParamArray* out_param_array{};
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             const auto ec = rcExecMyRule(static_cast<RcComm*>(conn), &input, &out_param_array);
 
             std::vector<std::string> plugin_instances;
@@ -392,7 +392,7 @@ namespace
             json::array_t row;
             json::array_t rows;
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             for (auto&& r : irods::query{static_cast<RcComm*>(conn), gql}) {
                 for (auto&& c : r) {

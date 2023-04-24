@@ -445,6 +445,7 @@ test_users_groups_endpoint()
 }
 
 test_collections_endpoint
+#test_configuration_endpoint
 test_data_objects_endpoint
 test_metadata_endpoint
 test_query_endpoint
@@ -452,3 +453,5 @@ test_resource_endpoint
 test_rules_endpoint
 test_tickets_endpoint
 test_users_groups_endpoint
+#test_zones_endpoint
+#test_information_endpoint

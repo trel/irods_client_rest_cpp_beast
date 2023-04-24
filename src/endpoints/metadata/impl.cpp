@@ -129,7 +129,7 @@ namespace
             char* output{};
             irods::at_scope_exit_unsafe free_output{[&output] { std::free(output); }};
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             const auto ec = rc_atomic_apply_metadata_operations(static_cast<RcComm*>(conn), data_iter->second.c_str(), &output);
 
             json error_info;

@@ -1,11 +1,16 @@
 #ifndef IRODS_HTTP_API_ENDPOINT_COMMON_HPP
 #define IRODS_HTTP_API_ENDPOINT_COMMON_HPP
 
+#include "globals.hpp"
 #include "log.hpp"
 
+#include <irods/connection_pool.hpp>
 #include <irods/filesystem/object_status.hpp>
 #include <irods/filesystem/permissions.hpp>
+#include <irods/irods_exception.hpp>
 #include <irods/process_stash.hpp>
+#include <irods/rodsErrorTable.h>
+#include <irods/switch_user.h>
 
 #include <boost/any.hpp>
 #include <boost/beast/http/status.hpp>
@@ -355,6 +360,27 @@ namespace irods
 
         return std::nullopt;
     } // to_object_type_enum
+
+    // TODO May require the zone name be passed as well for federation?
+    inline auto get_connection(const std::string& _username) -> irods::connection_pool::connection_proxy
+    {
+        namespace log = irods::http::log;
+
+        auto& cp = irods::http::globals::conn_pool;
+        auto conn = cp->get_connection();
+        const auto& zone = irods::http::globals::config->at("irods_server").at("zone").get_ref<const std::string&>();
+
+        log::trace("{}: Changing identity associated with connection to [{}].", __func__, _username);
+
+        if (const auto ec = rc_switch_user(static_cast<RcComm*>(conn), _username.c_str(), zone.c_str()); ec != 0) {
+            irods::http::log::error("{}: rc_switch_user error: {}", __func__, ec);
+            THROW(SYS_INTERNAL_ERR, "");
+        }
+
+        log::trace("{}: Successfully changed identity associated with connection to [{}].", __func__, _username);
+
+        return conn;
+    } // get_connection
 } // namespace irods
 
 #endif // IRODS_HTTP_API_ENDPOINT_COMMON_HPP

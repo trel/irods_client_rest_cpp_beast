@@ -23,7 +23,7 @@
 // clang-format off
 namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
-namespace net   = boost::asio;      // from <boost/asio.hpp>
+//namespace net   = boost::asio;      // from <boost/asio.hpp>
 
 //using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
 
@@ -213,7 +213,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             const auto status = fs::client::status(conn, lpath_iter->second);
 
@@ -244,7 +244,7 @@ namespace
                 {"permissions", perms},
                 // TODO Notice these require additional network calls. Could be avoided by using GenQuery, perhaps.
                 {"registered", fs::client::is_collection_registered(conn, lpath_iter->second)},
-                {"mtime", fs::client::last_write_time(conn, lpath_iter->second).time_since_epoch().count()}
+                {"modified_at", fs::client::last_write_time(conn, lpath_iter->second).time_since_epoch().count()}
             }.dump();
         }
         catch (const fs::filesystem_error& e) {
@@ -296,7 +296,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             fs::client::create_collections(conn, lpath_iter->second);
 
             res.body() = json{
@@ -354,7 +354,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             if (!fs::client::is_collection(conn, lpath_iter->second)) {
                 return irods::http::fail(res, http::status::bad_request, json{
@@ -434,7 +434,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             if (!fs::client::is_collection(conn, old_lpath_iter->second)) {
                 return irods::http::fail(res, http::status::bad_request, json{
@@ -518,7 +518,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             if (!fs::client::is_collection(conn, lpath_iter->second)) {
                 return irods::http::fail(res, http::status::bad_request, json{

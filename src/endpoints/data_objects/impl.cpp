@@ -207,7 +207,7 @@ namespace
             // Alternatively, we can make C API calls and get the exact reasons for a failure. This is
             // more work, but will allow the client to make better decisions about what to do next.
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             io::client::native_transport tp{conn};
             io::idstream in{tp, lpath_iter->second};
 
@@ -816,7 +816,7 @@ namespace
             std::strncpy(input.objPath, lpath_iter->second.c_str(), sizeof(DataObjInp::objPath));
             addKeyVal(&input.condInput, DEST_RESC_NAME_KW, dst_resc_iter->second.c_str());
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             const auto ec = rcDataObjRepl(static_cast<RcComm*>(conn), &input);
 
             res.body() = json{
@@ -881,7 +881,7 @@ namespace
                 addKeyVal(&input.condInput, ADMIN_KW, "");
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             const auto ec = rcDataObjTrim(static_cast<RcComm*>(conn), &input);
 
             res.body() = json{
@@ -930,7 +930,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             if (!fs::client::is_data_object(conn, lpath_iter->second)) {
                 return irods::http::fail(res, http::status::bad_request, json{
@@ -1021,7 +1021,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             const auto status = fs::client::status(conn, lpath_iter->second);
 
@@ -1056,7 +1056,7 @@ namespace
                 {"size", fs::client::data_object_size(conn, lpath_iter->second)},
                 {"checksum", fs::client::data_object_checksum(conn, lpath_iter->second)},
                 {"registered", fs::client::is_data_object_registered(conn, lpath_iter->second)},
-                {"mtime", fs::client::last_write_time(conn, lpath_iter->second).time_since_epoch().count()}
+                {"modified_at", fs::client::last_write_time(conn, lpath_iter->second).time_since_epoch().count()}
             }.dump();
         }
         catch (const fs::filesystem_error& e) {
@@ -1192,7 +1192,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             // TODO This type of check needs to apply to all operations in /data-objects and /collections
             // that take a logical path.
@@ -1259,7 +1259,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             if (!fs::client::is_data_object(conn, old_lpath_iter->second)) {
                 return irods::http::fail(res, http::status::bad_request, json{
@@ -1378,7 +1378,7 @@ namespace
                 {"options", options}
             };
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             const auto ec = rc_touch(static_cast<RcComm*>(conn), input.dump().c_str());
 
             res.body() = json{

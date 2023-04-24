@@ -74,6 +74,7 @@ target_link_libraries(
   ${EXECUTABLE_NAME}
   PRIVATE
   irods_client
+  ${IRODS_EXTERNALS_FULLPATH_BOOST}/lib/libboost_program_options.so
   ${IRODS_EXTERNALS_FULLPATH_FMT}/lib/libfmt.so
   CURL::libcurl
   $<TARGET_OBJECTS:authentication>
@@ -86,3 +87,5 @@ target_link_libraries(
   $<TARGET_OBJECTS:rules>
   $<TARGET_OBJECTS:tickets>
   $<TARGET_OBJECTS:users_groups>)
+  #$<TARGET_OBJECTS:zones>
+  #$<TARGET_OBJECTS:information>)

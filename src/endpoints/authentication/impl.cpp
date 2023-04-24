@@ -1,6 +1,7 @@
 #include "handlers.hpp"
 
 #include "common.hpp"
+#include "globals.hpp"
 #include "log.hpp"
 
 #include <irods/base64.hpp>
@@ -67,7 +68,7 @@ namespace irods::http::handler
             return fail(status_type::bad_request);
         }
 
-        log::debug("{}: Authorization value: [{}]\n", __func__, iter->value());
+        log::debug("{}: Authorization value: [{}]", __func__, iter->value());
 
         //
         // TODO Here is where we determine what form of authentication to perform (e.g. Basic or OIDC).
@@ -80,16 +81,16 @@ namespace irods::http::handler
 
         std::string authorization{iter->value().substr(pos + 6)};
         boost::trim(authorization);
-        log::debug("{}: Authorization value (trimmed): [{}]\n", __func__, authorization);
+        log::debug("{}: Authorization value (trimmed): [{}]", __func__, authorization);
 
         unsigned long size = 128;
         std::vector<std::uint8_t> creds(size); // TODO
         const auto ec = irods::base64_decode((unsigned char*) authorization.data(), authorization.size(), creds.data(), &size); // TODO
-        log::debug("{}: base64 error code         = [{}]\n", __func__, ec);
-        log::debug("{}: base64 decoded size       = [{}]\n", __func__, size);
+        log::debug("{}: base64 error code         = [{}]", __func__, ec);
+        log::debug("{}: base64 decoded size       = [{}]", __func__, size);
 
         std::string_view sv{(char*) creds.data(), size}; 
-        log::debug("{}: base64 decode credentials = [{}]\n", __func__, sv);
+        log::debug("{}: base64 decode credentials = [{}]", __func__, sv);
 
         const auto colon = sv.find(':');
         if (colon == std::string_view::npos) {
@@ -98,14 +99,19 @@ namespace irods::http::handler
 
         std::string username{sv.substr(0, colon)};
         std::string password{sv.substr(colon + 1)};
-        log::debug("{}: username = [{}]\n", __func__, username);
-        log::debug("{}: password = [{}]\n", __func__, password);
+        log::debug("{}: username = [{}]", __func__, username);
+        log::debug("{}: password = [{}]", __func__, password);
 
         bool login_successful = false;
 
         try {
+            const auto& svr = irods::http::globals::config->at("irods_server");
+            const auto& host = svr.at("host").get_ref<const std::string&>();
+            const auto port = svr.at("port").get<std::uint16_t>();
+            const auto& zone = svr.at("zone").get_ref<const std::string&>();
+
             irods::experimental::client_connection conn{
-                irods::experimental::defer_authentication, "localhost", 1247, username, "tempZone"};
+                irods::experimental::defer_authentication, host, port, username, zone};
 
             login_successful = (clientLoginWithPassword(static_cast<RcComm*>(conn), password.data()) == 0);
         }

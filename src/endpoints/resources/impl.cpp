@@ -160,7 +160,7 @@ namespace
                 resc_info.context_string = ctx_iter->second;
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             adm::client::add_resource(conn, resc_info);
 
             res.body() = json{
@@ -209,7 +209,7 @@ namespace
                 return irods::http::fail(http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             adm::client::remove_resource(conn, name_iter->second);
 
             res.body() = json{
@@ -306,7 +306,7 @@ namespace
                 return irods::http::fail(http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             const auto ctx_iter = _args.find("context");
             if (ctx_iter != std::end(_args)) {
@@ -368,7 +368,7 @@ namespace
                 return irods::http::fail(http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             adm::client::remove_child_resource(conn, parent_name_iter->second, child_name_iter->second);
 
             res.body() = json{
@@ -417,7 +417,7 @@ namespace
                 return irods::http::fail(http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
             adm::client::rebalance_resource(conn, name_iter->second);
 
             res.body() = json{
@@ -466,7 +466,7 @@ namespace
                 return irods::http::fail(http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             json::object_t info;
             bool exists = false;
