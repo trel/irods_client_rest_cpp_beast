@@ -555,6 +555,7 @@ namespace
             log::trace("{}: Opening initial output stream to [{}].", __func__, lpath_iter->second);
 
             // Open the first stream.
+            // These objects will be moved into the correct locations.
             irods::experimental::client_connection conn;
             auto tp = std::make_unique<io::client::native_transport>(conn);
             io::odstream out{*tp, lpath_iter->second};

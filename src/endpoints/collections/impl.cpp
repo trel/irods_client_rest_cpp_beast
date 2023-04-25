@@ -134,7 +134,7 @@ namespace
                 return irods::http::fail(res, http::status::bad_request);
             }
 
-            irods::experimental::client_connection conn;
+            auto conn = irods::get_connection(client_info->username);
 
             if (!fs::client::is_collection(conn, lpath_iter->second)) {
                 return irods::http::fail(res, http::status::bad_request, json{
