@@ -1,0 +1,13 @@
+#ifndef IRODS_HTTP_API_VERSION_HPP
+#define IRODS_HTTP_API_VERSION_HPP
+
+namespace irods::http::version
+{
+    // clang-format off
+    inline constexpr const char* binary_name = "@IRODS_BINARY_NAME@";
+    inline constexpr const char* api_version = "@IRODS_HTTP_API_VERSION@";
+    inline constexpr const char* sha         = "@IRODS_HTTP_GIT_SHA1@";
+    // clang-format on
+} // namespace irods::http::version
+
+#endif // IRODS_HTTP_API_VERSION_HPP

@@ -15,6 +15,23 @@ curl_opts='-s'
 #
 
 #
+# /info
+#
+
+test_information_endpoint()
+{
+    curl "${base_url}/info" $curl_opts | jq
+}
+
+test_zones_endpoint()
+{
+    # Stat a collection.
+    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/zones" \
+        --data-urlencode 'op=report' \
+        $curl_opts | jq
+}
+
+#
 # /collections
 #
 
@@ -444,14 +461,14 @@ test_users_groups_endpoint()
         $curl_opts | jq
 }
 
-#test_collections_endpoint
+test_collections_endpoint
 #test_configuration_endpoint
-#test_data_objects_endpoint
+test_data_objects_endpoint
+test_information_endpoint
 test_metadata_endpoint
-#test_query_endpoint
-#test_resource_endpoint
-#test_rules_endpoint
-#test_tickets_endpoint
-#test_users_groups_endpoint
-#test_zones_endpoint
-#test_information_endpoint
+test_query_endpoint
+test_resource_endpoint
+test_rules_endpoint
+test_tickets_endpoint
+test_users_groups_endpoint
+test_zones_endpoint

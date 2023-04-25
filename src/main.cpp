@@ -9,20 +9,17 @@
 #include <irods/rcMisc.h>
 #include <irods/rodsClient.h>
 
-#include <curl/curl.h>
+//#include <curl/curl.h>
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
-#include <boost/asio/dispatch.hpp>
+//#include <boost/asio/dispatch.hpp>
 #include <boost/asio/strand.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/thread_pool.hpp>
 #include <boost/config.hpp>
-#include <boost/algorithm/string.hpp>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
+//#include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
 
 #include <fmt/format.h>
@@ -45,7 +42,7 @@
 
 // clang-format off
 namespace beast = boost::beast; // from <boost/beast.hpp>
-namespace http  = beast::http;  // from <boost/beast/http.hpp>
+//namespace http  = beast::http;  // from <boost/beast/http.hpp>
 namespace net   = boost::asio;  // from <boost/asio.hpp>
 namespace po    = boost::program_options;
 namespace log   = irods::http::log;
@@ -59,54 +56,16 @@ const irods::http::request_handler_map_type req_handlers{
     {"/irods-rest/0.9.5/collections",  irods::http::handler::collections},
     //{"/irods-rest/0.9.5/config",     irods::http::handler::configuration},
     {"/irods-rest/0.9.5/data-objects", irods::http::handler::data_objects},
+    {"/irods-rest/0.9.5/info",         irods::http::handler::information},
     {"/irods-rest/0.9.5/metadata",     irods::http::handler::metadata},
     {"/irods-rest/0.9.5/query",        irods::http::handler::query},
     {"/irods-rest/0.9.5/resources",    irods::http::handler::resources},
     {"/irods-rest/0.9.5/rules",        irods::http::handler::rules},
     {"/irods-rest/0.9.5/tickets",      irods::http::handler::tickets},
     {"/irods-rest/0.9.5/users-groups", irods::http::handler::users_groups},
-    //{"/irods-rest/0.9.5/zones",        irods::http::handler::zones},
-    //{"/irods-rest/0.9.5/info",         irods::http::handler::information}
+    {"/irods-rest/0.9.5/zones",        irods::http::handler::zones}
 };
 // clang-format on
-
-// This function produces an HTTP response for the given
-// request. The type of the response object depends on the
-// contents of the request, so the interface requires the
-// caller to pass a generic lambda for receiving the response.
-template <class Body, class Allocator, class Send>
-auto handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send) -> void
-{
-    // Print the headers.
-    for (auto&& h : req.base()) {
-        log::debug("{}: Header: ({}, {})", __func__, h.name_string(), h.value());
-    }
-
-    // Print the components of the request URL.
-    log::debug("{}: Method: {}", __func__, req.method_string());
-    log::debug("{}: Version: {}", __func__, req.version());
-    log::debug("{}: Target: {}", __func__, req.target());
-    log::debug("{}: Keep Alive: {}", __func__, req.keep_alive());
-    log::debug("{}: Has Content Length: {}", __func__, req.has_content_length());
-    log::debug("{}: Chunked: {}", __func__, req.chunked());
-    log::debug("{}: Needs EOF: {}", __func__, req.need_eof());
-
-    // "host" is a placeholder that's used so that get_url_path() can parse the URL correctly.
-    const auto path = irods::http::get_url_path(fmt::format("http://host{}", req.target()));
-    if (!path) {
-        send(std::move(irods::http::fail(http::status::bad_request)));
-    }
-
-    if (const auto iter = req_handlers.find(*path); iter != std::end(req_handlers)) {
-        (iter->second)(req, send);
-        //(iter->second)(req, [&send](auto&& _res) -> void {
-            //send(std::forward<decltype(_res)>(_res));
-        //});
-        return;
-    }
-
-    send(std::move(irods::http::fail(http::status::not_found)));
-} // handle_request
 
 // Accepts incoming connections and launches the sessions.
 class listener : public std::enable_shared_from_this<listener>
@@ -287,6 +246,7 @@ auto main(int _argc, char* _argv[]) -> int
         irods::http::globals::config = &config;
 
         set_log_level(config);
+        spdlog::set_pattern("[%Y-%m-%d %T.%e] [P:%P] [%^%l%$] [T:%t] %v"); // TODO Can be configurable.
 
         // TODO For LONG running tasks, see the following:
         //

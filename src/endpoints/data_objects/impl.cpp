@@ -67,6 +67,13 @@ namespace
         std::unique_ptr<std::mutex> mtx;
         int index = 0;
 
+        // TODO How do we pick a stream?
+        //
+        // Should the client have to worry about this? It's easy to let them target a specific stream.
+        // It's also more deterministic.
+        //
+        // What if the chunk size and other info was passed on parallel_write_init?
+        // Does that give us more performance?
         auto next_stream() -> irods::experimental::io::odstream&
         {
             std::scoped_lock lk{*mtx};
@@ -370,16 +377,6 @@ namespace
         res.keep_alive(_req.keep_alive());
 
         try {
-            // TODO This is only required if the user did not include a parallel-write-handle.
-            const auto lpath_iter = _args.find("lpath");
-            if (lpath_iter == std::end(_args)) {
-                log::error("{}: Missing [lpath] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
-            }
-
-            log::trace("{}: Opening data object [{}] for write.", __func__, lpath_iter->second);
-
-            //std::unique_ptr<irods::experimental::client_connection> conn;
             irods::connection_pool::connection_proxy conn;
             std::unique_ptr<io::client::native_transport> tp;
 
@@ -400,27 +397,27 @@ namespace
                 // We've found a matching handle!
                 //
 
-                // TODO How do we pick a stream?
-                //
-                // Should the client have to worry about this? It's easy to let them target a specific stream.
-                // It's also more deterministic.
-                //
-                // TODO This counter needs to be part of the parallel_write_stream.
                 out_ptr = &iter->second.next_stream();
                 log::debug("{}: (write) Parallel Write - stream memory address = [{}].", __func__, fmt::ptr(out_ptr));
             }
             else {
+                const auto lpath_iter = _args.find("lpath");
+                if (lpath_iter == std::end(_args)) {
+                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    return irods::http::fail(res, http::status::bad_request);
+                }
+
+                log::trace("{}: Opening data object [{}] for write.", __func__, lpath_iter->second);
                 log::trace("{}: (write) Initializing for single buffer write.", __func__);
-                //conn = std::make_unique<irods::experimental::client_connection>();
+
                 conn = irods::get_connection(client_info->username);
-                //tp = std::make_unique<io::client::native_transport>(*conn);
                 tp = std::make_unique<io::client::native_transport>(conn);
                 out = std::make_unique<io::odstream>(*tp, lpath_iter->second);
                 out_ptr = out.get();
             }
 
             if (!*out_ptr) {
-                log::error("{}: Could not open data object [{}] for write.", __func__, lpath_iter->second);
+                log::error("{}: Could not open data object for write.", __func__);
 
                 res.body() = json{
                     {"irods_response", {
@@ -445,7 +442,7 @@ namespace
                     out_ptr->seekp(std::stoll(iter->second));
                 }
                 catch (const std::exception& e) {
-                    log::error("{}: Could not seek to position [{}] in data object [{}].", __func__, iter->second, lpath_iter->second);
+                    log::error("{}: Could not seek to position [{}] in data object.", __func__, iter->second);
 
                     res.body() = json{
                         {"irods_response", {
