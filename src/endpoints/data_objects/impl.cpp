@@ -11,8 +11,10 @@
 #include <irods/dataObjTrim.h>
 #include <irods/filesystem.hpp>
 #include <irods/irods_exception.hpp>
+#include <irods/phyPathReg.h>
 #include <irods/rcMisc.h>
 #include <irods/rodsErrorTable.h>
+#include <irods/rodsKeyWdDef.h>
 #include <irods/touch.h>
 
 #include <irods/transport/default_transport.hpp>
@@ -1110,7 +1112,6 @@ namespace
 
     auto handle_register_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
     {
-#if 0
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
             return *result.response;
@@ -1125,6 +1126,40 @@ namespace
         res.keep_alive(_req.keep_alive());
 
         try {
+            // TODO
+            DataObjInp input{};
+            std::strncpy(input.objPath, "", sizeof(DataObjInp::objPath));
+
+            addKeyVal(&input.condInput, DEST_RESC_NAME_KW, "");
+
+            addKeyVal(&input.condInput, REG_REPL_KW, "");
+
+            addKeyVal(&input.condInput, FILE_PATH_KW, "");
+            addKeyVal(&input.condInput, DATA_SIZE_KW, "");
+
+            addKeyVal(&input.condInput, REG_CHKSUM_KW, "");
+            addKeyVal(&input.condInput, VERIFY_CHKSUM_KW, "");
+
+            addKeyVal(&input.condInput, FORCE_FLAG_KW, "");
+
+            auto conn = irods::get_connection(client_info->username);
+
+            if (const auto ec = rcPhyPathReg(static_cast<RcComm*>(conn), &input); ec < 0) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", ec},
+                    }}
+                }.dump();
+                res.prepare_payload();
+                return res;
+            }
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0},
+                }}
+            }.dump();
         }
         catch (const irods::exception& e) {
             res.result(http::status::bad_request);
@@ -1142,12 +1177,6 @@ namespace
         res.prepare_payload();
 
         return res;
-#else
-        (void) _req;
-        (void) _args;
-        log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
-#endif
     } // handle_register_op
 
     auto handle_unregister_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
