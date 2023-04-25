@@ -82,6 +82,8 @@ namespace irods::http::handler
             if (const auto iter = handlers_for_get.find(op_iter->second); iter != std::end(handlers_for_get)) {
                 return _sess_ptr->send((iter->second)(_req, url.query));
             }
+
+            return _sess_ptr->send(fail(status_type::bad_request));
         }
         else if (_req.method() == verb_type::post) {
             const auto args = irods::http::to_argument_list(_req.body());
@@ -95,6 +97,8 @@ namespace irods::http::handler
             if (const auto iter = handlers_for_post.find(op_iter->second); iter != std::end(handlers_for_post)) {
                 return _sess_ptr->send((iter->second)(_req, args));
             }
+
+            return _sess_ptr->send(fail(status_type::bad_request));
         }
 
         log::error("{}: Incorrect HTTP method.", __func__);

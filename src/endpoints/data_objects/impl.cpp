@@ -52,7 +52,7 @@ namespace
 {
     // clang-format off
     using query_arguments_type = decltype(irods::http::url::query);
-    using handler_type         = irods::http::response_type(*)(const irods::http::request_type& _req, const query_arguments_type& _args);
+    using handler_type         = void(*)(irods::http::session_pointer_type, const irods::http::request_type& _req, const query_arguments_type& _args);
     // clang-format on
 
     struct parallel_write_stream
@@ -91,23 +91,23 @@ namespace
     // Handler function prototypes
     //
 
-    auto handle_read_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_write_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_parallel_write_init_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_parallel_write_shutdown_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_read_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_write_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_parallel_write_init_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_parallel_write_shutdown_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
 
-    auto handle_replicate_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_trim_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_replicate_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_trim_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
 
-    auto handle_set_permission_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_stat_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_set_permission_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_stat_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
 
-    auto handle_register_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_unregister_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_register_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_unregister_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
 
-    auto handle_rename_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_touch_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_rename_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_remove_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_touch_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
 
     //
     // Operation to Handler mappings
@@ -160,8 +160,10 @@ namespace irods::http::handler
             }
 
             if (const auto iter = handlers_for_get.find(op_iter->second); iter != std::end(handlers_for_get)) {
-                return _sess_ptr->send((iter->second)(_req, url.query));
+                return (iter->second)(_sess_ptr, _req, url.query);
             }
+
+            return _sess_ptr->send(fail(status_type::bad_request));
         }
         else if (_req.method() == verb_type::post) {
             const auto args = irods::http::to_argument_list(_req.body());
@@ -173,8 +175,10 @@ namespace irods::http::handler
             }
 
             if (const auto iter = handlers_for_post.find(op_iter->second); iter != std::end(handlers_for_post)) {
-                return _sess_ptr->send((iter->second)(_req, args));
+                return (iter->second)(_sess_ptr, _req, args);
             }
+
+            return _sess_ptr->send(fail(status_type::bad_request));
         }
 
         log::error("{}: Incorrect HTTP method.", __func__);
@@ -188,11 +192,11 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_read_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_read_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -216,7 +220,7 @@ namespace
             const auto lpath_iter = _args.find("lpath");
             if (lpath_iter == std::end(_args)) {
                 log::error("{}: Missing [lpath] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             // TODO While dstream makes reading/writing simple, using it means we lose the
@@ -248,7 +252,7 @@ namespace
                 }.dump();
                 res.prepare_payload();
 
-                return res;
+                _sess_ptr->send(std::move(res));
             }
 
             // TODO This needs to be clamped to a max size set by the administrator.
@@ -272,7 +276,7 @@ namespace
                     }.dump();
                     res.prepare_payload();
 
-                    return res;
+                    _sess_ptr->send(std::move(res));
                 }
             }
 
@@ -299,7 +303,7 @@ namespace
                     }.dump();
                     res.prepare_payload();
 
-                    return res;
+                    _sess_ptr->send(std::move(res));
                 }
             }
             else {
@@ -360,14 +364,14 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
     } // handle_read_op
 
-    auto handle_write_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_write_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -392,7 +396,7 @@ namespace
                 auto iter = parallel_write_contexts.find(parallel_write_handle_iter->second);
                 if (iter == std::end(parallel_write_contexts)) {
                     log::error("{}: Invalid handle for parallel write.", __func__);
-                    return irods::http::fail(res, http::status::ok);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::ok));
                 }
 
                 //
@@ -406,7 +410,7 @@ namespace
                 const auto lpath_iter = _args.find("lpath");
                 if (lpath_iter == std::end(_args)) {
                     log::error("{}: Missing [lpath] parameter.", __func__);
-                    return irods::http::fail(res, http::status::bad_request);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
                 log::trace("{}: Opening data object [{}] for write.", __func__, lpath_iter->second);
@@ -432,7 +436,7 @@ namespace
                 }.dump();
                 res.prepare_payload();
 
-                return res;
+                _sess_ptr->send(std::move(res));
             }
 
             // TODO This needs to be clamped to a max size set by the administrator.
@@ -457,7 +461,7 @@ namespace
                     }.dump();
                     res.prepare_payload();
 
-                    return res;
+                    _sess_ptr->send(std::move(res));
                 }
             }
 
@@ -471,14 +475,14 @@ namespace
                 log::error("{}: Missing [count] parameter.", __func__);
                 res.result(http::status::bad_request);
                 res.prepare_payload();
-                return res;
+                _sess_ptr->send(std::move(res));
             }
             const auto count = std::stoll(std::string{iter->second});
 
             iter = _args.find("bytes");
             if (iter == std::end(_args)) {
                 log::error("{}: Missing [bytes] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             out_ptr->write(iter->second.data(), count);
@@ -513,14 +517,14 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
     } // handle_read_op
 
-    auto handle_parallel_write_init_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_parallel_write_init_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -535,7 +539,7 @@ namespace
             const auto lpath_iter = _args.find("lpath");
             if (lpath_iter == std::end(_args)) {
                 log::error("{}: Missing [lpath] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             // TODO
@@ -549,7 +553,7 @@ namespace
             const auto stream_count_iter = _args.find("stream-count");
             if (stream_count_iter == std::end(_args)) {
                 log::error("{}: Missing [stream-count] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             namespace io = irods::experimental::io;
@@ -575,7 +579,7 @@ namespace
                     {"http_api_error_message", "Open error."}
                 }.dump();
                 res.prepare_payload();
-                return res;
+                _sess_ptr->send(std::move(res));
             }
 
             log::trace("{}: Output stream for [{}] is open.", __func__, lpath_iter->second);
@@ -606,7 +610,7 @@ namespace
                     {"http_api_error_message", "Parallel write initialization error."}
                 }.dump();
                 res.prepare_payload();
-                return res;
+                _sess_ptr->send(std::move(res));
             }
             log::trace("{}: (init) parallel_write_context was inserted successfully. Initializing output streams.", __func__);
 
@@ -640,7 +644,7 @@ namespace
             if (!streams[0]->out) {
                 log::error("{}: (init) Could not open stream [0].", __func__);
                 parallel_write_contexts.erase(iter);
-                return res;
+                _sess_ptr->send(std::move(res));
             }
 
 #if 0
@@ -717,14 +721,14 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
     } // handle_parallel_write_init_op
 
-    auto handle_parallel_write_shutdown_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_parallel_write_shutdown_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -745,7 +749,7 @@ namespace
             const auto parallel_write_handle_iter = _args.find("parallel-write-handle");
             if (parallel_write_handle_iter == std::end(_args)) {
                 log::error("{}: Missing [parallel-write-handle] parameter.", __func__);
-                return irods::http::fail(http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(http::status::bad_request));
             }
 
             log::debug("{}: (shutdown) Parallel Write Handle = [{}].", __func__, parallel_write_handle_iter->second);
@@ -803,14 +807,14 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
     } // handle_parallel_write_shutdown_op
 
-    auto handle_replicate_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_replicate_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -825,13 +829,13 @@ namespace
             const auto lpath_iter = _args.find("lpath");
             if (lpath_iter == std::end(_args)) {
                 log::error("{}: Missing [lpath] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             const auto dst_resc_iter = _args.find("dst-resource");
             if (dst_resc_iter == std::end(_args)) {
                 log::error("{}: Missing [dst-resource] parameter.", __func__);
-                return irods::http::fail(http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(http::status::bad_request));
             }
 
             // TODO This should be part of the replica library.
@@ -864,14 +868,14 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
     } // handle_replicate_op
 
-    auto handle_trim_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_trim_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -886,13 +890,13 @@ namespace
             const auto lpath_iter = _args.find("lpath");
             if (lpath_iter == std::end(_args)) {
                 log::error("{}: Missing [lpath] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             const auto resc_iter = _args.find("resource");
             if (resc_iter == std::end(_args)) {
                 log::error("{}: Missing [resource] parameter.", __func__);
-                return irods::http::fail(http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(http::status::bad_request));
             }
 
             // TODO This should be part of the replica library.
@@ -929,14 +933,14 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
     } // handle_trim_op
 
-    auto handle_set_permission_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_set_permission_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -951,35 +955,35 @@ namespace
             const auto lpath_iter = _args.find("lpath");
             if (lpath_iter == std::end(_args)) {
                 log::error("{}: Missing [lpath] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             auto conn = irods::get_connection(client_info->username);
 
             if (!fs::client::is_data_object(conn, lpath_iter->second)) {
-                return irods::http::fail(res, http::status::bad_request, json{
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request, json{
                     {"irods_response", {
                         {"error_code", NOT_A_DATA_OBJECT}
                     }}
-                }.dump());
+                }.dump()));
             }
 
             const auto entity_name_iter = _args.find("entity-name");
             if (entity_name_iter == std::end(_args)) {
                 log::error("{}: Missing [entity-name] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             const auto perm_iter = _args.find("permission");
             if (perm_iter == std::end(_args)) {
                 log::error("{}: Missing [permission] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             const auto perm_enum = irods::to_permission_enum(perm_iter->second);
             if (!perm_enum) {
                 log::error("{}: Invalid value for [permission] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             const auto admin_mode_iter = _args.find("admin");
@@ -1020,14 +1024,14 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
     } // handle_set_permission_op
 
-    auto handle_stat_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_stat_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -1042,7 +1046,7 @@ namespace
             const auto lpath_iter = _args.find("lpath");
             if (lpath_iter == std::end(_args)) {
                 log::error("{}: Missing [lpath] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             auto conn = irods::get_connection(client_info->username);
@@ -1050,11 +1054,11 @@ namespace
             const auto status = fs::client::status(conn, lpath_iter->second);
 
             if (!fs::client::is_data_object(status)) {
-                return irods::http::fail(res, http::status::bad_request, json{
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request, json{
                     {"irods_response", {
                         {"error_code", NOT_A_DATA_OBJECT}
                     }}
-                }.dump());
+                }.dump()));
             }
 
             json perms;
@@ -1107,14 +1111,16 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
     } // handle_stat_op
 
-    auto handle_register_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_register_op(irods::http::session_pointer_type _sess_ptr,
+                            const irods::http::request_type& _req,
+                            const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -1126,21 +1132,48 @@ namespace
         res.keep_alive(_req.keep_alive());
 
         try {
-            // TODO
             DataObjInp input{};
-            std::strncpy(input.objPath, "", sizeof(DataObjInp::objPath));
 
-            addKeyVal(&input.condInput, DEST_RESC_NAME_KW, "");
+            if (const auto lpath_iter = _args.find("lpath"); lpath_iter != std::end(_args)) {
+                std::strncpy(input.objPath, lpath_iter->second.c_str(), sizeof(DataObjInp::objPath) - 1);
+            }
+            else {
+                log::error("{}: Missing [lpath] parameter.", __func__);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+            }
 
-            addKeyVal(&input.condInput, REG_REPL_KW, "");
+            if (const auto iter = _args.find("ppath"); iter != std::end(_args)) {
+                addKeyVal(&input.condInput, FILE_PATH_KW, iter->second.c_str());
+            }
+            else {
+                log::error("{}: Missing [ppath] parameter.", __func__);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+            }
 
-            addKeyVal(&input.condInput, FILE_PATH_KW, "");
-            addKeyVal(&input.condInput, DATA_SIZE_KW, "");
+            if (const auto iter = _args.find("dst-resource"); iter != std::end(_args)) {
+                addKeyVal(&input.condInput, DEST_RESC_NAME_KW, iter->second.c_str());
+            }
 
-            addKeyVal(&input.condInput, REG_CHKSUM_KW, "");
-            addKeyVal(&input.condInput, VERIFY_CHKSUM_KW, "");
+            if (const auto iter = _args.find("replica"); iter != std::end(_args) && iter->second == "1") {
+                addKeyVal(&input.condInput, REG_REPL_KW, "");
+            }
 
-            addKeyVal(&input.condInput, FORCE_FLAG_KW, "");
+            if (const auto iter = _args.find("data-size"); iter != std::end(_args)) {
+                addKeyVal(&input.condInput, DATA_SIZE_KW, iter->second.c_str());
+            }
+
+            if (const auto iter = _args.find("checksum"); iter != std::end(_args)) {
+                if (iter->second == "register") {
+                    addKeyVal(&input.condInput, REG_CHKSUM_KW, "");
+                }
+                else if (iter->second == "verify") {
+                    addKeyVal(&input.condInput, VERIFY_CHKSUM_KW, "");
+                }
+            }
+
+            if (const auto iter = _args.find("force"); iter != std::end(_args)) {
+                addKeyVal(&input.condInput, FORCE_FLAG_KW, "");
+            }
 
             auto conn = irods::get_connection(client_info->username);
 
@@ -1152,7 +1185,7 @@ namespace
                     }}
                 }.dump();
                 res.prepare_payload();
-                return res;
+                _sess_ptr->send(std::move(res));
             }
 
             res.body() = json{
@@ -1176,15 +1209,16 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
     } // handle_register_op
 
-    auto handle_unregister_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    // TODO Perhaps this isn't needed because they have "trim" and "remove".
+    auto handle_unregister_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
 #if 0
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -1212,20 +1246,20 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
 #else
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
     } // handle_unregister_op
 
-    auto handle_remove_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_remove_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -1240,7 +1274,7 @@ namespace
             const auto lpath_iter = _args.find("lpath");
             if (lpath_iter == std::end(_args)) {
                 log::error("{}: Missing [lpath] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             auto conn = irods::get_connection(client_info->username);
@@ -1249,7 +1283,7 @@ namespace
             // that take a logical path.
             if (!fs::client::is_data_object(conn, lpath_iter->second)) {
                 log::error("{}: Logical path does not point to a data object.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             fs::remove_options opts = fs::remove_options::none;
@@ -1285,14 +1319,14 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
     } // handle_remove_op
 
-    auto handle_rename_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_rename_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -1307,23 +1341,23 @@ namespace
             const auto old_lpath_iter = _args.find("old-lpath");
             if (old_lpath_iter == std::end(_args)) {
                 log::error("{}: Missing [old-lpath] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             auto conn = irods::get_connection(client_info->username);
 
             if (!fs::client::is_data_object(conn, old_lpath_iter->second)) {
-                return irods::http::fail(res, http::status::bad_request, json{
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request, json{
                     {"irods_response", {
                         {"error_code", NOT_A_DATA_OBJECT}
                     }}
-                }.dump());
+                }.dump()));
             }
 
             const auto new_lpath_iter = _args.find("new-lpath");
             if (new_lpath_iter == std::end(_args)) {
                 log::error("{}: Missing [new-lpath] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             fs::client::rename(conn, old_lpath_iter->second, new_lpath_iter->second);
@@ -1358,14 +1392,14 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
     } // handle_rename_op
 
-    auto handle_touch_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_touch_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
@@ -1379,10 +1413,8 @@ namespace
         try {
             const auto lpath_iter = _args.find("lpath");
             if (lpath_iter == std::end(_args)) {
-                //if (op_iter->second != "write" && !_args.contains("parallel-write-handle")) {
-                    log::error("{}: Missing [lpath] parameter.", __func__);
-                    return irods::http::fail(res, http::status::bad_request);
-                //}
+                log::error("{}: Missing [lpath] parameter.", __func__);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
             json::object_t options;
@@ -1399,7 +1431,7 @@ namespace
                 }
                 catch (const std::exception& e) {
                     log::error("{}: Could not convert replica-number [{}] into an integer.", __func__, opt_iter->second);
-                    return irods::http::fail(res, http::status::bad_request);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
             }
 
@@ -1415,7 +1447,7 @@ namespace
                 }
                 catch (const std::exception& e) {
                     log::error("{}: Could not convert seconds-since-epoch [{}] into an integer.", __func__, opt_iter->second);
-                    return irods::http::fail(res, http::status::bad_request);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
             }
 
@@ -1453,6 +1485,6 @@ namespace
 
         res.prepare_payload();
 
-        return res;
+        _sess_ptr->send(std::move(res));
     } // handle_touch_op
 } // anonymous namespace
