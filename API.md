@@ -2,7 +2,7 @@
 
 ## Authentication
 
-### Basic
+### Scheme: Basic
 
 _Command:_
 ```bash
@@ -11,10 +11,11 @@ curl -X POST --user <username>:<password> http://localhost:<port>/irods-http/<ve
 
 _Returns:_ A string representing a bearer token that can be used to carry out operations as the authenticated user.
 
-### Open ID Connect (OIDC)
+### Scheme: Open ID Connect (OIDC)
 
 Coming soon ...
 
+---
 ## Collections
 
 ### Operation: create
@@ -23,7 +24,7 @@ Creates a new collection.
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 
@@ -46,7 +47,7 @@ Removes a collection.
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 
@@ -69,7 +70,7 @@ Returns information about a collection.
 
 _HTTP Method:_ GET
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 
@@ -92,7 +93,7 @@ Returns the contents of a collection.
 
 _HTTP Method:_ GET
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 - recurse
@@ -117,7 +118,7 @@ Sets the permission of a user or group on a collection.
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 - entity-name
@@ -144,7 +145,7 @@ Renames or moves a collection.
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - old-lpath
 - new-lpath
@@ -163,6 +164,7 @@ _Returns:_
 }
 ```
 
+---
 ## Data Objects
 
 ### Operation: touch
@@ -171,7 +173,7 @@ Updates the mtime of an existing data object or creates a new data object if it 
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 
@@ -196,7 +198,7 @@ The data object will be moved to the trash collection if `no-trash=1` is passed.
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 - no-trash
@@ -221,7 +223,7 @@ Returns information about a collection.
 
 _HTTP Method:_ GET
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 
@@ -244,7 +246,7 @@ Returns the contents of a data object.
 
 _HTTP Method:_ GET
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 - offset
@@ -271,7 +273,7 @@ Sets the permission of a user or group on a data object.
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 - entity-name
@@ -298,7 +300,7 @@ Renames or moves a data object.
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - old-lpath
 - new-lpath
@@ -323,7 +325,7 @@ Replicates an existing replica from one resource to another resource.
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 - src-resource
@@ -352,7 +354,7 @@ Trims an existing replica.
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 - resource
@@ -378,7 +380,7 @@ Reads the contents of a data object.
 
 _HTTP Method:_ GET
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 - resource
@@ -409,7 +411,7 @@ To write to a data object in parallel, see [Operation: parallel-write-init](#ope
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 - resource
@@ -443,7 +445,7 @@ Returns a parallel-write-handle that can be used for parallel write operations.
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 - resource
@@ -473,7 +475,7 @@ This operation MUST be called to complete the parallel write operation. Failing 
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - parallel-write-handle
 
@@ -490,6 +492,7 @@ _Returns:_
 }
 ```
 
+---
 ## Information
 
 Returns general information about the iRODS HTTP API server.
@@ -515,6 +518,7 @@ _Returns:_
 }
 ```
 
+---
 ## Metadata
 
 Atomically applies several metadata operations in sequence on a single iRODS entity.
@@ -538,12 +542,13 @@ _Returns:_
 ```json
 {
     "irods_response": {
-        "error_code": <integer>
+        "error_code": "<integer>"
     },
-    "info": <json_object>
+    "info": "<json_object>"
 }
 ```
 
+---
 ## Query
 
 ### Operation: query
@@ -578,10 +583,12 @@ _Returns:_
 }
 ```
 
+---
 ## Resources
 
 
 
+---
 ## Rules
 
 ### Operation: list_rule_engines
@@ -603,7 +610,7 @@ _Returns:_
 ```json
 {
     "irods_response": {
-        "error_code": <integer>
+        "error_code": "<integer>"
     },
     "rule_engine_plugin_instances": [
         "rep-instance-1",
@@ -671,6 +678,7 @@ _Returns:_
 }
 ```
 
+---
 ## Tickets
 
 ### Operation: create
@@ -679,7 +687,7 @@ Creates a new ticket for a collection or data object.
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - lpath
 - type
@@ -718,7 +726,7 @@ Removes a ticket.
 
 _HTTP Method:_ POST
 
-_Parameter:_
+_Parameters:_
 - op
 - name
 
@@ -735,10 +743,12 @@ _Returns:_
 }
 ```
 
+---
 ## Users and Groups
 
 
 
+---
 ## Zones
 
 ### Operation: report
@@ -747,13 +757,13 @@ Returns information about the iRODS zone.
 
 _HTTP Method:_ GET
 
-_Parameter:_
+_Parameters:_
 - op
 
 _Command:_
 ```bash
 curl -G -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/zones \
-    --data-urlencode 'op=report' # Is "stat" a better term? It certainly falls in line with the other endpoints.
+    --data-urlencode 'op=report'
 ```
 
 _Returns:_
