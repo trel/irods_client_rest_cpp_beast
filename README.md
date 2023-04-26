@@ -13,7 +13,7 @@ A project that presents an iRODS 4.3.1+ server as HTTP v1.1.
 
 ## Compiling
 
-To the server, follow the normal CMake steps.
+To compile the server, follow the normal CMake steps.
 
 The following example uses **Ninja** to compile the server.
 ```bash
