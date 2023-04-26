@@ -1,17 +1,25 @@
 {
-    "host": "0.0.0.0",
-    "port": 9000,
+    "http_server": {
+        "host": "0.0.0.0",
+        "port": 9000,
 
-    "log_level": "warn",
+        "log_level": "warn",
 
-    "request_handler_threads": 1,
-    "io_threads": 1,
-    "irods_connection_pool_size": 2,
+        "requests": {
+            "threads": 3,
+            "max_rbuffer_size_in_bytes": 8388608,
+            "max_wbuffer_size_in_bytes": 8388608,
+            "connection_timeout_in_seconds": 30
+        },
 
-    "io_read_buffer_size": 20000,
-    "io_write_buffer_size": 20000,
+        "background_io": {
+            "threads": 3,
+            "max_rbuffer_size_in_bytes": 8192,
+            "max_wbuffer_size_in_bytes": 8192
+        }
+    },
 
-    "irods_server": {
+    "irods_client": {
         "host": "<host>",
         "port": 1247,
         "zone": "<zone>",
@@ -19,6 +27,9 @@
             "username": "<username>",
             "password": "<password>"
         },
-        "connection_refresh_timeout_in_seconds": 600
+        "connection_pool": {
+            "size": 6,
+            "refresh_timeout_in_seconds": 600
+        }
     }
 }

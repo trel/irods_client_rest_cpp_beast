@@ -24,7 +24,7 @@
 // clang-format off
 namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
-//namespace net   = boost::asio;      // from <boost/asio.hpp>
+namespace net   = boost::asio;      // from <boost/asio.hpp>
 
 //using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
 
@@ -37,18 +37,18 @@ namespace
 {
     // clang-format off
     using query_arguments_type = decltype(irods::http::url::query); // TODO Could be moved to common.hpp
-    using handler_type         = irods::http::response_type(*)(const irods::http::request_type& _req, const query_arguments_type& _args);
+    using handler_type         = void(*)(irods::http::session_pointer_type, const irods::http::request_type&, const query_arguments_type&);
     // clang-format on
 
     //
     // Handler function prototypes
     //
 
-    auto handle_execute_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_list_genquery_columns_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_list_specific_queries_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_add_specific_query_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_specific_query_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_execute_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_list_genquery_columns_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_list_specific_queries_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_add_specific_query_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_remove_specific_query_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
 
     //
     // Operation to Handler mappings
@@ -81,7 +81,7 @@ namespace irods::http::handler
             }
 
             if (const auto iter = handlers_for_get.find(op_iter->second); iter != std::end(handlers_for_get)) {
-                return _sess_ptr->send((iter->second)(_req, url.query));
+                return (iter->second)(_sess_ptr, _req, url.query);
             }
 
             return _sess_ptr->send(fail(status_type::bad_request));
@@ -96,7 +96,7 @@ namespace irods::http::handler
             }
 
             if (const auto iter = handlers_for_post.find(op_iter->second); iter != std::end(handlers_for_post)) {
-                return _sess_ptr->send((iter->second)(_req, args));
+                return (iter->second)(_sess_ptr, _req, args);
             }
 
             return _sess_ptr->send(fail(status_type::bad_request));
@@ -113,107 +113,124 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_execute_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_execute_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
         log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
 
+        const auto query_iter = _args.find("query");
+        if (query_iter == std::end(_args)) {
+            log::error("{}: Missing [query] parameter.", __func__);
+            return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+        }
+
+        // TODO Handle the options below.
+#if 0
+        const auto query_type_iter = _args.find("type");
+        if (query_type_iter == std::end(_args)) {
+            log::error("{}: Missing [query-type] parameter.", __func__);
+            return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+        }
+
+        const auto offset_iter = _args.find("offset");
+        if (offset_iter == std::end(_args)) {
+            log::error("{}: Missing [offset] parameter.", __func__);
+            return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+        }
+
+        const auto limit_iter = _args.find("limit");
+        if (limit_iter == std::end(_args)) {
+            log::error("{}: Missing [limit] parameter.", __func__);
+            return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+        }
+#endif
+        // TODO GenQuery2 is definitely the right answer for this simply because of
+        // pagination features such as OFFSET and LIMIT. We can make that a runtime
+        // configuration option.
+
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
-        try {
-            const auto query_iter = _args.find("query");
-            if (query_iter == std::end(_args)) {
-                log::error("{}: Missing [query] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
-            }
+        net::post(*irods::http::globals::thread_pool_bg, [_sess_ptr, client_info, gql = query_iter->second, res = std::move(res)]() mutable {
+            try {
+                json::array_t row;
+                json::array_t rows;
 
-#if 0
-            const auto query_type_iter = _args.find("query-type");
-            if (query_type_iter != std::end(_args)) {
-                log::error("{}: Missing [query-type] parameter.", __func__);
-                return irods::http::fail(http::status::bad_request);
-            }
-#endif
-            // TODO GenQuery2 is definitely the right answer for this simply because of
-            // pagination features such as OFFSET and LIMIT. We can make that a runtime
-            // configuration option.
+                {
+                    auto conn = irods::get_connection(client_info->username);
 
-            json::array_t row;
-            json::array_t rows;
+                    for (auto&& r : irods::query{static_cast<RcComm*>(conn), gql}) {
+                        for (auto&& c : r) {
+                            row.push_back(c);
+                        }
 
-            auto conn = irods::get_connection(client_info->username);
-
-            for (auto&& r : irods::query{static_cast<RcComm*>(conn), query_iter->second}) {
-                for (auto&& c : r) {
-                    row.push_back(c);
+                        rows.push_back(row);
+                        row.clear();
+                    }
                 }
 
-                rows.push_back(row);
-                row.clear();
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }},
+                    {"rows", rows}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }},
-                {"rows", rows}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
+            res.prepare_payload();
 
-        res.prepare_payload();
-
-        return res;
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_execute_op
 
-    auto handle_list_genquery_columns_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_list_genquery_columns_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_list_genquery_columns_op
 
-    auto handle_list_specific_queries_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_list_specific_queries_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_list_specific_queries_op
 
-    auto handle_add_specific_query_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_add_specific_query_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_add_specific_query_op
 
-    auto handle_remove_specific_query_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_remove_specific_query_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
     {
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_remove_specific_query_op
 } // anonymous namespace

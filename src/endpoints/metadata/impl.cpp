@@ -127,7 +127,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         const auto data_iter = _args.find("data");
@@ -147,6 +147,10 @@ namespace
 
                 auto conn = irods::get_connection(client_info->username);
                 const auto ec = rc_atomic_apply_metadata_operations(static_cast<RcComm*>(conn), json_input.c_str(), &output);
+
+                if (ec != 0) {
+                    res.result(http::status::bad_request);
+                }
 
                 json error_info;
                 if (output) {

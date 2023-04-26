@@ -125,7 +125,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -167,7 +167,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -208,7 +208,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -330,7 +330,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {

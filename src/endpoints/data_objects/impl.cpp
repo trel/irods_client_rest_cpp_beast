@@ -204,7 +204,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/problem-details+json"); // TODO Should we use this?
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -241,6 +241,7 @@ namespace
             if (!in) {
                 log::error("{}: Could not open data object [{}] for read.", __func__, lpath_iter->second);
 
+                res.result(http::status::bad_request);
                 res.body() = json{
                     {"irods_response", {
                         {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
@@ -265,6 +266,7 @@ namespace
                 catch (const std::exception& e) {
                     log::error("{}: Could not seek to position [{}] in data object [{}].", __func__, iter->second, lpath_iter->second);
 
+                    res.result(http::status::bad_request);
                     res.body() = json{
                         {"irods_response", {
                             {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
@@ -292,6 +294,7 @@ namespace
                 catch (const std::exception& e) {
                     log::error("{}: Could not initialize read buffer to size [{}] for data object [{}].", __func__, iter->second, lpath_iter->second);
 
+                    res.result(http::status::bad_request);
                     res.body() = json{
                         {"irods_response", {
                             {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
@@ -330,6 +333,7 @@ namespace
             // examples showing how to do it.
             in.read(buffer.data(), buffer.size());
 
+#if 0
             res.body() = json{
                 {"irods_response", {
                     {"error_code", 0}
@@ -339,6 +343,10 @@ namespace
                 // library will not view the range as a string. This is what we want.
                 {"bytes", std::span(buffer.data(), in.gcount())}
             }.dump();
+#else
+            res.set(http::field::content_type, "application/octet-stream");
+            res.body() = std::string_view(buffer.data(), in.gcount());
+#endif
         }
         catch (const fs::filesystem_error& e) {
             res.result(http::status::bad_request);
@@ -379,7 +387,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -396,7 +404,7 @@ namespace
                 auto iter = parallel_write_contexts.find(parallel_write_handle_iter->second);
                 if (iter == std::end(parallel_write_contexts)) {
                     log::error("{}: Invalid handle for parallel write.", __func__);
-                    return _sess_ptr->send(irods::http::fail(res, http::status::ok));
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
                 //

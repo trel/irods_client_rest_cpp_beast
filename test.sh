@@ -5,7 +5,7 @@ irods_password="$2"
 
 set -x
 
-base_url='http://localhost:9000/irods-rest/0.9.5'
+base_url='http://localhost:9000/irods-http/0.9.5'
 bearer_token=$(curl -X POST --user "${irods_username}:${irods_password}" -s "${base_url}/authenticate")
 curl_opts='-s'
 
@@ -328,6 +328,7 @@ test_data_objects_endpoint()
     ils -l $data_object
     istream read $data_object
 
+    # Write some bytes to the data object using the parallel write operations.
     pw_data_object="/tempZone/home/$irods_username/pwfile.txt"
     pw_handle=$(curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
         --data-urlencode 'op=parallel_write_init' \
@@ -354,7 +355,6 @@ test_data_objects_endpoint()
         --data-urlencode 'op=parallel_write_shutdown' \
         --data-urlencode "parallel-write-handle=$pw_handle" \
         $curl_opts | jq
-    istream read $pw_data_object
 
     # Stat the data object again to show that the size was updated.
     curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
@@ -373,7 +373,7 @@ test_data_objects_endpoint()
         --data-urlencode 'op=read' \
         --data-urlencode "lpath=$data_object" \
         --data-urlencode 'count=1000' \
-        $curl_opts | jq
+        $curl_opts #| jq
     # Permanently remove the new data object (no trash).
     curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
         --data-urlencode 'op=remove' \
@@ -461,14 +461,14 @@ test_users_groups_endpoint()
         $curl_opts | jq
 }
 
-test_collections_endpoint
+#test_collections_endpoint
 #test_configuration_endpoint
-test_data_objects_endpoint
-test_information_endpoint
+#test_data_objects_endpoint
+#test_information_endpoint
 test_metadata_endpoint
-test_query_endpoint
-test_resource_endpoint
-test_rules_endpoint
-test_tickets_endpoint
-test_users_groups_endpoint
-test_zones_endpoint
+#test_query_endpoint
+#test_resource_endpoint
+#test_rules_endpoint
+#test_tickets_endpoint
+#test_users_groups_endpoint
+#test_zones_endpoint

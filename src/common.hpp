@@ -3,6 +3,7 @@
 
 #include "globals.hpp"
 #include "log.hpp"
+#include "version.hpp"
 
 #include <irods/connection_pool.hpp>
 #include <irods/filesystem/object_status.hpp>
@@ -66,9 +67,9 @@ namespace irods::http
     inline auto fail(response_type& _response, status_type _status, const std::string_view _error_msg) -> response_type
     {
         _response.result(_status);
-        _response.set(boost::beast::http::field::server, "irods-http"); // TODO Should be defined by CMakeLists.txt
-        _response.set(boost::beast::http::field::content_type, "text/plain"); // TODO
-        _response.set(boost::beast::http::field::content_length, "0");
+        _response.set(field_type::server, version::server_name);
+        _response.set(field_type::content_type, "application/json");
+        //_response.set(boost::beast::http::field::content_length, "0");
         _response.body() = _error_msg;
         _response.prepare_payload();
         return _response;

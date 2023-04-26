@@ -3,6 +3,7 @@
 #include "handlers.hpp"
 #include "log.hpp"
 #include "session.hpp"
+#include "version.hpp"
 
 #include <irods/connection_pool.hpp>
 #include <irods/rcConnect.h>
@@ -47,23 +48,23 @@ namespace net   = boost::asio;  // from <boost/asio.hpp>
 namespace po    = boost::program_options;
 namespace log   = irods::http::log;
 
-using json            = nlohmann::json;
-//using request_handler = void(*)(const irods::http::request_type&);
-using tcp             = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
+using json = nlohmann::json;
+using tcp  = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
 
+// IRODS_HTTP_API_BASE_URL is a macro defined by the CMakeLists.txt.
 const irods::http::request_handler_map_type req_handlers{
-    {"/irods-rest/0.9.5/authenticate", irods::http::handler::authentication},
-    {"/irods-rest/0.9.5/collections",  irods::http::handler::collections},
-    //{"/irods-rest/0.9.5/config",     irods::http::handler::configuration},
-    {"/irods-rest/0.9.5/data-objects", irods::http::handler::data_objects},
-    {"/irods-rest/0.9.5/info",         irods::http::handler::information},
-    {"/irods-rest/0.9.5/metadata",     irods::http::handler::metadata},
-    {"/irods-rest/0.9.5/query",        irods::http::handler::query},
-    {"/irods-rest/0.9.5/resources",    irods::http::handler::resources},
-    {"/irods-rest/0.9.5/rules",        irods::http::handler::rules},
-    {"/irods-rest/0.9.5/tickets",      irods::http::handler::tickets},
-    {"/irods-rest/0.9.5/users-groups", irods::http::handler::users_groups},
-    {"/irods-rest/0.9.5/zones",        irods::http::handler::zones}
+    {IRODS_HTTP_API_BASE_URL "/authenticate", irods::http::handler::authentication},
+    {IRODS_HTTP_API_BASE_URL "/collections",  irods::http::handler::collections},
+//  {IRODS_HTTP_API_BASE_URL "/config",       irods::http::handler::configuration},
+    {IRODS_HTTP_API_BASE_URL "/data-objects", irods::http::handler::data_objects},
+    {IRODS_HTTP_API_BASE_URL "/info",         irods::http::handler::information},
+    {IRODS_HTTP_API_BASE_URL "/metadata",     irods::http::handler::metadata},
+    {IRODS_HTTP_API_BASE_URL "/query",        irods::http::handler::query},
+    {IRODS_HTTP_API_BASE_URL "/resources",    irods::http::handler::resources},
+    {IRODS_HTTP_API_BASE_URL "/rules",        irods::http::handler::rules},
+    {IRODS_HTTP_API_BASE_URL "/tickets",      irods::http::handler::tickets},
+    {IRODS_HTTP_API_BASE_URL "/users-groups", irods::http::handler::users_groups},
+    {IRODS_HTTP_API_BASE_URL "/zones",        irods::http::handler::zones}
 };
 // clang-format on
 

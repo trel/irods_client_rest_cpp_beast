@@ -27,8 +27,6 @@ namespace irods::http::handler
             return _sess_ptr->send(fail(status_type::method_not_allowed));
         }
 
-        //const auto& svr = irods::http::globals::config->at("irods_server");
-
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
             return _sess_ptr->send(std::move(*result.response));
@@ -56,21 +54,15 @@ namespace irods::http::handler
         {
             auto conn = irods::get_connection(client_info->username);
 
-            log::trace("{}: Calling rcZoneReport.", __func__);
             if (const auto ec = rcZoneReport(static_cast<RcComm*>(conn), &bbuf); ec != 0) {
-                log::error("{}: rc_zone_report error: [{}]", __func__, ec);
+                log::error("{}: rcZoneReport error: [{}]", __func__, ec);
                 return _sess_ptr->send(irods::http::fail(status_type::bad_request));
             }
         }
 
-        log::trace("{}: bbuf memory address = [{}]", __func__, fmt::ptr(bbuf));
-        if (bbuf) {
-            log::trace("{}: bbuf length = [{}]", __func__, bbuf->len);
-        }
-
         response_type res{status_type::ok, _req.version()};
         res.set(field_type::server, BOOST_BEAST_VERSION_STRING);
-        res.set(field_type::content_type, "text/plain");
+        res.set(field_type::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
         res.body() = std::string_view(static_cast<char*>(bbuf->buf), bbuf->len);
         res.prepare_payload();

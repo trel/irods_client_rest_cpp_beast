@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18.0 FATAL_ERROR)
 
-set(IRODS_BINARY_NAME "irods_http_api")
+set(IRODS_HTTP_BINARY_NAME "irods_http_api")
 
 set(IRODS_HTTP_API_VERSION_MAJOR 0)
 set(IRODS_HTTP_API_VERSION_MINOR 9)
@@ -18,7 +18,7 @@ set(CMAKE_EXE_LINKER_FLAGS_INIT "-rdynamic -Wl,--export-dynamic -Wl,--enable-new
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE_INIT "-Wl,--gc-sections -Wl,-z,combreloc")
 
 # TODO Rename binary.
-project(irods_client_rest_cpp_beast VERSION "${IRODS_VERSION}" LANGUAGES CXX)
+project(${IRODS_HTTP_BINARY_NAME} VERSION "${IRODS_VERSION}" LANGUAGES CXX)
 
 set(CMAKE_SKIP_BUILD_RPATH OFF)
 set(CMAKE_SKIP_INSTALL_RPATH OFF)

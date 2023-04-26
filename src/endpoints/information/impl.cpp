@@ -33,7 +33,7 @@ namespace irods::http::handler
 
         response_type res{status_type::ok, _req.version()};
         res.set(field_type::server, BOOST_BEAST_VERSION_STRING);
-        res.set(field_type::content_type, "text/plain");
+        res.set(field_type::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         res.body() = json{

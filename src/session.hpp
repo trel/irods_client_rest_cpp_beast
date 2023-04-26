@@ -13,8 +13,10 @@
 #include <boost/asio/thread_pool.hpp>
 #include <boost/config.hpp>
 
+#include <chrono>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <utility>
 
 namespace irods::http
@@ -46,15 +48,17 @@ namespace irods::http
 
         auto do_read() -> void
         {
-            // Make the request empty before reading,
-            // otherwise the operation behavior is undefined.
-            req_ = {};
+            // Construct a new parser for each message.
+            parser_.emplace();
+
+            // Apply the limit defined in the configuration file.
+            parser_->body_limit(1); // TODO Testing.
 
             // Set the timeout.
             stream_.expires_after(std::chrono::seconds(30)); // TODO Needs to be configurable.
 
             // Read a request
-            boost::beast::http::async_read(stream_, buffer_, req_,
+            boost::beast::http::async_read(stream_, buffer_, *parser_,
                                            boost::beast::bind_front_handler(
                                                &session::on_read,
                                                shared_from_this()));
@@ -69,6 +73,11 @@ namespace irods::http
                 return do_close();
             }
 
+            if (ec == boost::beast::http::error::body_limit) {
+                log::error("{}: Request constraint error: {}", __func__, ec.message());
+                return;
+            }
+
             if (ec) {
                 return irods::fail(ec, "read");
             }
@@ -77,7 +86,7 @@ namespace irods::http
             // Process client request and send a response.
             //
 
-            namespace log = irods::http::log;
+            auto req_ = parser_->release();
 
             // Print the headers.
             for (auto&& h : req_.base()) {
@@ -166,51 +175,11 @@ namespace irods::http
         } // send
 
       private:
-#if 0
-        // This is the C++11 equivalent of a generic lambda.
-        // The function object is used to send an HTTP message.
-        struct send_lambda
-        {
-            session& self_;
-
-            explicit send_lambda(session& self)
-                : self_(self)
-            {
-            } // send_lambda (constructor)
-
-            template <bool isRequest, class Body, class Fields>
-            auto operator()(boost::beast::http::message<isRequest, Body, Fields>&& msg) const -> void
-            {
-                namespace beast = boost::beast;
-                namespace http  = beast::http;
-
-                // The lifetime of the message has to extend
-                // for the duration of the async operation so
-                // we use a shared_ptr to manage it.
-                auto sp = std::make_shared<
-                    http::message<isRequest, Body, Fields>>(std::move(msg));
-
-                // Store a type-erased version of the shared
-                // pointer in the class to keep it alive.
-                self_.res_ = sp;
-
-                // Write the response
-                http::async_write(
-                    self_.stream_,
-                    *sp,
-                    beast::bind_front_handler(
-                        &session::on_write,
-                        self_.shared_from_this(),
-                        sp->need_eof()));
-            } // operator()()
-        }; // struct send_lambda
-#endif
-
         boost::beast::tcp_stream stream_;
         boost::beast::flat_buffer buffer_;
-        boost::beast::http::request<boost::beast::http::string_body> req_;
-        std::shared_ptr<void> res_;
-        //send_lambda lambda_;
+        //boost::beast::http::request<boost::beast::http::string_body> req_;
+        std::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser_;
+        std::shared_ptr<void> res_; // TODO Probably doesn't need to be a shared_ptr anymore. The session owns it and is available for the lifetime of the request.
         const request_handler_map_type* req_handlers_;
     }; // class session
 } // namespace irods::http

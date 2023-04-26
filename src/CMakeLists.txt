@@ -8,7 +8,7 @@ configure_file(
 
 add_subdirectory(endpoints)
 
-set(EXECUTABLE_NAME "irods_http_api")
+set(EXECUTABLE_NAME ${IRODS_HTTP_BINARY_NAME})
 
 add_executable(${EXECUTABLE_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 
@@ -25,7 +25,10 @@ target_compile_definitions(
   BOOST_BEAST_USE_STD_STRING_VIEW
   # The following macro requires that the application never attempt to
   # change log levels concurrently across threads.
-  SPDLOG_NO_ATOMIC_LEVELS)
+  SPDLOG_NO_ATOMIC_LEVELS
+  # Defines a macro which is used to construct the URL paths to individual
+  # endpoint handlers (e.g. /irods-http/1.0.0/collections).
+  IRODS_HTTP_API_BASE_URL="/irods-http/${IRODS_HTTP_API_VERSION}")
 
 target_include_directories(
   ${EXECUTABLE_NAME}
