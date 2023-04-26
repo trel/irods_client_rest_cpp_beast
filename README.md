@@ -116,7 +116,7 @@ To stop the server, you can use **CTRL-C** or send **SIGINT** or **SIGTERM** to 
 
 Coming soon ...
 
-## API
+## API Documentation
 
-See [API](/API.md) for API information.
+See [API.md](/API.md) for details.
 

@@ -15,7 +15,6 @@ _Returns:_ A string representing a bearer token that can be used to carry out op
 
 Coming soon ...
 
----
 ## Collections
 
 ### Operation: create
@@ -164,7 +163,6 @@ _Returns:_
 }
 ```
 
----
 ## Data Objects
 
 ### Operation: touch
@@ -492,7 +490,6 @@ _Returns:_
 }
 ```
 
----
 ## Information
 
 Returns general information about the iRODS HTTP API server.
@@ -518,7 +515,6 @@ _Returns:_
 }
 ```
 
----
 ## Metadata
 
 Atomically applies several metadata operations in sequence on a single iRODS entity.
@@ -548,7 +544,6 @@ _Returns:_
 }
 ```
 
----
 ## Query
 
 ### Operation: query
@@ -583,12 +578,10 @@ _Returns:_
 }
 ```
 
----
 ## Resources
 
 
 
----
 ## Rules
 
 ### Operation: list_rule_engines
@@ -667,7 +660,7 @@ _Returns:_
 ```json
 {
     "irods_response": {
-        "error_code": <integer>
+        "error_code": "<integer>"
     },
     "rule_engine_plugin_instances": [
         "rep-instance-1",
@@ -678,7 +671,6 @@ _Returns:_
 }
 ```
 
----
 ## Tickets
 
 ### Operation: create
@@ -743,12 +735,10 @@ _Returns:_
 }
 ```
 
----
 ## Users and Groups
 
 
 
----
 ## Zones
 
 ### Operation: report
