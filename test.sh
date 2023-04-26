@@ -338,19 +338,19 @@ test_data_objects_endpoint()
     echo "Parallel Write Handle = [${pw_handle}]."
     curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
         --data-urlencode 'op=write' \
-        --data-urlencode "lpath=$pw_data_object" \
         --data-urlencode 'count=6' \
         --data-urlencode 'bytes=hello ' \
         --data-urlencode "parallel-write-handle=$pw_handle" \
         $curl_opts | jq
+        #--data-urlencode "lpath=$pw_data_object" \
     curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
         --data-urlencode 'op=write' \
-        --data-urlencode "lpath=$pw_data_object" \
         --data-urlencode 'offset=6' \
         --data-urlencode 'count=6' \
         --data-urlencode 'bytes=world!' \
         --data-urlencode "parallel-write-handle=$pw_handle" \
         $curl_opts | jq
+        #--data-urlencode "lpath=$pw_data_object" \
     curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
         --data-urlencode 'op=parallel_write_shutdown' \
         --data-urlencode "parallel-write-handle=$pw_handle" \
