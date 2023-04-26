@@ -405,7 +405,7 @@ _Returns:_
 
 Writes bytes to a data object.
 
-To write to a data object in parallel, see [Operation: parallel-write-init](#operation:-parallel-write-init).
+To write to a data object in parallel, see [Operation: parallel-write-init](#operation-parallel-write-init).
 
 _HTTP Method:_ POST
 
