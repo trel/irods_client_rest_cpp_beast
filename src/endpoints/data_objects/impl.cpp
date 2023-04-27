@@ -253,7 +253,7 @@ namespace
                 }.dump();
                 res.prepare_payload();
 
-                _sess_ptr->send(std::move(res));
+                return _sess_ptr->send(std::move(res));
             }
 
             // TODO This needs to be clamped to a max size set by the administrator.
@@ -278,7 +278,7 @@ namespace
                     }.dump();
                     res.prepare_payload();
 
-                    _sess_ptr->send(std::move(res));
+                    return _sess_ptr->send(std::move(res));
                 }
             }
 
@@ -306,7 +306,7 @@ namespace
                     }.dump();
                     res.prepare_payload();
 
-                    _sess_ptr->send(std::move(res));
+                    return _sess_ptr->send(std::move(res));
                 }
             }
             else {
@@ -444,7 +444,7 @@ namespace
                 }.dump();
                 res.prepare_payload();
 
-                _sess_ptr->send(std::move(res));
+                return _sess_ptr->send(std::move(res));
             }
 
             // TODO This needs to be clamped to a max size set by the administrator.
@@ -469,7 +469,7 @@ namespace
                     }.dump();
                     res.prepare_payload();
 
-                    _sess_ptr->send(std::move(res));
+                    return _sess_ptr->send(std::move(res));
                 }
             }
 
@@ -483,7 +483,7 @@ namespace
                 log::error("{}: Missing [count] parameter.", __func__);
                 res.result(http::status::bad_request);
                 res.prepare_payload();
-                _sess_ptr->send(std::move(res));
+                return _sess_ptr->send(std::move(res));
             }
             const auto count = std::stoll(std::string{iter->second});
 
@@ -540,7 +540,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -587,7 +587,7 @@ namespace
                     {"http_api_error_message", "Open error."}
                 }.dump();
                 res.prepare_payload();
-                _sess_ptr->send(std::move(res));
+                return _sess_ptr->send(std::move(res));
             }
 
             log::trace("{}: Output stream for [{}] is open.", __func__, lpath_iter->second);
@@ -618,7 +618,7 @@ namespace
                     {"http_api_error_message", "Parallel write initialization error."}
                 }.dump();
                 res.prepare_payload();
-                _sess_ptr->send(std::move(res));
+                return _sess_ptr->send(std::move(res));
             }
             log::trace("{}: (init) parallel_write_context was inserted successfully. Initializing output streams.", __func__);
 
@@ -652,7 +652,7 @@ namespace
             if (!streams[0]->out) {
                 log::error("{}: (init) Could not open stream [0].", __func__);
                 parallel_write_contexts.erase(iter);
-                _sess_ptr->send(std::move(res));
+                return _sess_ptr->send(std::move(res));
             }
 
 #if 0
@@ -744,7 +744,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -830,27 +830,37 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
-            const auto lpath_iter = _args.find("lpath");
-            if (lpath_iter == std::end(_args)) {
+            // TODO This should be part of the replica library.
+            DataObjInp input{};
+            irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
+
+            if (const auto iter = _args.find("lpath"); iter != std::end(_args)) {
+                std::strncpy(input.objPath, iter->second.c_str(), sizeof(DataObjInp::objPath));
+            }
+            else {
                 log::error("{}: Missing [lpath] parameter.", __func__);
                 return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
-            const auto dst_resc_iter = _args.find("dst-resource");
-            if (dst_resc_iter == std::end(_args)) {
+            if (const auto iter = _args.find("dst-resource"); iter != std::end(_args)) {
+                addKeyVal(&input.condInput, DEST_RESC_NAME_KW, iter->second.c_str());
+            }
+            else {
                 log::error("{}: Missing [dst-resource] parameter.", __func__);
                 return _sess_ptr->send(irods::http::fail(http::status::bad_request));
             }
 
-            // TODO This should be part of the replica library.
-            DataObjInp input{};
-            irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
-            std::strncpy(input.objPath, lpath_iter->second.c_str(), sizeof(DataObjInp::objPath));
-            addKeyVal(&input.condInput, DEST_RESC_NAME_KW, dst_resc_iter->second.c_str());
+            if (const auto iter = _args.find("src-resource"); iter != std::end(_args)) {
+                addKeyVal(&input.condInput, RESC_NAME_KW, iter->second.c_str());
+            }
+
+            if (const auto iter = _args.find("admin"); iter != std::end(_args) && iter->second == "1") {
+                addKeyVal(&input.condInput, ADMIN_KW, "");
+            }
 
             auto conn = irods::get_connection(client_info->username);
             const auto ec = rcDataObjRepl(static_cast<RcComm*>(conn), &input);
@@ -891,27 +901,48 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
-            const auto lpath_iter = _args.find("lpath");
-            if (lpath_iter == std::end(_args)) {
+            // TODO This should be part of the replica library.
+            DataObjInp input{};
+            irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
+
+            if (const auto iter = _args.find("lpath"); iter != std::end(_args)) {
+                std::strncpy(input.objPath, iter->second.c_str(), sizeof(DataObjInp::objPath));
+            }
+            else {
                 log::error("{}: Missing [lpath] parameter.", __func__);
                 return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
-            const auto resc_iter = _args.find("resource");
-            if (resc_iter == std::end(_args)) {
-                log::error("{}: Missing [resource] parameter.", __func__);
-                return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+            {
+                const auto resc_iter = _args.find("resource");
+                const auto found_resc = (resc_iter != std::end(_args));
+
+                const auto repl_iter = _args.find("replica");
+                const auto found_repl = (repl_iter != std::end(_args));
+
+                if (found_resc && found_repl) {
+                    log::error("{}: [resource] and [replica] cannot be used at the same time.", __func__);
+                    return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+                }
+                else if (found_resc) {
+                    addKeyVal(&input.condInput, RESC_NAME_KW, resc_iter->second.c_str());
+                }
+                else if (found_repl) {
+                    addKeyVal(&input.condInput, REPL_NUM_KW, repl_iter->second.c_str());
+                }
+                else {
+                    log::error("{}: Missing parameter: [resource] or [replica]", __func__);
+                    return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+                }
             }
 
-            // TODO This should be part of the replica library.
-            DataObjInp input{};
-            irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
-            std::strncpy(input.objPath, lpath_iter->second.c_str(), sizeof(DataObjInp::objPath));
-            addKeyVal(&input.condInput, RESC_NAME_KW, resc_iter->second.c_str());
+            if (const auto iter = _args.find("unregister"); iter != std::end(_args) && iter->second == "1") {
+                input.oprType = UNREG_OPR;
+            }
 
             if (const auto iter = _args.find("admin"); iter != std::end(_args) && iter->second == "1") {
                 addKeyVal(&input.condInput, ADMIN_KW, "");
@@ -956,7 +987,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -1047,7 +1078,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -1136,7 +1167,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -1158,7 +1189,7 @@ namespace
                 return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
-            if (const auto iter = _args.find("dst-resource"); iter != std::end(_args)) {
+            if (const auto iter = _args.find("resource"); iter != std::end(_args)) {
                 addKeyVal(&input.condInput, DEST_RESC_NAME_KW, iter->second.c_str());
             }
 
@@ -1234,7 +1265,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -1275,7 +1306,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -1287,17 +1318,23 @@ namespace
 
             auto conn = irods::get_connection(client_info->username);
 
-            // TODO This type of check needs to apply to all operations in /data-objects and /collections
-            // that take a logical path.
             if (!fs::client::is_data_object(conn, lpath_iter->second)) {
-                log::error("{}: Logical path does not point to a data object.", __func__);
-                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request, json{
+                    {"irods_response", {
+                        {"error_code", NOT_A_DATA_OBJECT}
+                    }}
+                }.dump()));
             }
 
-            fs::remove_options opts = fs::remove_options::none;
+            fs::extended_remove_options opts{};
 
+            // TODO use-trash? force?
             if (const auto iter = _args.find("no-trash"); iter != std::end(_args) && iter->second == "1") {
-                opts = fs::remove_options::no_trash;
+                opts.no_trash = true;
+            }
+
+            if (const auto iter = _args.find("unregister"); iter != std::end(_args) && iter->second == "1") {
+                opts.unregister = true;
             }
 
             // There's no admin flag for removal.
@@ -1342,7 +1379,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -1415,7 +1452,7 @@ namespace
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/plain");
+        res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
         try {
@@ -1432,7 +1469,7 @@ namespace
                 options["no_create"] = (opt_iter->second == "1");
             }
 
-            opt_iter = _args.find("replica-number");
+            opt_iter = _args.find("replica");
             if (opt_iter != std::end(_args)) {
                 try {
                     options["replica_number"] = std::stoi(opt_iter->second);

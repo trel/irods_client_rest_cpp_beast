@@ -272,7 +272,7 @@ auto main(int _argc, char* _argv[]) -> int
         irods::http::globals::req_handler_ioc = &ioc;
 
         // Create and launch a listening port.
-        log::trace("Initializing listenin socket (host=[{}], port=[{}]).", address.to_string(), port);
+        log::trace("Initializing listening socket (host=[{}], port=[{}]).", address.to_string(), port);
         std::make_shared<listener>(ioc, tcp::endpoint{address, port})->run();
 
         // Capture SIGINT and SIGTERM to perform a clean shutdown.

@@ -130,7 +130,7 @@ namespace
         res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
-        const auto data_iter = _args.find("data");
+        const auto data_iter = _args.find("json");
         if (data_iter == std::end(_args)) {
             log::error("{}: Missing [data] parameter.", __func__);
             return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));

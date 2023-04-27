@@ -2,6 +2,7 @@
 #define IRODS_HTTP_API_SESSION_HPP
 
 #include "common.hpp"
+#include "globals.hpp"
 #include "log.hpp"
 
 #include <boost/beast/core.hpp>
@@ -28,7 +29,6 @@ namespace irods::http
         session(boost::asio::ip::tcp::socket&& socket,
                 const request_handler_map_type& _request_handler_map)
             : stream_(std::move(socket))
-            //, lambda_(*this)
             , req_handlers_{&_request_handler_map}
         {
         } // session (constructor)
@@ -52,7 +52,7 @@ namespace irods::http
             parser_.emplace();
 
             // Apply the limit defined in the configuration file.
-            parser_->body_limit(1); // TODO Testing.
+            parser_->body_limit(10000); // TODO Testing.
 
             // Set the timeout.
             stream_.expires_after(std::chrono::seconds(30)); // TODO Needs to be configurable.
@@ -108,6 +108,7 @@ namespace irods::http
             const auto path = irods::http::get_url_path(fmt::format("http://host{}", req_.target()));
             if (!path) {
                 send(irods::http::fail(http::status::bad_request));
+                return;
             }
 
             if (const auto iter = req_handlers_->find(*path); iter != std::end(*req_handlers_)) {

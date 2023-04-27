@@ -100,10 +100,20 @@ test_collections_endpoint()
 
 test_query_endpoint()
 {
-    # List all data objects in the catalog.
+    # Run a general query.
     curl -G -H "authorization: Bearer $bearer_token" "${base_url}/query" \
-        --data-urlencode 'op=execute' \
+        --data-urlencode 'op=execute_genquery' \
         --data-urlencode 'query=select COLL_NAME, DATA_NAME' \
+        --data-urlencode 'offset=2' \
+        --data-urlencode 'count=2' \
+        ${curl_opts} | jq
+
+    # Run a specific query.
+    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/query" \
+        --data-urlencode 'op=execute_specific_query' \
+        --data-urlencode 'name=ShowCollAcls' \
+        --data-urlencode "args=/tempZone/home/$irods_username" \
+        --data-urlencode 'count=1' \
         ${curl_opts} | jq
 }
 
@@ -230,7 +240,7 @@ test_metadata_endpoint()
 {
     curl -H "authorization: Bearer $bearer_token" "${base_url}/metadata" \
         --data-urlencode 'op=atomic_execute' \
-        --data-urlencode "data={
+        --data-urlencode "json={
             \"entity_name\": \"/tempZone/home/$irods_username\",
             \"entity_type\": \"collection\",
             \"operations\": [
@@ -252,7 +262,7 @@ test_metadata_endpoint()
     # in 4.2.12. Nothing's broken, it's just not convenient to read.
     curl -H "authorization: Bearer $bearer_token" -H 'content-type: text/plain' "${base_url}/metadata" \
         --data-urlencode 'op=atomic_execute' \
-        --data-urlencode "data={
+        --data-urlencode "json={
             \"entity_name\": \"/tempZone/home/$irods_username\",
             \"entity_type\": \"file\",
             \"operations\": [
@@ -290,7 +300,7 @@ test_rules_endpoint()
         --data-urlencode 'rep-instance=irods_rule_engine_plugin-irods_rule_language-instance' \
         --data-urlencode 'rule-text=delay("<EF>60</EF><INST_NAME>irods_rule_engine_plugin-irods_rule_language-instance</INST_NAME>") { writeLine("serverLog", "REST API!!!"); }' \
         ${curl_opts} | jq
-    # List all delay rules.
+    # List all delay rules. TODO GenQuery?
     curl -G -H "authorization: Bearer $bearer_token" "${base_url}/rules" \
         --data-urlencode 'op=list_delay_rules' \
         ${curl_opts} | jq
@@ -465,8 +475,8 @@ test_users_groups_endpoint()
 #test_configuration_endpoint
 #test_data_objects_endpoint
 #test_information_endpoint
-test_metadata_endpoint
-#test_query_endpoint
+#test_metadata_endpoint
+test_query_endpoint
 #test_resource_endpoint
 #test_rules_endpoint
 #test_tickets_endpoint

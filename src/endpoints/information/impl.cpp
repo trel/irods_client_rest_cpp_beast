@@ -8,13 +8,8 @@
 
 #include <irods/client_connection.hpp>
 #include <irods/irods_exception.hpp>
-//#include <irods/process_stash.hpp>
-//#include <irods/rcConnect.h>
 
-//#include <boost/asio.hpp>
 #include <boost/beast.hpp>
-//#include <boost/beast/http.hpp>
-
 #include <nlohmann/json.hpp>
 
 #include <string>
@@ -37,14 +32,18 @@ namespace irods::http::handler
         res.keep_alive(_req.keep_alive());
 
         res.body() = json{
-            {"binary_name", irods::http::version::binary_name},
+            //{"binary_name", irods::http::version::binary_name}, // TODO Remove?
             {"api_version", irods::http::version::api_version},
-            {"commit", irods::http::version::sha},
+            {"build", irods::http::version::sha},
+#if 0
             {"irods_server", {
                 {"host", svr.at("host")},
                 {"port", svr.at("port")},
                 {"zone", svr.at("zone")}
             }}
+#else
+            {"irods_zone", svr.at("zone")}
+#endif
         }.dump();
 
         res.prepare_payload();
