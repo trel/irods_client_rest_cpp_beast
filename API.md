@@ -31,7 +31,7 @@ _Command:_
 ```bash
 curl -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/collections \
     --data-urlencode 'op=create' \
-    --data-urlencode 'lpath=<path/to/collection>'
+    --data-urlencode 'lpath=</path/to/collection>'
 ```
 
 _Returns:_
@@ -54,7 +54,7 @@ _Command:_
 ```bash
 curl -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/collections \
     --data-urlencode 'op=remove' \
-    --data-urlencode 'lpath=<path/to/collection>'
+    --data-urlencode 'lpath=</path/to/collection>'
 ```
 
 _Returns:_
@@ -77,7 +77,7 @@ _Command:_
 ```bash
 curl -G -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/collections \
     --data-urlencode 'op=stat' \
-    --data-urlencode 'lpath=<path/to/collection>'
+    --data-urlencode 'lpath=</path/to/collection>'
 ```
 
 _Returns:_
@@ -101,7 +101,7 @@ _Command:_
 ```bash
 curl -G -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/collections \
     --data-urlencode 'op=list' \
-    --data-urlencode 'lpath=<path/to/collection>' \
+    --data-urlencode 'lpath=</path/to/collection>' \
     --data-urlencode 'recurse=0'
 ```
 
@@ -127,7 +127,7 @@ _Command:_
 ```bash
 curl -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/collections \
     --data-urlencode 'op=set_permission' \
-    --data-urlencode 'lpath=<path/to/collection>' \
+    --data-urlencode 'lpath=</path/to/collection>' \
     --data-urlencode 'entity-name=<user_or_group>' \
     --data-urlencode 'permission=<permission_string>'
 ```
@@ -153,8 +153,8 @@ _Command:_
 ```bash
 curl -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/collections \
     --data-urlencode 'op=rename' \
-    --data-urlencode 'old-lpath=<path/to/old_collection>' \
-    --data-urlencode 'new-lpath=<path/to/new_collection>'
+    --data-urlencode 'old-lpath=</path/to/old_collection>' \
+    --data-urlencode 'new-lpath=</path/to/new_collection>'
 ```
 
 _Returns:_
@@ -179,7 +179,7 @@ _Command:_
 ```bash
 curl -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/data-objects \
     --data-urlencode 'op=touch' \
-    --data-urlencode 'lpath=<path/to/data_object>'
+    --data-urlencode 'lpath=</path/to/data_object>'
 ```
 
 _Returns:_
@@ -199,13 +199,13 @@ _HTTP Method:_ POST
 _Parameters:_
 - op
 - lpath
-- no-trash
+- no-trash (default: 0)
 
 _Command:_
 ```bash
 curl -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/data-objects \
     --data-urlencode 'op=remove' \
-    --data-urlencode 'lpath=<path/to/data_object>' \
+    --data-urlencode 'lpath=</path/to/data_object>' \
     --data-urlencode 'no-trash=<integer>'
 ```
 
@@ -217,7 +217,7 @@ _Returns:_
 
 ### Operation: stat
 
-Returns information about a collection.
+Returns information about a data object.
 
 _HTTP Method:_ GET
 
@@ -229,7 +229,7 @@ _Command:_
 ```bash
 curl -G -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/data-objects \
     --data-urlencode 'op=stat' \
-    --data-urlencode 'lpath=<path/to/data_object>'
+    --data-urlencode 'lpath=</path/to/data_object>'
 ```
 
 _Returns:_
@@ -254,7 +254,7 @@ _Command:_
 ```bash
 curl -G -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/data-objects \
     --data-urlencode 'op=read' \
-    --data-urlencode 'lpath=<path/to/data_object>' \
+    --data-urlencode 'lpath=</path/to/data_object>' \
     --data-urlencode 'offset=<integer>' \
     --data-urlencode 'count=<integer>' \
 ```
@@ -281,7 +281,7 @@ _Command:_
 ```bash
 curl -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/data-objects \
     --data-urlencode 'op=set_permission' \
-    --data-urlencode 'lpath=<path/to/data_object>' \
+    --data-urlencode 'lpath=</path/to/data_object>' \
     --data-urlencode 'entity-name=<user_or_group>' \
     --data-urlencode 'permission=<permission_string>'
 ```
@@ -307,8 +307,8 @@ _Command:_
 ```bash
 curl -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/data-objects \
     --data-urlencode 'op=rename' \
-    --data-urlencode 'old-lpath=<path/to/old_data_object>' \
-    --data-urlencode 'new-lpath=<path/to/new_data_object>'
+    --data-urlencode 'old-lpath=</path/to/old_data_object>' \
+    --data-urlencode 'new-lpath=</path/to/new_data_object>'
 ```
 
 _Returns:_
@@ -335,7 +335,7 @@ _Command:_
 ```bash
 curl -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/data-objects \
     --data-urlencode 'op=replicate' \
-    --data-urlencode 'lpath=<path/to/data_object>' \
+    --data-urlencode 'lpath=</path/to/data_object>' \
     --data-urlencode 'src-resource=<string>' \
     --data-urlencode 'dst-resource=<string>'
 ```
@@ -362,7 +362,7 @@ _Command:_
 ```bash
 curl -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/data-objects \
     --data-urlencode 'op=trim' \
-    --data-urlencode 'lpath=<path/to/data_object>' \
+    --data-urlencode 'lpath=</path/to/data_object>' \
     --data-urlencode 'resource=<string>'
 ```
 
@@ -390,7 +390,7 @@ _Command:_
 ```bash
 curl -G -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/data-objects \
     --data-urlencode 'op=read' \
-    --data-urlencode 'lpath=<path/to/data_object>' \
+    --data-urlencode 'lpath=</path/to/data_object>' \
     --data-urlencode 'offset=<integer>' \
     --data-urlencode 'count=<integer>'
 ```
@@ -423,7 +423,7 @@ _Command:_
 ```bash
 curl -G -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/data-objects \
     --data-urlencode 'op=write' \
-    --data-urlencode 'lpath=<path/to/data_object>' \
+    --data-urlencode 'lpath=</path/to/data_object>' \
     --data-urlencode 'offset=<integer>' \
     --data-urlencode 'count=<integer>' \
     --data-urlencode 'bytes=<binary_data>'
@@ -454,7 +454,7 @@ _Command:_
 ```bash
 curl -G -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/data-objects \
     --data-urlencode 'op=parallel-write-init' \
-    --data-urlencode 'lpath=<path/to/data_object>' \
+    --data-urlencode 'lpath=</path/to/data_object>' \
     --data-urlencode 'stream-count=<integer>'
 ```
 
@@ -685,7 +685,7 @@ _Parameters:_
 - type
 - use-count
 - write-data-object-count
-- write-byte-object-count
+- write-byte-count
 - seconds-until-expiration
 - users
 - groups
@@ -695,7 +695,7 @@ _Command:_
 ```bash
 curl -H 'Authorization: Bearer <token>' http://localhost:<port>/irods-http/<version>/tickets \
     --data-urlencode 'op=create' \
-    --data-urlencode 'lpath=<path/to/data_object>' \
+    --data-urlencode 'lpath=</path/to/data_object>' \
     --data-urlencode 'type=<string>' \
     --data-urlencode 'use-count=<integer>' \
     --data-urlencode 'write-data-object-count=<integer>' \
