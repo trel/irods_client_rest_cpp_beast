@@ -7,6 +7,7 @@
 #include <irods/client_connection.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/irods_query.hpp>
+#include <irods/procApiRequest.h>
 #include <irods/query_builder.hpp>
 #include <irods/rodsErrorTable.h>
 
@@ -133,6 +134,14 @@ namespace
             return _sess_ptr->send(irods::http::fail(http::status::bad_request));
         }
 
+        const auto parser_iter = _args.find("parser");
+        if (parser_iter != std::end(_args)) {
+            if (parser_iter->second != "genquery1" || parser_iter->second != "genquery2") {
+                log::error("{}: Missing [parser] parameter.", __func__);
+                return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+            }
+        }
+
         const auto to_int = [fn = __func__](const std::string& _v) {
             try {
                 return std::stoi(_v);
@@ -163,7 +172,7 @@ namespace
         res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
-        net::post(*irods::http::globals::thread_pool_bg, [_sess_ptr, client_info, gql = query_iter->second, res = std::move(res), offset, count]() mutable {
+        net::post(*irods::http::globals::thread_pool_bg, [_sess_ptr, client_info, parser = parser_iter->second, gql = query_iter->second, res = std::move(res), offset, count]() mutable {
             try {
                 json::array_t row;
                 json::array_t rows;
@@ -171,34 +180,61 @@ namespace
                 {
                     auto conn = irods::get_connection(client_info->username);
 
-                    int offset_counter = 0;
-                    int count_counter = 0;
+                    if ("genquery2" == parser) {
+                        char* sql{};
 
-                    for (auto&& r : irods::query{static_cast<RcComm*>(conn), gql}) {
-                        if (offset_counter < offset) {
-                            ++offset_counter;
-                            continue;
+                        const auto ec = procApiRequest(static_cast<RcComm*>(conn),
+                                                       1'000'001, // TODO GenQuery2 API number. Need a better way to get this.
+                                                       gql.c_str(),
+                                                       nullptr,
+                                                       reinterpret_cast<void**>(&sql),
+                                                       nullptr);
+
+                        if (ec < 0) {
+                            res.result(http::status::bad_request);
+                            res.body() = json{
+                                {"irods_response", {
+                                    {"error_code", ec},
+                                }}
+                            }.dump();
+                        }
+                        
+                        // The string below contains a format placeholder for the "rows" property
+                        // because this avoids the need to parse the GenQuery2 results into an nlohmann
+                        // JSON object just to serialize it for the response.
+                        constexpr const auto* json_fmt_string = R"_({{"irods_response": {{"error_code": 0}}, {{"rows": {}}}}})_";
+                        res.body() = fmt::format(json_fmt_string, sql);
+                    }
+                    else {
+                        int offset_counter = 0;
+                        int count_counter = 0;
+
+                        for (auto&& r : irods::query{static_cast<RcComm*>(conn), gql}) {
+                            if (offset_counter < offset) {
+                                ++offset_counter;
+                                continue;
+                            }
+
+                            for (auto&& c : r) {
+                                row.push_back(c);
+                            }
+
+                            rows.push_back(row);
+                            row.clear();
+
+                            if (++count_counter == count) {
+                                break;
+                            }
                         }
 
-                        for (auto&& c : r) {
-                            row.push_back(c);
-                        }
-
-                        rows.push_back(row);
-                        row.clear();
-
-                        if (++count_counter == count) {
-                            break;
-                        }
+                        res.body() = json{
+                            {"irods_response", {
+                                {"error_code", 0},
+                            }},
+                            {"rows", rows}
+                        }.dump();
                     }
                 }
-
-                res.body() = json{
-                    {"irods_response", {
-                        {"error_code", 0},
-                    }},
-                    {"rows", rows}
-                }.dump();
             }
             catch (const irods::exception& e) {
                 res.result(http::status::bad_request);
