@@ -106,7 +106,7 @@ namespace irods::http::handler
         bool login_successful = false;
 
         try {
-            const auto& svr = irods::http::globals::config->at("irods_server");
+            const auto& svr = irods::http::globals::config->at("irods_client");
             const auto& host = svr.at("host").get_ref<const std::string&>();
             const auto port = svr.at("port").get<std::uint16_t>();
             const auto& zone = svr.at("zone").get_ref<const std::string&>();

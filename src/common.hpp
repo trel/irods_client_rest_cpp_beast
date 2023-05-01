@@ -376,7 +376,7 @@ namespace irods
 
         auto& cp = irods::http::globals::conn_pool;
         auto conn = cp->get_connection();
-        const auto& zone = irods::http::globals::config->at("irods_server").at("zone").get_ref<const std::string&>();
+        const auto& zone = irods::http::globals::config->at("irods_client").at("zone").get_ref<const std::string&>();
 
         log::trace("{}: Changing identity associated with connection to [{}].", __func__, _username);
 

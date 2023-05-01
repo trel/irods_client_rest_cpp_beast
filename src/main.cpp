@@ -191,23 +191,27 @@ auto set_log_level(const json& _config) -> void
 
 auto init_irods_connection_pool(const json& _config) -> irods::connection_pool
 {
-    const auto& svr = _config.at("irods_server");
-    const auto& rodsadmin = svr.at("rodsadmin");
+    const auto& client = _config.at("irods_client");
+    const auto& zone = client.at("zone").get_ref<const std::string&>();
+    const auto& conn_pool = client.at("connection_pool");
+    const auto& rodsadmin = client.at("rodsadmin");
+    const auto& username = rodsadmin.at("username").get_ref<const std::string&>();
 
     return {
-        _config.at("irods_connection_pool_size").get<int>(),
-        svr.at("host").get_ref<const std::string&>(),
-        svr.at("port").get<int>(),
-        rodsadmin.at("username").get_ref<const std::string&>(),
-        svr.at("zone").get_ref<const std::string&>(),
-        rodsadmin.at("username").get_ref<const std::string&>(),
-        svr.at("zone").get_ref<const std::string&>(),
-        svr.at("connection_refresh_timeout_in_seconds").get<int>(),
+        conn_pool.at("size").get<int>(),
+        client.at("host").get_ref<const std::string&>(),
+        client.at("port").get<int>(),
+        username,
+        zone,
+        username,
+        zone,
+        conn_pool.at("refresh_timeout_in_seconds").get<int>(),
         [pw = rodsadmin.at("password").get<std::string>()](RcComm& _comm) mutable {
             if (const auto ec = clientLoginWithPassword(&_comm, pw.data()); ec != 0) {
                 throw std::invalid_argument{fmt::format("Could not authenticate rodsadmin user: [{}]", ec)};
             }
-        }};
+        }
+    };
 } // init_irods_connection_pool
 
 auto main(int _argc, char* _argv[]) -> int
@@ -228,12 +232,12 @@ auto main(int _argc, char* _argv[]) -> int
         po::store(po::command_line_parser(_argc, _argv).options(opts_desc).positional(pod).run(), vm);
         po::notify(vm);
 
-        if (vm.count("help")) {
+        if (vm.count("help") > 0) {
             print_usage();
             return 0;
         }
 
-        if (vm.count("version")) {
+        if (vm.count("version") > 0) {
             print_version_info();
             return 0;
         }
@@ -246,7 +250,8 @@ auto main(int _argc, char* _argv[]) -> int
         const auto config = json::parse(std::ifstream{vm["config-file"].as<std::string>()});
         irods::http::globals::config = &config;
 
-        set_log_level(config);
+        const auto& http_server_config = config.at("http_server");
+        set_log_level(http_server_config);
         spdlog::set_pattern("[%Y-%m-%d %T.%e] [P:%P] [%^%l%$] [T:%t] %v"); // TODO Can be configurable.
 
         // TODO For LONG running tasks, see the following:
@@ -258,9 +263,9 @@ auto main(int _argc, char* _argv[]) -> int
         log::trace("Loading API plugins.");
         load_client_api_plugins();
 
-        const auto address = net::ip::make_address(config.at("host").get_ref<const std::string&>());
-        const auto port = config.at("port").get<std::uint16_t>();
-        const auto request_handler_thread_count = std::max(config.at("request_handler_threads").get<int>(), 1);
+        const auto address = net::ip::make_address(http_server_config.at("host").get_ref<const std::string&>());
+        const auto port = http_server_config.at("port").get<std::uint16_t>();
+        const auto request_thread_count = std::max(http_server_config.at("requests").at("threads").get<int>(), 1);
 
         log::trace("Initializing iRODS connection pool.");
         auto conn_pool = init_irods_connection_pool(config);
@@ -268,7 +273,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         // The io_context is required for all I/O.
         log::trace("Initializing HTTP components.");
-        net::io_context ioc{request_handler_thread_count};
+        net::io_context ioc{request_thread_count};
         irods::http::globals::req_handler_ioc = &ioc;
 
         // Create and launch a listening port.
@@ -288,13 +293,13 @@ auto main(int _argc, char* _argv[]) -> int
         // Launch the requested number of dedicated backgroup I/O threads.
         // These threads are used for long running tasks (e.g. reading/writing bytes, database, etc.)
         log::trace("Initializing thread pool for long running I/O tasks.");
-        net::thread_pool io_threads(std::max(config.at("io_threads").get<int>(), 1));
+        net::thread_pool io_threads(std::max(http_server_config.at("background_io").at("threads").get<int>(), 1));
         irods::http::globals::thread_pool_bg = &io_threads;
 
         // Run the I/O service on the requested number of threads.
         log::trace("Initializing thread pool for HTTP requests.");
-        net::thread_pool request_handler_threads(request_handler_thread_count);
-        for (auto i = request_handler_thread_count - 1; i > 0; --i) {
+        net::thread_pool request_handler_threads(request_thread_count);
+        for (auto i = request_thread_count - 1; i > 0; --i) {
             net::post(request_handler_threads, [&ioc] { ioc.run(); });
         }
         log::trace("Server is ready.");
