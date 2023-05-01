@@ -134,12 +134,15 @@ namespace
             return _sess_ptr->send(irods::http::fail(http::status::bad_request));
         }
 
+        std::string parser = "genquery1";
         const auto parser_iter = _args.find("parser");
         if (parser_iter != std::end(_args)) {
-            if (parser_iter->second != "genquery1" || parser_iter->second != "genquery2") {
-                log::error("{}: Missing [parser] parameter.", __func__);
+            if (parser_iter->second != "genquery1" && parser_iter->second != "genquery2") {
+                log::error("{}: Invalid argument for [parser] parameter.", __func__);
                 return _sess_ptr->send(irods::http::fail(http::status::bad_request));
             }
+
+            parser = parser_iter->second;
         }
 
         const auto to_int = [fn = __func__](const std::string& _v) {
@@ -172,7 +175,7 @@ namespace
         res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
-        net::post(*irods::http::globals::thread_pool_bg, [_sess_ptr, client_info, parser = parser_iter->second, gql = query_iter->second, res = std::move(res), offset, count]() mutable {
+        net::post(*irods::http::globals::thread_pool_bg, [_sess_ptr, client_info, parser = std::move(parser), gql = query_iter->second, res = std::move(res), offset, count]() mutable {
             try {
                 json::array_t row;
                 json::array_t rows;
