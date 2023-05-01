@@ -179,13 +179,10 @@ namespace
                 }
             }
 
-            // TODO This can be derived if the REST API provides a way to know what zone it
-            // is connected to. For example, the config file can define the local zone and then
-            // we can use that to compare whether the client is attempting to create a local or
-            // remote user.
             auto zone_type = adm::zone_type::local;
-            const auto remote_iter = _args.find("remote_user");
-            if (remote_iter != std::end(_args) && remote_iter->second == "1") {
+            if (const auto& client = irods::http::globals::config->at("irods_client");
+                zone_iter->second != client.at("zone").get_ref<const std::string&>())
+            {
                 zone_type = adm::zone_type::remote;
             }
 
