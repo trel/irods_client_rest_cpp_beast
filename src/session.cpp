@@ -20,9 +20,13 @@
 namespace irods::http
 {
     session::session(boost::asio::ip::tcp::socket&& socket,
-                     const request_handler_map_type& _request_handler_map)
+                     const request_handler_map_type& _request_handler_map,
+                     int _max_rbuffer_size,
+                     int _timeout_in_seconds)
         : stream_(std::move(socket))
         , req_handlers_{&_request_handler_map}
+        , max_rbuffer_size_{_max_rbuffer_size}
+        , timeout_in_secs_{_timeout_in_seconds}
     {
     } // session (constructor)
 
@@ -44,18 +48,13 @@ namespace irods::http
         // Construct a new parser for each message.
         parser_.emplace();
 
-        // TODO These options need to be retrieved before construction.
-        // Right now, we are paying a small penalty for looking up static information.
-        using json = nlohmann::json;
-        const auto& requests = irods::http::globals::config->at(json::json_pointer{"/http_server/requests"});
-
         // Apply the limit defined in the configuration file.
-        parser_->body_limit(requests.at("max_rbuffer_size_in_bytes").get<int>());
+        parser_->body_limit(max_rbuffer_size_);
 
         // Set the timeout.
-        stream_.expires_after(std::chrono::seconds(requests.at("timeout_in_seconds").get<int>()));
+        stream_.expires_after(std::chrono::seconds(timeout_in_secs_));
 
-        // Read a request
+        // Read a request.
         boost::beast::http::async_read(stream_, buffer_, *parser_,
                                        boost::beast::bind_front_handler(
                                            &session::on_read,

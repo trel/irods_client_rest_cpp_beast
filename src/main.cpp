@@ -71,13 +71,12 @@ const irods::http::request_handler_map_type req_handlers{
 // Accepts incoming connections and launches the sessions.
 class listener : public std::enable_shared_from_this<listener>
 {
-    net::io_context& ioc_;
-    tcp::acceptor acceptor_;
-
   public:
-    listener(net::io_context& ioc, tcp::endpoint endpoint)
-        : ioc_(ioc)
-        , acceptor_(net::make_strand(ioc))
+    listener(net::io_context& ioc, const tcp::endpoint& endpoint, const json& _config)
+        : ioc_{ioc}
+        , acceptor_{net::make_strand(ioc)}
+        , max_rbuffer_size_{_config.at(json::json_pointer{"/http_server/requests/max_rbuffer_size_in_bytes"}).get<int>()}
+        , timeout_in_secs_{_config.at(json::json_pointer{"/http_server/requests/timeout_in_seconds"}).get<int>()}
     {
         beast::error_code ec;
 
@@ -135,11 +134,17 @@ class listener : public std::enable_shared_from_this<listener>
         }
 
         // Create the session and run it
-        std::make_shared<irods::http::session>(std::move(socket), req_handlers)->run();
+        std::make_shared<irods::http::session>(
+            std::move(socket), req_handlers, max_rbuffer_size_, timeout_in_secs_)->run();
 
         // Accept another connection
         do_accept();
     } // on_accept
+
+    net::io_context& ioc_;
+    tcp::acceptor acceptor_;
+    const int max_rbuffer_size_;
+    const int timeout_in_secs_;
 }; // class listener
 
 auto print_usage() -> void
@@ -156,6 +161,7 @@ Options:
   -v, --version  Display version information and exit.
 )_");
 
+    // TODO
     char name[] = "irods_http_api"; // Keeps the compiler quiet.
     printReleaseInfo(name);
 } // print_usage
@@ -252,7 +258,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         const auto& http_server_config = config.at("http_server");
         set_log_level(http_server_config);
-        spdlog::set_pattern("[%Y-%m-%d %T.%e] [P:%P] [%^%l%$] [T:%t] %v"); // TODO Can be configurable.
+        spdlog::set_pattern("[%Y-%m-%d %T.%e] [P:%P] [%^%l%$] [T:%t] %v");
 
         // TODO For LONG running tasks, see the following:
         //
@@ -265,7 +271,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         const auto address = net::ip::make_address(http_server_config.at("host").get_ref<const std::string&>());
         const auto port = http_server_config.at("port").get<std::uint16_t>();
-        const auto request_thread_count = std::max(http_server_config.at("requests").at("threads").get<int>(), 1);
+        const auto request_thread_count = std::max(http_server_config.at(json::json_pointer{"/requests/threads"}).get<int>(), 1);
 
         log::trace("Initializing iRODS connection pool.");
         auto conn_pool = init_irods_connection_pool(config);
@@ -278,7 +284,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         // Create and launch a listening port.
         log::trace("Initializing listening socket (host=[{}], port=[{}]).", address.to_string(), port);
-        std::make_shared<listener>(ioc, tcp::endpoint{address, port})->run();
+        std::make_shared<listener>(ioc, tcp::endpoint{address, port}, config)->run();
 
         // Capture SIGINT and SIGTERM to perform a clean shutdown.
         log::trace("Initializing signal handlers.");
@@ -293,7 +299,7 @@ auto main(int _argc, char* _argv[]) -> int
         // Launch the requested number of dedicated backgroup I/O threads.
         // These threads are used for long running tasks (e.g. reading/writing bytes, database, etc.)
         log::trace("Initializing thread pool for long running I/O tasks.");
-        net::thread_pool io_threads(std::max(http_server_config.at("background_io").at("threads").get<int>(), 1));
+        net::thread_pool io_threads(std::max(http_server_config.at(json::json_pointer{"/background_io/threads"}).get<int>(), 1));
         irods::http::globals::thread_pool_bg = &io_threads;
 
         // Run the I/O service on the requested number of threads.
