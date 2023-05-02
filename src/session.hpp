@@ -2,164 +2,48 @@
 #define IRODS_HTTP_API_SESSION_HPP
 
 #include "common.hpp"
-#include "globals.hpp"
-#include "log.hpp"
+//#include "globals.hpp"
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
-#include <boost/beast/version.hpp>
-#include <boost/asio/dispatch.hpp>
-#include <boost/asio/strand.hpp>
-#include <boost/asio/signal_set.hpp>
-#include <boost/asio/thread_pool.hpp>
-#include <boost/config.hpp>
+//#include <boost/beast/version.hpp>
+//#include <boost/asio/dispatch.hpp>
+//#include <boost/asio/strand.hpp>
+//#include <boost/asio/signal_set.hpp>
+//#include <boost/asio/thread_pool.hpp>
+//#include <boost/config.hpp>
 
-#include <chrono>
-#include <iterator>
 #include <memory>
 #include <optional>
-#include <utility>
+//#include <utility>
 
 namespace irods::http
 {
-    class session : public std::enable_shared_from_this<session>
+    class session
+        : public std::enable_shared_from_this<session>
     {
       public:
-        // Take ownership of the stream
-        session(boost::asio::ip::tcp::socket&& socket,
-                const request_handler_map_type& _request_handler_map)
-            : stream_(std::move(socket))
-            , req_handlers_{&_request_handler_map}
-        {
-        } // session (constructor)
+        session(boost::asio::ip::tcp::socket&& socket, const request_handler_map_type& _request_handler_map);
 
-        // Start the asynchronous operation
-        auto run() -> void
-        {
-            // We need to be executing within a strand to perform async operations
-            // on the I/O objects in this session. Although not strictly necessary
-            // for single-threaded contexts, this example code is written to be
-            // thread-safe by default.
-            boost::asio::dispatch(stream_.get_executor(),
-                                  boost::beast::bind_front_handler(
-                                      &session::do_read,
-                                      shared_from_this()));
-        } // run
+        auto run() -> void;
 
-        auto do_read() -> void
-        {
-            // Construct a new parser for each message.
-            parser_.emplace();
+        auto do_read() -> void;
 
-            // Apply the limit defined in the configuration file.
-            parser_->body_limit(10000); // TODO Testing.
+        auto on_read(boost::beast::error_code ec, std::size_t bytes_transferred) -> void;
 
-            // Set the timeout.
-            stream_.expires_after(std::chrono::seconds(30)); // TODO Needs to be configurable.
+        auto on_write(bool close, boost::beast::error_code ec, std::size_t bytes_transferred) -> void;
 
-            // Read a request
-            boost::beast::http::async_read(stream_, buffer_, *parser_,
-                                           boost::beast::bind_front_handler(
-                                               &session::on_read,
-                                               shared_from_this()));
-        } // do_read
-
-        auto on_read(boost::beast::error_code ec, std::size_t bytes_transferred) -> void
-        {
-            boost::ignore_unused(bytes_transferred);
-
-            // This means they closed the connection
-            if (ec == boost::beast::http::error::end_of_stream) {
-                return do_close();
-            }
-
-            if (ec == boost::beast::http::error::body_limit) {
-                log::error("{}: Request constraint error: {}", __func__, ec.message());
-                return;
-            }
-
-            if (ec) {
-                return irods::fail(ec, "read");
-            }
-
-            //
-            // Process client request and send a response.
-            //
-
-            auto req_ = parser_->release();
-
-            // Print the headers.
-            for (auto&& h : req_.base()) {
-                log::debug("{}: Header: ({}, {})", __func__, h.name_string(), h.value());
-            }
-
-            // Print the components of the request URL.
-            log::debug("{}: Method: {}", __func__, req_.method_string());
-            log::debug("{}: Version: {}", __func__, req_.version());
-            log::debug("{}: Target: {}", __func__, req_.target());
-            log::debug("{}: Keep Alive: {}", __func__, req_.keep_alive());
-            log::debug("{}: Has Content Length: {}", __func__, req_.has_content_length());
-            log::debug("{}: Chunked: {}", __func__, req_.chunked());
-            log::debug("{}: Needs EOF: {}", __func__, req_.need_eof());
-
-            namespace http = boost::beast::http;
-
-            // "host" is a placeholder that's used so that get_url_path() can parse the URL correctly.
-            const auto path = irods::http::get_url_path(fmt::format("http://host{}", req_.target()));
-            if (!path) {
-                send(irods::http::fail(http::status::bad_request));
-                return;
-            }
-
-            if (const auto iter = req_handlers_->find(*path); iter != std::end(*req_handlers_)) {
-                (iter->second)(shared_from_this(), req_);
-                return;
-            }
-
-            send(irods::http::fail(http::status::not_found));
-        } // on_read
-
-        auto on_write(bool close, boost::beast::error_code ec, std::size_t bytes_transferred) -> void
-        {
-            boost::ignore_unused(bytes_transferred);
-
-            if (ec) {
-                return irods::fail(ec, "write");
-            }
-
-            if (close) {
-                // This means we should close the connection, usually because
-                // the response indicated the "Connection: close" semantic.
-                return do_close();
-            }
-
-            // We're done with the response so delete it
-            res_ = nullptr;
-
-            // Read another request
-            do_read();
-        } // on_write
-
-        auto do_close() -> void
-        {
-            // Send a TCP shutdown.
-            boost::beast::error_code ec;
-            stream_.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
-
-            // At this point the connection is closed gracefully.
-        } // do_close
+        auto do_close() -> void;
 
         template <bool isRequest, class Body, class Fields>
         auto send(boost::beast::http::message<isRequest, Body, Fields>&& msg) -> void
         {
-            namespace beast = boost::beast;
-            namespace http  = beast::http;
+            namespace http = boost::beast::http;
 
             // The lifetime of the message has to extend
             // for the duration of the async operation so
             // we use a shared_ptr to manage it.
-            auto sp = std::make_shared<
-                http::message<isRequest, Body, Fields>>(std::move(msg));
+            auto sp = std::make_shared<http::message<isRequest, Body, Fields>>(std::move(msg));
 
             // Store a type-erased version of the shared
             // pointer in the class to keep it alive.
@@ -169,7 +53,7 @@ namespace irods::http
             http::async_write(
                 stream_,
                 *sp,
-                beast::bind_front_handler(
+                boost::beast::bind_front_handler(
                     &session::on_write,
                     shared_from_this(),
                     sp->need_eof()));
@@ -178,7 +62,6 @@ namespace irods::http
       private:
         boost::beast::tcp_stream stream_;
         boost::beast::flat_buffer buffer_;
-        //boost::beast::http::request<boost::beast::http::string_body> req_;
         std::optional<boost::beast::http::request_parser<boost::beast::http::string_body>> parser_;
         std::shared_ptr<void> res_; // TODO Probably doesn't need to be a shared_ptr anymore. The session owns it and is available for the lifetime of the request.
         const request_handler_map_type* req_handlers_;
