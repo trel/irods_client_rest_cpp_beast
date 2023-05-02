@@ -1,6 +1,7 @@
 #include "handlers.hpp"
 
 #include "common.hpp"
+#include "globals.hpp"
 #include "log.hpp"
 #include "session.hpp"
 

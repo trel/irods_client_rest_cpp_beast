@@ -11,6 +11,7 @@
 #include <irods/process_stash.hpp>
 #include <irods/rcConnect.h>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
 //#include <boost/asio/ip/tcp.hpp> // TODO Remove
 #include <boost/beast.hpp>

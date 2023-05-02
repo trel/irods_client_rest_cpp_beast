@@ -13,7 +13,8 @@ Checks:
     misc-*,
     modernize-*,
     performance-*,
-    readability-*
+    readability-*,
+    -readability-avoid-const-params-in-decls
 WarningsAsErrors:
     boost-*,
     bugprone-*,

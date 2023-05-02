@@ -9,6 +9,7 @@
 #include <irods/rodsErrorTable.h>
 #include <irods/ticket_administration.hpp>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
 //#include <boost/asio/ip/tcp.hpp> // TODO Remove
 #include <boost/beast.hpp>
