@@ -4,32 +4,15 @@
 #include "log.hpp"
 #include "version.hpp"
 
-//#include <irods/connection_pool.hpp>
-//#include <irods/filesystem/object_status.hpp>
-//#include <irods/filesystem/permissions.hpp>
-//#include <irods/irods_exception.hpp>
 #include <irods/process_stash.hpp>
 #include <irods/rodsErrorTable.h>
 #include <irods/switch_user.h>
 
 #include <boost/any.hpp>
-//#include <boost/beast/http/status.hpp>
-//#include <boost/beast/http/message.hpp>
-//#include <boost/beast/http/string_body.hpp>
-//#include <boost/uuid/uuid.hpp>
-//#include <boost/uuid/uuid_generators.hpp>
-//#include <boost/uuid/uuid_io.hpp>
 #include <boost/algorithm/string.hpp>
 
 #include <curl/curl.h>
 #include <spdlog/spdlog.h>
-
-//#include <memory>
-//#include <optional>
-//#include <string>
-//#include <string_view>
-//#include <unordered_map>
-//#include <vector>
 
 namespace irods::http
 {
@@ -231,8 +214,15 @@ namespace irods::http
             return {.response = fail(status_type::unauthorized)};
         }
 
+        const auto* p = boost::any_cast<authenticated_client_info>(&*object);
+        if (std::chrono::steady_clock::now() >= p->expires_at) {
+            log::error("{}: Session for bearer token [{}] has expired.", __func__, bearer_token);
+            irods::process_stash::erase(bearer_token);
+            return {.response = fail(status_type::unauthorized)};
+        }
+
         log::debug("{}: Client is authenticated.", __func__);
-        return {.client_info = boost::any_cast<authenticated_client_info>(&*object)};
+        return {.client_info = p};
     } // resolve_client_identity
 } // namespace irods::http
 

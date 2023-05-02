@@ -17,6 +17,7 @@
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
 
+#include <chrono>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -141,7 +142,8 @@ namespace irods::http::handler
         auto bearer_token = irods::process_stash::insert(authenticated_client_info{
             .auth_scheme = authorization_scheme::basic,
             .username = std::move(username),
-            .password = std::move(password)
+            .password = std::move(password),
+            .expires_at = std::chrono::steady_clock::now() + std::chrono::minutes{1} // TODO How does this play with OIDC?
         });
 
         // TODO Parse the header value and determine if the user is allowed to access.

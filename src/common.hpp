@@ -1,30 +1,19 @@
 #ifndef IRODS_HTTP_API_ENDPOINT_COMMON_HPP
 #define IRODS_HTTP_API_ENDPOINT_COMMON_HPP
 
-//#include "globals.hpp"
-//#include "log.hpp"
-//#include "version.hpp"
-
 #include <irods/connection_pool.hpp>
 #include <irods/filesystem/object_status.hpp>
 #include <irods/filesystem/permissions.hpp>
 #include <irods/irods_exception.hpp>
-//#include <irods/process_stash.hpp>
-//#include <irods/rodsErrorTable.h>
-//#include <irods/switch_user.h>
 
-//#include <boost/any.hpp>
 #include <boost/beast/http/status.hpp>
 #include <boost/beast/http/message.hpp>
 #include <boost/beast/http/string_body.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
-//#include <boost/algorithm/string.hpp>
 
-//#include <curl/curl.h>
-//#include <spdlog/spdlog.h>
-
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
@@ -60,6 +49,7 @@ namespace irods::http
         authorization_scheme auth_scheme;
         std::string username;
         std::string password; // TODO Probably not needed.
+        std::chrono::steady_clock::time_point expires_at; // TODO This may be controlled by OIDC. Think about how to handle that.
         // TODO Store an expiration timestamp here. Post discush: let it expire and send reauth code to client.
         // Perhaps a purge timestamp as well. This is an optimization situation.
     }; // struct authenticated_client_info
