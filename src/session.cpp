@@ -11,6 +11,8 @@
 #include <boost/asio/thread_pool.hpp>
 #include <boost/config.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <chrono>
 #include <iterator>
 #include <utility>
@@ -42,11 +44,16 @@ namespace irods::http
         // Construct a new parser for each message.
         parser_.emplace();
 
+        // TODO These options need to be retrieved before construction.
+        // Right now, we are paying a small penalty for looking up static information.
+        using json = nlohmann::json;
+        const auto& requests = irods::http::globals::config->at(json::json_pointer{"/http_server/requests"});
+
         // Apply the limit defined in the configuration file.
-        parser_->body_limit(10000); // TODO Testing.
+        parser_->body_limit(requests.at("max_rbuffer_size_in_bytes").get<int>());
 
         // Set the timeout.
-        stream_.expires_after(std::chrono::seconds(30)); // TODO Needs to be configurable.
+        stream_.expires_after(std::chrono::seconds(requests.at("timeout_in_seconds").get<int>()));
 
         // Read a request
         boost::beast::http::async_read(stream_, buffer_, *parser_,
