@@ -928,7 +928,8 @@ namespace
                     log::error("{}: [resource] and [replica] cannot be used at the same time.", __func__);
                     return _sess_ptr->send(irods::http::fail(http::status::bad_request));
                 }
-                else if (found_resc) {
+
+                if (found_resc) {
                     addKeyVal(&input.condInput, RESC_NAME_KW, resc_iter->second.c_str());
                 }
                 else if (found_repl) {
