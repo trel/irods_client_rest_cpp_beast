@@ -834,7 +834,6 @@ namespace
         res.keep_alive(_req.keep_alive());
 
         try {
-            // TODO This should be part of the replica library.
             DataObjInp input{};
             irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
 
@@ -905,7 +904,6 @@ namespace
         res.keep_alive(_req.keep_alive());
 
         try {
-            // TODO This should be part of the replica library.
             DataObjInp input{};
             irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
 
@@ -921,11 +919,11 @@ namespace
                 const auto resc_iter = _args.find("resource");
                 const auto found_resc = (resc_iter != std::end(_args));
 
-                const auto repl_iter = _args.find("replica");
+                const auto repl_iter = _args.find("replica-number");
                 const auto found_repl = (repl_iter != std::end(_args));
 
                 if (found_resc && found_repl) {
-                    log::error("{}: [resource] and [replica] cannot be used at the same time.", __func__);
+                    log::error("{}: [resource] and [replica-number] cannot be used at the same time.", __func__);
                     return _sess_ptr->send(irods::http::fail(http::status::bad_request));
                 }
 
@@ -936,7 +934,7 @@ namespace
                     addKeyVal(&input.condInput, REPL_NUM_KW, repl_iter->second.c_str());
                 }
                 else {
-                    log::error("{}: Missing parameter: [resource] or [replica]", __func__);
+                    log::error("{}: Missing parameter: [resource] or [replica-number]", __func__);
                     return _sess_ptr->send(irods::http::fail(http::status::bad_request));
                 }
             }
@@ -1194,7 +1192,7 @@ namespace
                 addKeyVal(&input.condInput, DEST_RESC_NAME_KW, iter->second.c_str());
             }
 
-            if (const auto iter = _args.find("replica"); iter != std::end(_args) && iter->second == "1") {
+            if (const auto iter = _args.find("replica-number"); iter != std::end(_args) && iter->second == "1") {
                 addKeyVal(&input.condInput, REG_REPL_KW, "");
             }
 
@@ -1470,13 +1468,13 @@ namespace
                 options["no_create"] = (opt_iter->second == "1");
             }
 
-            opt_iter = _args.find("replica");
+            opt_iter = _args.find("replica-number");
             if (opt_iter != std::end(_args)) {
                 try {
                     options["replica_number"] = std::stoi(opt_iter->second);
                 }
                 catch (const std::exception& e) {
-                    log::error("{}: Could not convert replica-number [{}] into an integer.", __func__, opt_iter->second);
+                    log::error("{}: Could not convert replica number [{}] into an integer.", __func__, opt_iter->second);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
             }
