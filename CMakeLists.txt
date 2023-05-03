@@ -9,7 +9,6 @@ set(IRODS_HTTP_API_VERSION "${IRODS_HTTP_API_VERSION_MAJOR}.${IRODS_HTTP_API_VER
 
 find_package(IRODS REQUIRED CONFIG)
 
-include(${IRODS_TARGETS_PATH})
 include(RequireOutOfSourceBuild)
 include(IrodsCXXCompiler)
 
@@ -33,6 +32,7 @@ set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 # TODO Remove once project is ready for the public.
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
+include(${IRODS_TARGETS_PATH})
 include(GNUInstallDirs)
 include(UseLibCXX)
 
