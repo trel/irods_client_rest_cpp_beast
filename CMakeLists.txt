@@ -9,6 +9,7 @@ set(IRODS_HTTP_API_VERSION "${IRODS_HTTP_API_VERSION_MAJOR}.${IRODS_HTTP_API_VER
 
 find_package(IRODS REQUIRED CONFIG)
 
+include(${IRODS_TARGETS_PATH})
 include(RequireOutOfSourceBuild)
 include(IrodsCXXCompiler)
 
@@ -20,6 +21,8 @@ set(CMAKE_EXE_LINKER_FLAGS_RELEASE_INIT "-Wl,--gc-sections -Wl,-z,combreloc")
 # TODO Rename binary.
 project(${IRODS_HTTP_BINARY_NAME} VERSION "${IRODS_VERSION}" LANGUAGES CXX)
 
+find_package(Threads REQUIRED)
+
 set(CMAKE_SKIP_BUILD_RPATH OFF)
 set(CMAKE_SKIP_INSTALL_RPATH OFF)
 set(CMAKE_SKIP_RPATH OFF)
@@ -30,7 +33,6 @@ set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 # TODO Remove once project is ready for the public.
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
-include(${IRODS_TARGETS_PATH})
 include(GNUInstallDirs)
 include(UseLibCXX)
 
@@ -41,7 +43,6 @@ endif()
 
 find_package(CURL REQUIRED)
 find_package(nlohmann_json "3.6.1" REQUIRED)
-find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED COMPONENTS Crypto SSL)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

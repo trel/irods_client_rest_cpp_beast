@@ -160,6 +160,7 @@ namespace
         if (const auto iter = _args.find("offset"); iter != std::end(_args)) {
             offset = to_int(iter->second);
         }
+        offset = std::max(0, offset);
 
         int count = 32; // TODO Configurable?
         if (const auto iter = _args.find("count"); iter != std::end(_args)) {
@@ -275,6 +276,7 @@ namespace
             return _sess_ptr->send(irods::http::fail(http::status::bad_request));
         }
 
+        // TODO This should lead to an error if _v is bad. Progress should be stopped.
         const auto to_int = [fn = __func__](const std::string& _v) {
             try {
                 return std::stoi(_v);
@@ -289,6 +291,7 @@ namespace
         if (const auto iter = _args.find("offset"); iter != std::end(_args)) {
             offset = to_int(iter->second);
         }
+        offset = std::max(0, offset);
 
         int count = 32; // TODO Configurable?
         if (const auto iter = _args.find("count"); iter != std::end(_args)) {
@@ -299,7 +302,12 @@ namespace
         std::vector<std::string> args;
 
         if (const auto iter = _args.find("args"); iter != std::end(_args) && !iter->second.empty()) {
-            boost::split(args, iter->second, boost::is_any_of(","));
+            if (const auto delim_iter = _args.find("args-delimiter"); delim_iter != std::end(_args) && !delim_iter->second.empty()) {
+                boost::split(args, iter->second, boost::is_any_of(delim_iter->second));
+            }
+            else {
+                boost::split(args, iter->second, boost::is_any_of(","));
+            }
         }
 
         // TODO GenQuery2 is definitely the right answer for this simply because of
