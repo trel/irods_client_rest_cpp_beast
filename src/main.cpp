@@ -147,6 +147,13 @@ class listener : public std::enable_shared_from_this<listener>
     const int timeout_in_secs_;
 }; // class listener
 
+auto print_version_info() -> void
+{
+    namespace version = irods::http::version;
+    const std::string_view sha = version::sha;
+    fmt::print("{} v{}-{}\n", version::binary_name, version::api_version, sha.substr(0, 7));
+} // print_version_info
+
 auto print_usage() -> void
 {
     fmt::print(R"_(irods_http_api - Exposes the iRODS API over HTTP
@@ -159,17 +166,11 @@ configuration options.
 Options:
   -h, --help     Display this help message and exit.
   -v, --version  Display version information and exit.
+
 )_");
 
-    // TODO
-    char name[] = "irods_http_api"; // Keeps the compiler quiet.
-    printReleaseInfo(name);
+    print_version_info();
 } // print_usage
-
-auto print_version_info() -> void
-{
-    fmt::print("iRODS Version {}.{}.{}{: >16}irods_http_api\n", IRODS_VERSION_MAJOR, IRODS_VERSION_MINOR, IRODS_VERSION_PATCHLEVEL, "");
-} // print_version_info
 
 auto set_log_level(const json& _config) -> void
 {
