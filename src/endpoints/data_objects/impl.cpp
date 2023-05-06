@@ -10,6 +10,7 @@
 #include <irods/dataObjRepl.h>
 #include <irods/dataObjTrim.h>
 #include <irods/filesystem.hpp>
+#include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/phyPathReg.h>
 #include <irods/rcMisc.h>
@@ -27,17 +28,19 @@
 
 #include <nlohmann/json.hpp>
 
-#include <span>
+#include <atomic>
 #include <mutex>
+#include <span>
+#include <shared_mutex>
 #include <string>
-//#include <string_view>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
 // clang-format off
 namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
-//namespace net   = boost::asio;      // from <boost/asio.hpp>
+namespace net   = boost::asio;      // from <boost/asio.hpp>
 
 //using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
 
@@ -52,22 +55,79 @@ namespace
 {
     // clang-format off
     using query_arguments_type = decltype(irods::http::url::query);
-    using handler_type         = void(*)(irods::http::session_pointer_type, const irods::http::request_type& _req, const query_arguments_type& _args);
+    using handler_type         = void(*)(irods::http::session_pointer_type, irods::http::request_type& _req, query_arguments_type& _args);
     // clang-format on
 
-    struct parallel_write_stream
+    class parallel_write_stream
     {
-        irods::experimental::client_connection conn{irods::experimental::defer_connection};
-        std::unique_ptr<irods::experimental::io::client::native_transport> tp;
-        irods::experimental::io::odstream out;
-    }; // struct parallel_write_stream
+      public:
+        // TODO May need to accept a zone for the client (i.e. federation).
+        parallel_write_stream(const std::string& _client_username,
+                              const std::string& _path,
+                              const irods::experimental::io::odstream* _base = nullptr)
+        {
+            const auto& client = irods::http::globals::config->at("irods_client");
+            const auto& zone = client.at("zone").get_ref<const std::string&>();
+            const auto& rodsadmin = client.at("rodsadmin");
+
+            conn_.connect(irods::experimental::defer_authentication,
+                          client.at("host").get_ref<const std::string&>(),
+                          client.at("port").get<int>(),
+                          rodsadmin.at("username").get_ref<const std::string&>(),
+                          zone,
+                          _client_username,
+                          zone);
+
+            auto password = rodsadmin.at("password").get<std::string>();
+
+            if (clientLoginWithPassword(static_cast<RcComm*>(conn_), password.data()) != 0) {
+                conn_.disconnect();
+                THROW(SYS_INTERNAL_ERR, "Could not connect to iRODS server as proxied user.");
+            }
+
+            tp_ = std::make_unique<irods::experimental::io::client::native_transport>(conn_);
+
+            // TODO Handle truncate and append.
+            if (_base) {
+                stream_.open(*tp_, _base->replica_token(), _path, _base->replica_number(), std::ios::out);
+            }
+            else {
+                stream_.open(*tp_, _path);
+            }
+
+            if (!stream_) {
+                tp_.reset();
+                conn_.disconnect();
+                THROW(SYS_INTERNAL_ERR, fmt::format("Could not open output stream for [{}].", _path));
+            }
+        } // parallel_write_stream (constructor)
+
+        auto stream() noexcept -> irods::experimental::io::odstream&
+        {
+            return stream_;
+        } // stream
+
+        auto is_in_use() const noexcept -> bool
+        {
+            return in_use_.load();
+        } // is_in_use
+
+        auto in_use(bool _value) noexcept -> void
+        {
+            in_use_.store(_value);
+        } // in_use
+
+      private:
+        irods::experimental::client_connection conn_{irods::experimental::defer_connection};
+        std::unique_ptr<irods::experimental::io::client::native_transport> tp_;
+        irods::experimental::io::odstream stream_;
+        std::atomic<bool> in_use_{false};
+    }; // class parallel_write_stream
 
     struct parallel_write_context
     {
-        std::string logical_path;
         std::vector<std::shared_ptr<parallel_write_stream>> streams;
         std::unique_ptr<std::mutex> mtx;
-        int index = 0;
 
         // TODO How do we pick a stream?
         //
@@ -76,38 +136,49 @@ namespace
         //
         // What if the chunk size and other info was passed on parallel_write_init?
         // Does that give us more performance?
-        auto next_stream() -> irods::experimental::io::odstream&
+        auto find_available_parallel_write_stream() -> parallel_write_stream*
         {
             std::scoped_lock lk{*mtx};
-            const auto i = index;
-            index = ++index % streams.size();
-            return streams.at(i)->out;
-        } // next_stream
+
+            auto iter = std::find_if(std::begin(streams), std::end(streams), [](auto& _stream) {
+                return !_stream->is_in_use();
+            });
+
+            if (iter == std::end(streams)) {
+                return nullptr;
+            }
+
+            (*iter)->in_use(true);
+
+            return (*iter).get();
+        } // find_available_parallel_write_stream
     }; // struct parallel_write_context
 
+    std::shared_mutex pwc_mtx;
     std::unordered_map<std::string, parallel_write_context> parallel_write_contexts;
 
     //
     // Handler function prototypes
     //
 
-    auto handle_read_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_write_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_parallel_write_init_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_parallel_write_shutdown_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_read_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_write_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_parallel_write_init_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_parallel_write_shutdown_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
 
-    auto handle_replicate_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_trim_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_replicate_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_trim_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
 
-    auto handle_set_permission_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_stat_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_set_permission_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_stat_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
 
-    auto handle_register_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_unregister_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_register_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_unregister_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
 
-    auto handle_rename_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_remove_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_touch_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_rename_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_copy_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_remove_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_touch_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
 
     //
     // Operation to Handler mappings
@@ -127,7 +198,7 @@ namespace
         {"parallel_write_shutdown", handle_parallel_write_shutdown_op},
 
         {"rename", handle_rename_op},
-        //{"copy", handle_copy_op},
+        {"copy", handle_copy_op},
 
         {"replicate", handle_replicate_op},
         {"trim", handle_trim_op},
@@ -148,10 +219,10 @@ namespace
 namespace irods::http::handler
 {
     // Handles all requests sent to /data_objects.
-    auto data_objects(session_pointer_type _sess_ptr, const request_type& _req) -> void
+    auto data_objects(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
         if (_req.method() == verb_type::get) {
-            const auto url = irods::http::parse_url(_req);
+            auto url = irods::http::parse_url(_req);
 
             const auto op_iter = url.query.find("op");
             if (op_iter == std::end(url.query)) {
@@ -165,8 +236,9 @@ namespace irods::http::handler
 
             return _sess_ptr->send(fail(status_type::bad_request));
         }
-        else if (_req.method() == verb_type::post) {
-            const auto args = irods::http::to_argument_list(_req.body());
+
+        if (_req.method() == verb_type::post) {
+            auto args = irods::http::to_argument_list(_req.body());
 
             const auto op_iter = args.find("op");
             if (op_iter == std::end(args)) {
@@ -192,7 +264,7 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_read_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_read_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -200,625 +272,499 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "application/problem-details+json"); // TODO Should we use this?
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-            // TODO Inputs:
-            // - offset
-            // - count
-            //     - content-length vs query parameter
-            //     - How about chunked encoding?
-            //
-            // TODO Should a client care about a specific replica when reading?
-            // TODO Should a client be allowed to target a leaf resource?
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "application/problem-details+json"); // TODO Should we use this?
+            res.keep_alive(_req.keep_alive());
 
-            const auto lpath_iter = _args.find("lpath");
-            if (lpath_iter == std::end(_args)) {
-                log::error("{}: Missing [lpath] parameter.", __func__);
-                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-            }
-
-            // TODO While dstream makes reading/writing simple, using it means we lose the
-            // ability to know why an operation failed. This is because dstream or the transport
-            // doesn't expose the internal details for a failure. And IOStreams don't throw exceptions
-            // unless they are configured to do so, which leads to very ugly/weird code.
-            //
-            // With that said, this operation can only report what it thinks may have happened. The
-            // client will have to contact the iRODS administrator to have them check the logs.
-            //
-            // Alternatively, we can make C API calls and get the exact reasons for a failure. This is
-            // more work, but will allow the client to make better decisions about what to do next.
-
-            auto conn = irods::get_connection(client_info->username);
-            io::client::native_transport tp{conn};
-            io::idstream in{tp, lpath_iter->second};
-
-            if (!in) {
-                log::error("{}: Could not open data object [{}] for read.", __func__, lpath_iter->second);
-
-                res.result(http::status::bad_request);
-                res.body() = json{
-                    {"irods_response", {
-                        {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
-                    }},
-                    // TODO REST API internal error. Do we need REST API error codes to
-                    // indicate the issue was not iRODS related (we never reached out to iRODS)?
-                    {"http_api_error_code", -1}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
-                    {"http_api_error_message", "Open error."}
-                }.dump();
-                res.prepare_payload();
-
-                return _sess_ptr->send(std::move(res));
-            }
-
-            // TODO This needs to be clamped to a max size set by the administrator.
-            // Should this be required?
-            auto iter = _args.find("offset");
-            if (iter != std::end(_args)) {
-                try {
-                    in.seekg(std::stoll(iter->second));
-                }
-                catch (const std::exception& e) {
-                    log::error("{}: Could not seek to position [{}] in data object [{}].", __func__, iter->second, lpath_iter->second);
-
-                    res.result(http::status::bad_request);
-                    res.body() = json{
-                        {"irods_response", {
-                            {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
-                        }},
-                        // TODO REST API internal error. Do we need REST API error codes to
-                        // indicate the issue was not iRODS related (we never reached out to iRODS)?
-                        {"http_api_error_code", -2}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
-                        {"http_api_error_message", "Seek error."}
-                    }.dump();
-                    res.prepare_payload();
-
-                    return _sess_ptr->send(std::move(res));
-                }
-            }
-
-            std::vector<char> buffer;
-
-            // TODO This needs to be clamped to a max size set by the administrator.
-            // Should this be required?
-            iter = _args.find("count");
-            if (iter != std::end(_args)) {
-                try {
-                    buffer.resize(std::stoi(iter->second));
-                }
-                catch (const std::exception& e) {
-                    log::error("{}: Could not initialize read buffer to size [{}] for data object [{}].", __func__, iter->second, lpath_iter->second);
-
-                    res.result(http::status::bad_request);
-                    res.body() = json{
-                        {"irods_response", {
-                            {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
-                        }},
-                        // TODO REST API internal error. Do we need REST API error codes to
-                        // indicate the issue was not iRODS related (we never reached out to iRODS)?
-                        {"http_api_error_code", -3}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
-                        {"http_api_error_message", "Buffer error."}
-                    }.dump();
-                    res.prepare_payload();
-
-                    return _sess_ptr->send(std::move(res));
-                }
-            }
-            else {
-                buffer.resize(8192);
-            }
-
-            // TODO Given a specific number of bytes to read, we can define a loop that reads the
-            // requested number of bytes using a fixed size buffer. Obviously, this means multiple
-            // read operations are required, but that isn't a problem. The big win for doing this is
-            // that we protect the application from exhausting all memory because a client decided
-            // to execute multiple reads with a count of N GB buffers.
-            //
-            // Something else to think about is moving stream operation API calls to a separate
-            // thread pool. If there are 10000 clients all performing reads and writes, and all these
-            // operations happen within the same threads that are servicing HTTP requests, it is
-            // easy to see how new HTTP requests can be blocked due to existing IO operations being
-            // serviced.
-            //
-            // ---
-            //
-            // Keeping this as is isn't so bad if we can keep the number of read operations to one.
-            // The issue with the comment above the separator is we have to store the data in memory
-            // or use the chunked encoding. Boost.Beast does support chunked encoding and provides
-            // examples showing how to do it.
-            in.read(buffer.data(), buffer.size());
-
-#if 0
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0}
-                }},
-                {"bytes_read", in.gcount()},
-                // data will be returned as a buffer of bytes (i.e. integers). The nlohmann JSON
-                // library will not view the range as a string. This is what we want.
-                {"bytes", std::span(buffer.data(), in.gcount())}
-            }.dump();
-#else
-            res.set(http::field::content_type, "application/octet-stream");
-            res.body() = std::string_view(buffer.data(), in.gcount());
-#endif
-        }
-        catch (const fs::filesystem_error& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code().value()},
-                    {"error_message", e.what()}
-                }}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        _sess_ptr->send(std::move(res));
-    } // handle_read_op
-
-    auto handle_write_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
-    {
-        auto result = irods::http::resolve_client_identity(_req);
-        if (result.response) {
-            return _sess_ptr->send(std::move(*result.response));
-        }
-
-        const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
-
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
-
-        try {
-            irods::connection_pool::connection_proxy conn;
-            std::unique_ptr<io::client::native_transport> tp;
-
-            std::unique_ptr<io::odstream> out;
-            io::odstream* out_ptr{};
-
-            const auto parallel_write_handle_iter = _args.find("parallel-write-handle"); 
-            if (parallel_write_handle_iter != std::end(_args)) {
-                log::debug("{}: (write) Parallel Write Handle = [{}].", __func__, parallel_write_handle_iter->second);
-
-                auto iter = parallel_write_contexts.find(parallel_write_handle_iter->second);
-                if (iter == std::end(parallel_write_contexts)) {
-                    log::error("{}: Invalid handle for parallel write.", __func__);
-                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-                }
-
-                //
-                // We've found a matching handle!
-                //
-
-                out_ptr = &iter->second.next_stream();
-                log::debug("{}: (write) Parallel Write - stream memory address = [{}].", __func__, fmt::ptr(out_ptr));
-            }
-            else {
+            try {
                 const auto lpath_iter = _args.find("lpath");
                 if (lpath_iter == std::end(_args)) {
-                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    log::error("{}: Missing [lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
-                log::trace("{}: Opening data object [{}] for write.", __func__, lpath_iter->second);
-                log::trace("{}: (write) Initializing for single buffer write.", __func__);
+                auto conn = irods::get_connection(client_info->username);
+                io::client::native_transport tp{conn};
+                io::idstream in{tp, lpath_iter->second};
 
-                conn = irods::get_connection(client_info->username);
-                tp = std::make_unique<io::client::native_transport>(conn);
-                out = std::make_unique<io::odstream>(*tp, lpath_iter->second);
-                out_ptr = out.get();
-            }
-
-            if (!*out_ptr) {
-                log::error("{}: Could not open data object for write.", __func__);
-
-                res.body() = json{
-                    {"irods_response", {
-                        {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
-                    }},
-                    // TODO REST API internal error. Do we need REST API error codes to
-                    // indicate the issue was not iRODS related (we never reached out to iRODS)?
-                    {"http_api_error_code", -1}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
-                    {"http_api_error_message", "Open error."}
-                }.dump();
-                res.prepare_payload();
-
-                return _sess_ptr->send(std::move(res));
-            }
-
-            // TODO This needs to be clamped to a max size set by the administrator.
-            // Should this be required?
-            auto iter = _args.find("offset");
-            if (iter != std::end(_args)) {
-                log::trace("{}: Setting offset for write.", __func__);
-                try {
-                    out_ptr->seekp(std::stoll(iter->second));
-                }
-                catch (const std::exception& e) {
-                    log::error("{}: Could not seek to position [{}] in data object.", __func__, iter->second);
-
-                    res.body() = json{
-                        {"irods_response", {
-                            {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
-                        }},
-                        // TODO REST API internal error. Do we need REST API error codes to
-                        // indicate the issue was not iRODS related (we never reached out to iRODS)?
-                        {"http_api_error_code", -2}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
-                        {"http_api_error_message", "Seek error."}
-                    }.dump();
+                if (!in) {
+                    log::error("{}: Could not open data object [{}] for read.", fn, lpath_iter->second);
+                    res.result(http::status::bad_request);
                     res.prepare_payload();
-
                     return _sess_ptr->send(std::move(res));
                 }
-            }
 
-            // TODO This needs to be clamped to a max size set by the administrator.
-            // Should this be required?
-            //
-            // The Content-Type header cannot be used for this because it is used to describe the size
-            // of the request body. ALL parameters are passed via the request body when using POST.
-            iter = _args.find("count");
-            if (iter == std::end(_args)) {
-                log::error("{}: Missing [count] parameter.", __func__);
-                res.result(http::status::bad_request);
-                res.prepare_payload();
-                return _sess_ptr->send(std::move(res));
-            }
-            const auto count = std::stoll(std::string{iter->second});
-
-            iter = _args.find("bytes");
-            if (iter == std::end(_args)) {
-                log::error("{}: Missing [bytes] parameter.", __func__);
-                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-            }
-
-            out_ptr->write(iter->second.data(), count);
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0}
-                }}
-            }.dump();
-        }
-        catch (const fs::filesystem_error& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code().value()},
-                    {"error_message", e.what()}
-                }}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        _sess_ptr->send(std::move(res));
-    } // handle_read_op
-
-    auto handle_parallel_write_init_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
-    {
-        auto result = irods::http::resolve_client_identity(_req);
-        if (result.response) {
-            return _sess_ptr->send(std::move(*result.response));
-        }
-
-        const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
-
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
-
-        try {
-            const auto lpath_iter = _args.find("lpath");
-            if (lpath_iter == std::end(_args)) {
-                log::error("{}: Missing [lpath] parameter.", __func__);
-                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-            }
-
-            // TODO
-            // 1. Create a parallel transfer context (PTC).
-            // 2. Open one iRODS connection per stream and store in the PTC.
-            // 3. Generate a transfer handle and associate it with the Bearer/Access token and PTC.
-            // 4. Return transfer handle to client.
-            //
-            // The client is now free to call the write operation as much as they want.
-
-            const auto stream_count_iter = _args.find("stream-count");
-            if (stream_count_iter == std::end(_args)) {
-                log::error("{}: Missing [stream-count] parameter.", __func__);
-                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-            }
-
-            namespace io = irods::experimental::io;
-
-            log::trace("{}: Opening initial output stream to [{}].", __func__, lpath_iter->second);
-
-            // Open the first stream.
-            // These objects will be moved into the correct locations.
-            irods::experimental::client_connection conn;
-            auto tp = std::make_unique<io::client::native_transport>(conn);
-            io::odstream out{*tp, lpath_iter->second};
-
-            log::trace("{}: Checking if output stream is open for [{}].", __func__, lpath_iter->second);
-            if (!out) {
-                log::error("{}: Could not open initial output stream to [{}].", __func__, lpath_iter->second);
-                res.body() = json{
-                    {"irods_response", {
-                        {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
-                    }},
-                    // TODO REST API internal error. Do we need REST API error codes to
-                    // indicate the issue was not iRODS related (we never reached out to iRODS)?
-                    {"http_api_error_code", -1}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
-                    {"http_api_error_message", "Open error."}
-                }.dump();
-                res.prepare_payload();
-                return _sess_ptr->send(std::move(res));
-            }
-
-            log::trace("{}: Output stream for [{}] is open.", __func__, lpath_iter->second);
-            log::trace("{}: Generating transfer handle.", __func__);
-            auto transfer_handle = irods::generate_uuid(parallel_write_contexts);
-            log::debug("{}: (init) Parallel Write Handle = [{}].", __func__, transfer_handle);
-
-            //parallel_write_context pw_ctx;
-            //pw_ctx.logical_path = lpath_iter->second;
-            //pw_ctx.mtx = std::make_unique<std::mutex>();
-
-            auto [iter, insertion_result] = parallel_write_contexts.emplace(transfer_handle,
-                    parallel_write_context{
-                        .logical_path = lpath_iter->second,
-                        .mtx = std::make_unique<std::mutex>()
-                    });
-            //auto [iter, insertion_result] = parallel_write_contexts.emplace(transfer_handle, parallel_write_context{.logical_path = lpath_iter->second});
-            log::trace("{}: (init) Checking if parallel_write_context was inserted successfully.", __func__);
-            if (!insertion_result) {
-                log::error("{}: Could not initialize parallel write context for [{}].", __func__, lpath_iter->second);
-                res.body() = json{
-                    {"irods_response", {
-                        {"error_code", 0} // TODO Need something like IO_OPEN_ERROR
-                    }},
-                    // TODO REST API internal error. Do we need REST API error codes to
-                    // indicate the issue was not iRODS related (we never reached out to iRODS)?
-                    {"http_api_error_code", -2}, // IRODS_HTTP_API_ERROR_STREAM_OPEN_FAILED?
-                    {"http_api_error_message", "Parallel write initialization error."}
-                }.dump();
-                res.prepare_payload();
-                return _sess_ptr->send(std::move(res));
-            }
-            log::trace("{}: (init) parallel_write_context was inserted successfully. Initializing output streams.", __func__);
-
-            // Initialize the first stream.
-            auto& streams = iter->second.streams;
-            log::trace("{}: (init) Resizing stream container to hold [{}] streams.", __func__, stream_count_iter->second);
-            streams.resize(std::stoi(stream_count_iter->second));
-#if 0
-            streams.push_back(std::move(parallel_write_stream{
-                .conn = std::move(conn),
-                .tp = std::move(tp)
-            }));
-#else
-            //streams.emplace_back();
-            //streams.back().conn = std::move(conn);
-            //streams.back().tp = std::move(tp);
-            //streams.back().out = {*streams.back().tp, lpath_iter->second};
-            log::trace("{}: (init) Initializing stream [0].", __func__);
-            streams[0] = std::make_shared<parallel_write_stream>();
-            log::trace("{}: (init) Allocated memory for stream [0].", __func__);
-            log::trace("{}: (init) Moving client connection into place for stream [0].", __func__);
-            streams[0]->conn = std::move(conn);
-            log::trace("{}: (init) Moving transport into place for stream [0].", __func__);
-            streams[0]->tp = std::move(tp);
-            log::trace("{}: (init) Constructing odstream for stream [0].", __func__);
-            //streams[0]->out = {*streams.back()->tp, lpath_iter->second};
-            //streams[0]->out = {*streams[0]->tp, lpath_iter->second};
-            streams[0]->out = std::move(out);
-#endif
-
-            if (!streams[0]->out) {
-                log::error("{}: (init) Could not open stream [0].", __func__);
-                parallel_write_contexts.erase(iter);
-                return _sess_ptr->send(std::move(res));
-            }
-
-#if 0
-            const auto& replica_token = streams.back()->out.replica_token();
-            log::trace("{}: (init) First stream - replica token = [{}].", __func__, replica_token.value);
-            const auto& replica_number = streams.back()->out.replica_number();
-            log::trace("{}: (init) First stream - replica number = [{}].", __func__, replica_number.value);
-#else
-            const auto& replica_token = streams[0]->out.replica_token();
-            log::debug("{}: (init) First stream - replica token = [{}].", __func__, replica_token.value);
-            const auto& replica_number = streams[0]->out.replica_number();
-            log::debug("{}: (init) First stream - replica number = [{}].", __func__, replica_number.value);
-#endif
-
-            for (auto i = 1ull; i < streams.size(); ++i) {
-                log::trace("{}: (init) Initializing stream [{}].", __func__, i);
-                log::trace("{}: (init) Initializing client connection for stream [{}].", __func__, i);
-                irods::experimental::client_connection sibling_conn;
-                log::trace("{}: (init) Initializing transport for stream [{}].", __func__, i);
-                auto sibling_tp = std::make_unique<io::client::native_transport>(sibling_conn);
-                log::trace("{}: (init) Constructing odstream for stream [{}].", __func__, i);
-                io::odstream sibling_out{*sibling_tp, replica_token, lpath_iter->second, replica_number, std::ios::out};
-
-#if 0
-                streams.push_back(std::move(parallel_write_stream{
-                    .conn = std::move(sibling_conn),
-                    .tp = std::move(sibling_tp),
-                    .out = std::move(sibling_out)
-                }));
-#else
-                //streams.emplace_back();
-                //streams.back().conn = std::move(sibling_conn);
-                //streams.back().tp = std::move(sibling_tp);
-                //streams.back().out = std::move(sibling_out);
-                log::trace("{}: (init) Allocating parallel_write_stream for stream [{}].", __func__, i);
-                streams[i] = std::make_shared<parallel_write_stream>();
-                log::trace("{}: (init) Moving client connection into parallel_write_stream for stream [{}].", __func__, i);
-                streams[i]->conn = std::move(sibling_conn);
-                log::trace("{}: (init) Moving transport into parallel_write_stream for stream [{}].", __func__, i);
-                streams[i]->tp = std::move(sibling_tp);
-                log::trace("{}: (init) Moving odstream into parallel_write_stream for stream [{}].", __func__, i);
-                streams[i]->out = std::move(sibling_out);
-#endif
-            }
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }},
-                {"parallel_write_handle", transfer_handle}
-            }.dump();
-        }
-        catch (const fs::filesystem_error& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code().value()},
-                    {"error_message", e.what()}
-                }}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        _sess_ptr->send(std::move(res));
-    } // handle_parallel_write_init_op
-
-    auto handle_parallel_write_shutdown_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
-    {
-        auto result = irods::http::resolve_client_identity(_req);
-        if (result.response) {
-            return _sess_ptr->send(std::move(*result.response));
-        }
-
-        const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
-
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
-
-        try {
-            // TODO
-            // 1. Verify transfer handle and lookup PTC.
-            // 2. Close all streams in reverse order.
-            // 3. Disassociate the transfer handle and PTC.
-            // 4. Free resources.
-
-            const auto parallel_write_handle_iter = _args.find("parallel-write-handle");
-            if (parallel_write_handle_iter == std::end(_args)) {
-                log::error("{}: Missing [parallel-write-handle] parameter.", __func__);
-                return _sess_ptr->send(irods::http::fail(http::status::bad_request));
-            }
-
-            log::debug("{}: (shutdown) Parallel Write Handle = [{}].", __func__, parallel_write_handle_iter->second);
-
-            const auto pw_iter = parallel_write_contexts.find(parallel_write_handle_iter->second);
-            if (pw_iter != std::end(parallel_write_contexts)) {
-                // Ignore the first stream. It must be closed last so that replication resources
-                // are triggered correctly.
-                auto end = std::prev(std::rend(pw_iter->second.streams));
-
-                io::on_close_success close_input{};
-                close_input.update_size = false;
-                close_input.update_status = false;
-                close_input.compute_checksum = false;
-                close_input.send_notifications = false;
-                close_input.preserve_replica_state_table = false;
-
-                for (auto iter = std::rbegin(pw_iter->second.streams); iter != end; ++iter) {
-                    (*iter)->out.close(&close_input);
+                auto iter = _args.find("offset");
+                if (iter != std::end(_args)) {
+                    try {
+                        in.seekg(std::stoll(iter->second));
+                    }
+                    catch (const std::exception& e) {
+                        log::error("{}: Could not seek to position [{}] in data object [{}].", fn, iter->second, lpath_iter->second);
+                        res.result(http::status::bad_request);
+                        res.prepare_payload();
+                        return _sess_ptr->send(std::move(res));
+                    }
                 }
 
-                // Allow the first stream to update the catalog.
-                pw_iter->second.streams.front()->out.close();
+                std::vector<char> buffer;
 
-                parallel_write_contexts.erase(pw_iter);
+                iter = _args.find("count");
+                if (iter != std::end(_args)) {
+                    try {
+                        const auto count = std::stoi(iter->second);
+
+                        if (count > irods::http::globals::config->at(json::json_pointer{"/irods_client/max_rbuffer_size_in_bytes"}).get<int>()) {
+                            res.result(http::status::bad_request);
+                            res.prepare_payload();
+                            return _sess_ptr->send(std::move(res));
+                        }
+
+                        buffer.resize(count);
+                    }
+                    catch (const std::exception& e) {
+                        log::error("{}: Could not initialize read buffer to size [{}] for data object [{}].", fn, iter->second, lpath_iter->second);
+                        res.result(http::status::bad_request);
+                        res.prepare_payload();
+                        return _sess_ptr->send(std::move(res));
+                    }
+                }
+                else {
+                    res.result(http::status::bad_request);
+                    res.prepare_payload();
+                    return _sess_ptr->send(std::move(res));
+                }
+
+                in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+
+                res.set(http::field::content_type, "application/octet-stream");
+                res.body() = std::string_view(buffer.data(), in.gcount());
+            }
+            catch (const fs::filesystem_error& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code().value()},
+                        {"error_message", e.what()}
+                    }}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }}
-            }.dump();
-        }
-        catch (const fs::filesystem_error& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code().value()},
-                    {"error_message", e.what()}
-                }}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
+            res.prepare_payload();
+
+            _sess_ptr->send(std::move(res));
+        });
+    } // handle_read_op
+
+    auto handle_write_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    {
+        auto result = irods::http::resolve_client_identity(_req);
+        if (result.response) {
+            return _sess_ptr->send(std::move(*result.response));
         }
 
-        res.prepare_payload();
+        const auto* client_info = result.client_info;
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        _sess_ptr->send(std::move(res));
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
+
+            try {
+                irods::connection_pool::connection_proxy conn;
+                std::unique_ptr<io::client::native_transport> tp;
+
+                std::unique_ptr<io::odstream> out;
+                io::odstream* out_ptr{};
+
+                const auto parallel_write_handle_iter = _args.find("parallel-write-handle"); 
+
+                using at_scope_exit_type = irods::at_scope_exit<std::function<void()>>;
+                std::unique_ptr<at_scope_exit_type> mark_pw_stream_as_usable;
+
+                if (parallel_write_handle_iter != std::end(_args)) {
+                    log::debug("{}: (write) Parallel Write Handle = [{}].", fn, parallel_write_handle_iter->second);
+
+                    decltype(parallel_write_contexts)::iterator iter;
+
+                    {
+                        std::shared_lock lk{pwc_mtx};
+
+                        iter = parallel_write_contexts.find(parallel_write_handle_iter->second);
+                        if (iter == std::end(parallel_write_contexts)) {
+                            log::error("{}: Invalid handle for parallel write.", fn);
+                            return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                        }
+                    }
+
+                    //
+                    // We've found a matching handle!
+                    //
+
+                    auto* pw_stream = iter->second.find_available_parallel_write_stream();
+                    if (!pw_stream) {
+                        log::error("{}: Parallel write streams are busy. Client must wait for one to become available.", fn);
+                        return _sess_ptr->send(irods::http::fail(res, http::status::too_many_requests));
+                    }
+
+                    mark_pw_stream_as_usable = std::make_unique<at_scope_exit_type>([pw_stream] { pw_stream->in_use(false); });
+
+                    out_ptr = &pw_stream->stream();
+                    log::debug("{}: (write) Parallel Write - stream memory address = [{}].", fn, fmt::ptr(out_ptr));
+                }
+                else {
+                    const auto lpath_iter = _args.find("lpath");
+                    if (lpath_iter == std::end(_args)) {
+                        log::error("{}: Missing [lpath] parameter.", fn);
+                        return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                    }
+
+                    log::trace("{}: Opening data object [{}] for write.", fn, lpath_iter->second);
+                    log::trace("{}: (write) Initializing for single buffer write.", fn);
+
+                    conn = irods::get_connection(client_info->username);
+                    tp = std::make_unique<io::client::native_transport>(conn);
+                    out = std::make_unique<io::odstream>(*tp, lpath_iter->second);
+                    out_ptr = out.get();
+                }
+
+                if (!*out_ptr) {
+                    log::error("{}: Could not open data object for write.", fn);
+                    res.result(http::status::internal_server_error);
+                    res.prepare_payload();
+                    return _sess_ptr->send(std::move(res));
+                }
+
+                auto iter = _args.find("offset");
+                if (iter != std::end(_args)) {
+                    log::trace("{}: Setting offset for write.", fn);
+                    try {
+                        out_ptr->seekp(std::stoll(iter->second));
+                    }
+                    catch (const std::exception& e) {
+                        log::error("{}: Could not seek to position [{}] in data object.", fn, iter->second);
+                        res.result(http::status::bad_request);
+                        res.prepare_payload();
+                        return _sess_ptr->send(std::move(res));
+                    }
+                }
+
+                iter = _args.find("count");
+                if (iter == std::end(_args)) {
+                    log::error("{}: Missing [count] parameter.", fn);
+                    res.result(http::status::bad_request);
+                    res.prepare_payload();
+                    return _sess_ptr->send(std::move(res));
+                }
+                const auto count = std::stoll(iter->second);
+
+                if (count > irods::http::globals::config->at(json::json_pointer{"/irods_client/max_wbuffer_size_in_bytes"}).get<std::int64_t>()) {
+                    log::error("{}: Argument for [count] parameter exceeds [/irods_client/wbuffer_size_in_bytes].", fn);
+                    res.result(http::status::bad_request);
+                    res.prepare_payload();
+                    return _sess_ptr->send(std::move(res));
+                }
+
+                iter = _args.find("bytes");
+                if (iter == std::end(_args)) {
+                    log::error("{}: Missing [bytes] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                out_ptr->write(iter->second.data(), count);
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0}
+                    }}
+                }.dump();
+            }
+            catch (const fs::filesystem_error& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code().value()},
+                        {"error_message", e.what()}
+                    }}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
+            }
+
+            res.prepare_payload();
+
+            _sess_ptr->send(std::move(res));
+        });
+    } // handle_write_op
+
+    auto handle_parallel_write_init_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    {
+        auto result = irods::http::resolve_client_identity(_req);
+        if (result.response) {
+            return _sess_ptr->send(std::move(*result.response));
+        }
+
+        const auto* client_info = result.client_info;
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
+
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
+
+            try {
+                const auto lpath_iter = _args.find("lpath");
+                if (lpath_iter == std::end(_args)) {
+                    log::error("{}: Missing [lpath] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                // TODO
+                // 1. Create a parallel transfer context (PTC).
+                // 2. Open one iRODS connection per stream and store in the PTC.
+                // 3. Generate a transfer handle and associate it with the Bearer/Access token and PTC.
+                // 4. Return transfer handle to client.
+                //
+                // The client is now free to call the write operation as much as they want.
+
+                const auto stream_count_iter = _args.find("stream-count");
+                if (stream_count_iter == std::end(_args)) {
+                    log::error("{}: Missing [stream-count] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                const auto stream_count = std::stoi(stream_count_iter->second);
+                if (stream_count > irods::http::globals::config->at(json::json_pointer{"/irods_client/max_number_of_parallel_write_streams"}).get<int>()) {
+                    log::error("{}: Argument for [stream-count] parameter exceeds maximum number of streams allowed.", fn, stream_count_iter->second);
+                    res.result(http::status::bad_request);
+                    res.prepare_payload();
+                    return _sess_ptr->send(std::move(res));
+                }
+
+                namespace io = irods::experimental::io;
+
+                log::trace("{}: Opening initial output stream to [{}].", fn, lpath_iter->second);
+
+                std::vector<std::shared_ptr<parallel_write_stream>> pw_streams;
+                pw_streams.reserve(stream_count);
+
+                try {
+                    // Open the first stream.
+                    pw_streams.emplace_back(std::make_shared<parallel_write_stream>(client_info->username, lpath_iter->second));
+
+                    auto& first_stream = pw_streams.front()->stream();
+                    log::debug("{}: replica token=[{}], replica number=[{}], leaf resource name=[{}]",
+                               fn,
+                               first_stream.replica_token().value,
+                               first_stream.replica_number().value,
+                               first_stream.leaf_resource_name().value);
+
+                    // Open secondary streams using the first stream as a base.
+                    for (int i = 0; i < stream_count; ++i) {
+                        pw_streams.emplace_back(std::make_shared<parallel_write_stream>(client_info->username,
+                                                                                        lpath_iter->second,
+                                                                                        &pw_streams.front()->stream()));
+                    }
+                }
+                catch (const irods::exception& e) {
+                    log::error("{}: Could not open one or more output streams to [{}].", fn, lpath_iter->second);
+                    res.result(http::status::internal_server_error);
+                    res.prepare_payload();
+                    return _sess_ptr->send(std::move(res));
+                }
+
+                std::string transfer_handle;
+                decltype(parallel_write_contexts)::iterator pwc_iter;
+
+                {
+                    std::scoped_lock lk{pwc_mtx};
+
+                    transfer_handle = irods::generate_uuid(parallel_write_contexts);
+                    log::debug("{}: (init) Parallel Write Handle = [{}].", fn, transfer_handle);
+
+                    auto [iter, insertion_result] = parallel_write_contexts.emplace(transfer_handle, parallel_write_context{});
+                    if (!insertion_result) {
+                        log::error("{}: Could not initialize parallel write context for [{}].", fn, lpath_iter->second);
+                        res.result(http::status::internal_server_error);
+                        res.prepare_payload();
+                        return _sess_ptr->send(std::move(res));
+                    }
+
+                    pwc_iter = iter;
+                }
+
+                auto& pw_context = pwc_iter->second;
+                pw_context.streams = std::move(pw_streams);
+                pw_context.mtx = std::make_unique<std::mutex>();
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }},
+                    {"parallel_write_handle", transfer_handle}
+                }.dump();
+            }
+            catch (const fs::filesystem_error& e) {
+                // TODO Close all open streams!
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code().value()},
+                        {"error_message", e.what()}
+                    }}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                // TODO Close all open streams!
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                // TODO Close all open streams!
+                res.result(http::status::internal_server_error);
+            }
+
+            res.prepare_payload();
+
+            _sess_ptr->send(std::move(res));
+        });
+    } // handle_parallel_write_init_op
+
+    auto handle_parallel_write_shutdown_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    {
+        auto result = irods::http::resolve_client_identity(_req);
+        if (result.response) {
+            return _sess_ptr->send(std::move(*result.response));
+        }
+
+        const auto* client_info = result.client_info;
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
+
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
+
+            try {
+                // TODO
+                // 1. Verify transfer handle and lookup PTC.
+                // 2. Close all streams in reverse order.
+                // 3. Disassociate the transfer handle and PTC.
+                // 4. Free resources.
+
+                const auto parallel_write_handle_iter = _args.find("parallel-write-handle");
+                if (parallel_write_handle_iter == std::end(_args)) {
+                    log::error("{}: Missing [parallel-write-handle] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+                }
+
+                log::debug("{}: (shutdown) Parallel Write Handle = [{}].", fn, parallel_write_handle_iter->second);
+
+                {
+                    std::scoped_lock lk{pwc_mtx};
+
+                    const auto pw_iter = parallel_write_contexts.find(parallel_write_handle_iter->second);
+                    if (pw_iter != std::end(parallel_write_contexts)) {
+                        // Ignore the first stream. It must be closed last so that replication resources
+                        // are triggered correctly.
+                        auto end = std::prev(std::rend(pw_iter->second.streams));
+
+                        io::on_close_success close_input{};
+                        close_input.update_size = false;
+                        close_input.update_status = false;
+                        close_input.compute_checksum = false;
+                        close_input.send_notifications = false;
+                        close_input.preserve_replica_state_table = false;
+
+                        for (auto iter = std::rbegin(pw_iter->second.streams); iter != end; ++iter) {
+                            (*iter)->stream().close(&close_input);
+                        }
+
+                        // Allow the first stream to update the catalog.
+                        pw_iter->second.streams.front()->stream().close();
+
+                        parallel_write_contexts.erase(pw_iter);
+                    }
+                }
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }}
+                }.dump();
+            }
+            catch (const fs::filesystem_error& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code().value()},
+                        {"error_message", e.what()}
+                    }}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
+            }
+
+            res.prepare_payload();
+
+            _sess_ptr->send(std::move(res));
+        });
     } // handle_parallel_write_shutdown_op
 
-    auto handle_replicate_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_replicate_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -888,7 +834,7 @@ namespace
         _sess_ptr->send(std::move(res));
     } // handle_replicate_op
 
-    auto handle_trim_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_trim_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -974,7 +920,7 @@ namespace
         _sess_ptr->send(std::move(res));
     } // handle_trim_op
 
-    auto handle_set_permission_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_set_permission_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1065,7 +1011,7 @@ namespace
         _sess_ptr->send(std::move(res));
     } // handle_set_permission_op
 
-    auto handle_stat_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_stat_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1153,8 +1099,8 @@ namespace
     } // handle_stat_op
 
     auto handle_register_op(irods::http::session_pointer_type _sess_ptr,
-                            const irods::http::request_type& _req,
-                            const query_arguments_type& _args) -> void
+                            irods::http::request_type& _req,
+                            query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1251,7 +1197,7 @@ namespace
     } // handle_register_op
 
     // TODO Perhaps this isn't needed because they have "trim" and "remove".
-    auto handle_unregister_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_unregister_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
 #if 0
         auto result = irods::http::resolve_client_identity(_req);
@@ -1293,7 +1239,7 @@ namespace
 #endif
     } // handle_unregister_op
 
-    auto handle_remove_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_remove_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1366,7 +1312,7 @@ namespace
         _sess_ptr->send(std::move(res));
     } // handle_remove_op
 
-    auto handle_rename_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_rename_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1439,7 +1385,76 @@ namespace
         _sess_ptr->send(std::move(res));
     } // handle_rename_op
 
-    auto handle_touch_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_copy_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    {
+        auto result = irods::http::resolve_client_identity(_req);
+        if (result.response) {
+            return _sess_ptr->send(std::move(*result.response));
+        }
+
+        const auto* client_info = result.client_info;
+        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+
+        http::response<http::string_body> res{http::status::ok, _req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "application/json");
+        res.keep_alive(_req.keep_alive());
+
+        try {
+            const auto src_lpath_iter = _args.find("src-lpath");
+            if (src_lpath_iter == std::end(_args)) {
+                log::error("{}: Missing [src-lpath] parameter.", __func__);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+            }
+
+            auto conn = irods::get_connection(client_info->username);
+
+            if (!fs::client::is_data_object(conn, src_lpath_iter->second)) {
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request, json{
+                    {"irods_response", {
+                        {"error_code", NOT_A_DATA_OBJECT}
+                    }}
+                }.dump()));
+            }
+
+            const auto dst_lpath_iter = _args.find("dst-lpath");
+            if (dst_lpath_iter == std::end(_args)) {
+                log::error("{}: Missing [dst-lpath] parameter.", __func__);
+                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+            }
+
+            //fs::copy_options opts; // TODO
+
+            fs::client::copy_data_object(conn, src_lpath_iter->second, dst_lpath_iter->second); // TODO Returns a bool. Should it be checked?
+        }
+        catch (const fs::filesystem_error& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code().value()},
+                    {"error_message", e.what()}
+                }}
+            }.dump();
+        }
+        catch (const irods::exception& e) {
+            res.result(http::status::bad_request);
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", e.code()},
+                    {"error_message", e.client_display_what()}
+                }}
+            }.dump();
+        }
+        catch (const std::exception& e) {
+            res.result(http::status::internal_server_error);
+        }
+
+        res.prepare_payload();
+
+        _sess_ptr->send(std::move(res));
+    } // handle_copy_op
+
+    auto handle_touch_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {

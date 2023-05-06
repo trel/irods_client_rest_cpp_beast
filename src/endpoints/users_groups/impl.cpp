@@ -39,30 +39,30 @@ namespace
 {
     // clang-format off
     using query_arguments_type = decltype(irods::http::url::query);
-    using handler_type         = irods::http::response_type(*)(const irods::http::request_type& _req, const query_arguments_type& _args);
+    using handler_type         = irods::http::response_type(*)(irods::http::request_type& _req, query_arguments_type& _args);
     // clang-format on
 
     //
     // Handler function prototypes
     //
 
-    auto handle_create_user_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_user_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_set_password_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_set_user_type_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_add_user_auth_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_user_auth_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_create_user_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_remove_user_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_set_password_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_set_user_type_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_add_user_auth_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_remove_user_auth_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
 
-    auto handle_create_group_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_group_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_add_to_group_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_from_group_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_create_group_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_remove_group_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_add_to_group_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_remove_from_group_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
 
-    auto handle_users_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_groups_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_members_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_is_member_of_group_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_stat_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_users_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_groups_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_members_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_is_member_of_group_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_stat_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
 
     //
     // Operation to Handler mappings
@@ -92,11 +92,11 @@ namespace
 
 namespace irods::http::handler
 {
-    // Handles all requests sent to /users_groups.
-    auto users_groups(session_pointer_type _sess_ptr, const request_type& _req) -> void
+    // Handles all requests sent to /users-groups.
+    auto users_groups(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
         if (_req.method() == verb_type::get) {
-            const auto url = irods::http::parse_url(_req);
+            auto url = irods::http::parse_url(_req);
 
             const auto op_iter = url.query.find("op");
             if (op_iter == std::end(url.query)) {
@@ -110,8 +110,9 @@ namespace irods::http::handler
 
             return _sess_ptr->send(fail(status_type::bad_request));
         }
-        else if (_req.method() == verb_type::post) {
-            const auto args = irods::http::to_argument_list(_req.body());
+
+        if (_req.method() == verb_type::post) {
+            auto args = irods::http::to_argument_list(_req.body());
 
             const auto op_iter = args.find("op");
             if (op_iter == std::end(args)) {
@@ -137,7 +138,7 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_create_user_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_create_user_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -214,7 +215,7 @@ namespace
         return res;
     } // handle_create_user_op
 
-    auto handle_remove_user_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_remove_user_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -269,7 +270,7 @@ namespace
         return res;
     } // handle_remove_user_op
 
-    auto handle_set_password_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_set_password_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
 #if 0
         const auto result = irods::http::resolve_client_identity(_req);
@@ -311,7 +312,7 @@ namespace
 #endif
     } // handle_set_password_op
 
-    auto handle_set_user_type_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_set_user_type_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
 #if 0
         const auto result = irods::http::resolve_client_identity(_req);
@@ -353,7 +354,7 @@ namespace
 #endif
     } // handle_set_user_type_op
 
-    auto handle_add_user_auth_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_add_user_auth_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
 #if 0
         const auto result = irods::http::resolve_client_identity(_req);
@@ -395,7 +396,7 @@ namespace
 #endif
     } // handle_add_user_auth_op
 
-    auto handle_remove_user_auth_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_remove_user_auth_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
 #if 0
         const auto result = irods::http::resolve_client_identity(_req);
@@ -437,7 +438,7 @@ namespace
 #endif
     } // handle_remove_user_auth_op
 
-    auto handle_create_group_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_create_group_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -486,7 +487,7 @@ namespace
         return res;
     } // handle_create_group_op
 
-    auto handle_remove_group_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_remove_group_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -535,7 +536,7 @@ namespace
         return res;
     } // handle_remove_group_op
 
-    auto handle_add_to_group_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_add_to_group_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -597,7 +598,7 @@ namespace
         return res;
     } // handle_add_to_group_op
 
-    auto handle_remove_from_group_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_remove_from_group_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -659,7 +660,7 @@ namespace
         return res;
     } // handle_remove_from_group_op
 
-    auto handle_users_op(const irods::http::request_type& _req, const query_arguments_type&) -> irods::http::response_type
+    auto handle_users_op(irods::http::request_type& _req, query_arguments_type&) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -713,7 +714,7 @@ namespace
         return res;
     } // handle_users_op
 
-    auto handle_groups_op(const irods::http::request_type& _req, const query_arguments_type&) -> irods::http::response_type
+    auto handle_groups_op(irods::http::request_type& _req, query_arguments_type&) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -764,7 +765,7 @@ namespace
         return res;
     } // handle_groups_op
 
-    auto handle_members_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_members_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
 #if 0
         const auto result = irods::http::resolve_client_identity(_req);
@@ -806,7 +807,7 @@ namespace
 #endif
     } // handle_members_op
 
-    auto handle_is_member_of_group_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_is_member_of_group_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
 #if 0
         const auto result = irods::http::resolve_client_identity(_req);
@@ -848,7 +849,7 @@ namespace
 #endif
     } // handle_is_member_of_group_op
 
-    auto handle_stat_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_stat_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {

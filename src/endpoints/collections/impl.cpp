@@ -38,19 +38,19 @@ namespace
 {
     // clang-format off
     using query_arguments_type = decltype(irods::http::url::query);
-    using handler_type         = irods::http::response_type(*)(const irods::http::request_type& _req, const query_arguments_type& _args);
+    using handler_type         = irods::http::response_type(*)(irods::http::request_type& _req, query_arguments_type& _args);
     // clang-format on
 
     //
     // Handler function prototypes
     //
 
-    auto handle_list_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_stat_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_create_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_rename_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_set_permission_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_list_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_stat_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_create_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_remove_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_rename_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_set_permission_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
 
     //
     // Operation to Handler mappings
@@ -65,17 +65,19 @@ namespace
         {"create", handle_create_op},
         {"remove", handle_remove_op},
         {"rename", handle_rename_op},
-        {"set_permission", handle_set_permission_op}
+        //{"copy", handle_copy_op},
+        {"set_permission", handle_set_permission_op},
+        //{"enable_inheritance", handle_enable_inheritance_op} // TODO set_permission handles inheritance?
     };
 } // anonymous namespace
 
 namespace irods::http::handler
 {
     // Handles all requests sent to /collections.
-    auto collections(session_pointer_type _sess_ptr, const request_type& _req) -> void
+    auto collections(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
         if (_req.method() == verb_type::get) {
-            const auto url = irods::http::parse_url(_req);
+            auto url = irods::http::parse_url(_req);
 
             const auto op_iter = url.query.find("op");
             if (op_iter == std::end(url.query)) {
@@ -89,8 +91,9 @@ namespace irods::http::handler
 
             return _sess_ptr->send(fail(status_type::bad_request));
         }
-        else if (_req.method() == verb_type::post) {
-            const auto args = irods::http::to_argument_list(_req.body());
+
+        if (_req.method() == verb_type::post) {
+            auto args = irods::http::to_argument_list(_req.body());
 
             const auto op_iter = args.find("op");
             if (op_iter == std::end(args)) {
@@ -116,7 +119,7 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_list_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_list_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -196,7 +199,7 @@ namespace
         return res;
     } // handle_list_op
 
-    auto handle_stat_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_stat_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -279,7 +282,7 @@ namespace
         return res;
     } // handle_stat_op
 
-    auto handle_create_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_create_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -337,7 +340,7 @@ namespace
         return res;
     } // handle_create_op
 
-    auto handle_remove_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_remove_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -417,7 +420,7 @@ namespace
         return res;
     } // handle_remove_op
 
-    auto handle_rename_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_rename_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -501,7 +504,7 @@ namespace
         return res;
     } // handle_rename_op
 
-    auto handle_set_permission_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_set_permission_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {

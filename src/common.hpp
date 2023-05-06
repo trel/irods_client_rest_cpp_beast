@@ -33,7 +33,7 @@ namespace irods::http
     using verb_type     = boost::beast::http::verb;
 
     using session_pointer_type = std::shared_ptr<irods::http::session>;
-    using request_handler_type = void(*)(session_pointer_type, const request_type&);
+    using request_handler_type = void(*)(session_pointer_type, request_type&);
 
     using request_handler_map_type = std::unordered_map<std::string_view, request_handler_type>;
     // clang-format on

@@ -40,37 +40,39 @@ namespace
     // clang-format off
     using query_arguments_type = decltype(irods::http::url::query); // TODO Could be moved to common.hpp
 
-    using handler_type         = void(*)(irods::http::session_pointer_type&, const irods::http::request_type&, const query_arguments_type&);
+    using handler_type         = void(*)(irods::http::session_pointer_type&, irods::http::request_type&, query_arguments_type&);
     // clang-format on
 
     //
     // Handler function prototypes
     //
 
-    auto handle_atomic_execute_op(irods::http::session_pointer_type& _sess_ptr,
-                                  const irods::http::request_type& _req,
-                                  const query_arguments_type& _args) -> void;
+    auto handle_execute_op(irods::http::session_pointer_type& _sess_ptr,
+                           irods::http::request_type& _req,
+                           query_arguments_type& _args) -> void;
 
     //
     // Operation to Handler mappings
     //
 
+#if 0
     const std::unordered_map<std::string, handler_type> handlers_for_get{
     };
+#endif
 
     const std::unordered_map<std::string, handler_type> handlers_for_post{
-        {"atomic_execute", handle_atomic_execute_op}
+        {"execute", handle_execute_op}
     };
 } // anonymous namespace
 
 namespace irods::http::handler
 {
     // Handles all requests sent to /metadata.
-    auto metadata(session_pointer_type _sess_ptr, const request_type& _req) -> void
+    auto metadata(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
 #if 0
         if (_req.method() == verb_type::get) {
-            const auto url = irods::http::parse_url(_req);
+            auto url = irods::http::parse_url(_req);
 
             const auto op_iter = url.query.find("op");
             if (op_iter == std::end(url.query)) {
@@ -87,7 +89,7 @@ namespace irods::http::handler
         else
 #endif
         if (_req.method() == verb_type::post) {
-            const auto args = irods::http::to_argument_list(_req.body());
+            auto args = irods::http::to_argument_list(_req.body());
 
             const auto op_iter = args.find("op");
             if (op_iter == std::end(args)) {
@@ -113,9 +115,9 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_atomic_execute_op(irods::http::session_pointer_type& _sess_ptr,
-                                  const irods::http::request_type& _req,
-                                  const query_arguments_type& _args) -> void
+    auto handle_execute_op(irods::http::session_pointer_type& _sess_ptr,
+                                  irods::http::request_type& _req,
+                                  query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -182,5 +184,5 @@ namespace
             log::trace("{}: Metadata operations complete. Sending response.", fn);
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_atomic_execute_op
+    } // handle_execute_op
 } // anonymous namespace

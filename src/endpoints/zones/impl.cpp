@@ -18,7 +18,7 @@
 
 namespace irods::http::handler
 {
-    auto zones(session_pointer_type _sess_ptr, const request_type& _req) -> void
+    auto zones(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
         namespace log = irods::http::log;
 

@@ -41,19 +41,19 @@ namespace
 {
     // clang-format off
     using query_arguments_type = decltype(irods::http::url::query); // TODO Could be moved to common.hpp
-    using handler_type         = void(*)(irods::http::session_pointer_type, const irods::http::request_type&, const query_arguments_type&);
+    using handler_type         = void(*)(irods::http::session_pointer_type, irods::http::request_type&, query_arguments_type&);
     // clang-format on
 
     //
     // Handler function prototypes
     //
 
-    auto handle_execute_genquery_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_execute_specific_query_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_list_genquery_columns_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_list_specific_queries_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_add_specific_query_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
-    auto handle_remove_specific_query_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void;
+    auto handle_execute_genquery_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_execute_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_list_genquery_columns_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_list_specific_queries_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_add_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_remove_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
 
     //
     // Operation to Handler mappings
@@ -75,10 +75,10 @@ namespace
 namespace irods::http::handler
 {
     // Handles all requests sent to /query.
-    auto query(session_pointer_type _sess_ptr, const request_type& _req) -> void
+    auto query(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
         if (_req.method() == verb_type::get) {
-            const auto url = irods::http::parse_url(_req);
+            auto url = irods::http::parse_url(_req);
 
             const auto op_iter = url.query.find("op");
             if (op_iter == std::end(url.query)) {
@@ -92,8 +92,9 @@ namespace irods::http::handler
 
             return _sess_ptr->send(fail(status_type::bad_request));
         }
-        else if (_req.method() == verb_type::post) {
-            const auto args = irods::http::to_argument_list(_req.body());
+
+        if (_req.method() == verb_type::post) {
+            auto args = irods::http::to_argument_list(_req.body());
 
             const auto op_iter = args.find("op");
             if (op_iter == std::end(args)) {
@@ -119,7 +120,7 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_execute_genquery_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_execute_genquery_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -260,7 +261,7 @@ namespace
         });
     } // handle_execute_genquery_op
 
-    auto handle_execute_specific_query_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_execute_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -383,7 +384,7 @@ namespace
         });
     } // handle_execute_genquery_op
 
-    auto handle_list_genquery_columns_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_list_genquery_columns_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         (void) _req;
         (void) _args;
@@ -391,7 +392,7 @@ namespace
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_list_genquery_columns_op
 
-    auto handle_list_specific_queries_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_list_specific_queries_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         (void) _req;
         (void) _args;
@@ -399,7 +400,7 @@ namespace
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_list_specific_queries_op
 
-    auto handle_add_specific_query_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_add_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         (void) _req;
         (void) _args;
@@ -407,7 +408,7 @@ namespace
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_add_specific_query_op
 
-    auto handle_remove_specific_query_op(irods::http::session_pointer_type _sess_ptr, const irods::http::request_type& _req, const query_arguments_type& _args) -> void
+    auto handle_remove_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
     {
         (void) _req;
         (void) _args;

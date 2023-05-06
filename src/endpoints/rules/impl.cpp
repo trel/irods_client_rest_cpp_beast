@@ -46,18 +46,18 @@ namespace
 {
     // clang-format off
     using query_arguments_type = decltype(irods::http::url::query); // TODO Could be moved to common.hpp
-    using handler_type         = irods::http::response_type(*)(const irods::http::request_type& _req, const query_arguments_type& _args);
+    using handler_type         = irods::http::response_type(*)(irods::http::request_type& _req, query_arguments_type& _args);
     // clang-format on
 
     //
     // Handler function prototypes
     //
 
-    auto handle_execute_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_delay_rule_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_modify_delay_rule_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_list_rule_engines_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_list_delay_rules_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_execute_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_remove_delay_rule_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_modify_delay_rule_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_list_rule_engines_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_list_delay_rules_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
 
     //
     // Operation to Handler mappings
@@ -78,10 +78,10 @@ namespace
 namespace irods::http::handler
 {
     // Handles all requests sent to /rules.
-    auto rules(session_pointer_type _sess_ptr, const request_type& _req) -> void
+    auto rules(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
         if (_req.method() == verb_type::get) {
-            const auto url = irods::http::parse_url(_req);
+            auto url = irods::http::parse_url(_req);
 
             const auto op_iter = url.query.find("op");
             if (op_iter == std::end(url.query)) {
@@ -95,8 +95,9 @@ namespace irods::http::handler
 
             return _sess_ptr->send(fail(status_type::bad_request));
         }
-        else if (_req.method() == verb_type::post) {
-            const auto args = irods::http::to_argument_list(_req.body());
+
+        if (_req.method() == verb_type::post) {
+            auto args = irods::http::to_argument_list(_req.body());
 
             const auto op_iter = args.find("op");
             if (op_iter == std::end(args)) {
@@ -122,7 +123,7 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_execute_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_execute_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -220,7 +221,7 @@ namespace
         return res;
     } // handle_execute_op
 
-    auto handle_remove_delay_rule_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_remove_delay_rule_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -272,7 +273,7 @@ namespace
         return res;
     } // handle_remove_delay_rule_op
 
-    auto handle_modify_delay_rule_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_modify_delay_rule_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         (void) _req;
         (void) _args;
@@ -280,7 +281,7 @@ namespace
         return irods::http::fail(http::status::not_implemented);
     } // handle_modify_delay_rule_op
 
-    auto handle_list_rule_engines_op(const irods::http::request_type& _req, const query_arguments_type&) -> irods::http::response_type
+    auto handle_list_rule_engines_op(irods::http::request_type& _req, query_arguments_type&) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -352,7 +353,7 @@ namespace
         return res;
     } // handle_list_rule_engines_op
 
-    auto handle_list_delay_rules_op(const irods::http::request_type& _req, const query_arguments_type& _args) -> irods::http::response_type
+    auto handle_list_delay_rules_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {

@@ -8,14 +8,11 @@
         "requests": {
             "threads": 3,
             "max_rbuffer_size_in_bytes": 8388608,
-            "max_wbuffer_size_in_bytes": 8388608,
             "timeout_in_seconds": 30
         },
 
         "background_io": {
-            "threads": 3,
-            "max_rbuffer_size_in_bytes": 8192,
-            "max_wbuffer_size_in_bytes": 8192
+            "threads": 3
         }
     },
 
@@ -23,13 +20,20 @@
         "host": "<host>",
         "port": 1247,
         "zone": "<zone>",
+
         "rodsadmin": {
             "username": "<username>",
             "password": "<password>"
         },
+
         "connection_pool": {
             "size": 6,
             "refresh_timeout_in_seconds": 600
-        }
+        },
+
+        "max_number_of_parallel_write_streams": 4,
+
+        "max_rbuffer_size_in_bytes": 8192,
+        "max_wbuffer_size_in_bytes": 8192
     }
 }

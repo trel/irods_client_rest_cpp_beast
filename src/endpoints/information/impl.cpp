@@ -16,7 +16,7 @@
 
 namespace irods::http::handler
 {
-    auto information(session_pointer_type _sess_ptr, const request_type& _req) -> void
+    auto information(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
         if (_req.method() != boost::beast::http::verb::get) {
             return _sess_ptr->send(fail(status_type::method_not_allowed));
