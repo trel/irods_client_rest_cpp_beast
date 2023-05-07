@@ -17,6 +17,8 @@
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <chrono>
 #include <string>
 #include <string_view>
@@ -139,11 +141,13 @@ namespace irods::http::handler
         // operation. Perhaps they shouldn't be extended at all.
         //
         // Research this.
+        using json = nlohmann::json;
+        const auto seconds = irods::http::globals::config->at(json::json_pointer{"/http_server/authentication/basic/timeout_in_seconds"}).get<int>();
         auto bearer_token = irods::process_stash::insert(authenticated_client_info{
             .auth_scheme = authorization_scheme::basic,
             .username = std::move(username),
             .password = std::move(password),
-            .expires_at = std::chrono::steady_clock::now() + std::chrono::minutes{1} // TODO How does this play with OIDC?
+            .expires_at = std::chrono::steady_clock::now() + std::chrono::seconds{seconds}
         });
 
         // TODO Parse the header value and determine if the user is allowed to access.

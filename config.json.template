@@ -5,10 +5,16 @@
 
         "log_level": "warn",
 
+        "authentication": {
+            "basic": {
+                "timeout_in_seconds": 3600
+            }
+        },
+
         "requests": {
             "threads": 3,
             "max_rbuffer_size_in_bytes": 8388608,
-            "timeout_in_seconds": 30
+            "timeout_in_seconds": 30,
         },
 
         "background_io": {
