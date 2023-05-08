@@ -14,7 +14,8 @@ Checks:
     modernize-*,
     performance-*,
     readability-*,
-    -readability-avoid-const-params-in-decls
+    -readability-avoid-const-params-in-decls,
+    -readability-inconsistent-declaration-parameter-name
 WarningsAsErrors:
     boost-*,
     bugprone-*,
@@ -27,7 +28,7 @@ WarningsAsErrors:
     misc-*,
     modernize-*,
     performance-*,
-    readability-*
+    readability-*,
 HeaderFilterRegex: ''
 AnalyzeTemporaryDtors: false
 FormatStyle:     none

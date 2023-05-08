@@ -12,7 +12,6 @@
 #include <irods/rodsErrorTable.h>
 
 #include <boost/asio.hpp>
-//#include <boost/asio/ip/tcp.hpp> // TODO Remove
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
 
@@ -28,8 +27,6 @@ namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
 namespace net   = boost::asio;      // from <boost/asio.hpp>
 
-//using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
-
 namespace log = irods::http::log;
 
 using json = nlohmann::json;
@@ -37,11 +34,7 @@ using json = nlohmann::json;
 
 namespace
 {
-    // clang-format off
-    using query_arguments_type = decltype(irods::http::url::query); // TODO Could be moved to common.hpp
-
-    using handler_type         = void(*)(irods::http::session_pointer_type&, irods::http::request_type&, query_arguments_type&);
-    // clang-format on
+    using handler_type = void(*)(irods::http::session_pointer_type&, irods::http::request_type&, irods::http::query_arguments_type&);
 
     //
     // Handler function prototypes
@@ -49,7 +42,7 @@ namespace
 
     auto handle_execute_op(irods::http::session_pointer_type& _sess_ptr,
                            irods::http::request_type& _req,
-                           query_arguments_type& _args) -> void;
+                           irods::http::query_arguments_type& _args) -> void;
 
     //
     // Operation to Handler mappings
@@ -67,7 +60,6 @@ namespace
 
 namespace irods::http::handler
 {
-    // Handles all requests sent to /metadata.
     auto metadata(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
 #if 0
@@ -117,7 +109,7 @@ namespace
 
     auto handle_execute_op(irods::http::session_pointer_type& _sess_ptr,
                                   irods::http::request_type& _req,
-                                  query_arguments_type& _args) -> void
+                                  irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {

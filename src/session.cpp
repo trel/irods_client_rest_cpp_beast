@@ -101,19 +101,25 @@ namespace irods::http
 
         namespace http = boost::beast::http;
 
-        // "host" is a placeholder that's used so that get_url_path() can parse the URL correctly.
-        const auto path = irods::http::get_url_path(fmt::format("http://host{}", req_.target()));
-        if (!path) {
-            send(irods::http::fail(http::status::bad_request));
-            return;
-        }
+        try {
+            // "host" is a placeholder that's used so that get_url_path() can parse the URL correctly.
+            const auto path = irods::http::get_url_path(fmt::format("http://host{}", req_.target()));
+            if (!path) {
+                send(irods::http::fail(http::status::bad_request));
+                return;
+            }
 
-        if (const auto iter = req_handlers_->find(*path); iter != std::end(*req_handlers_)) {
-            (iter->second)(shared_from_this(), req_);
-            return;
-        }
+            if (const auto iter = req_handlers_->find(*path); iter != std::end(*req_handlers_)) {
+                (iter->second)(shared_from_this(), req_);
+                return;
+            }
 
-        send(irods::http::fail(http::status::not_found));
+            send(irods::http::fail(http::status::not_found));
+        }
+        catch (const std::exception& e) {
+            log::error("{}: {}", __func__, e.what());
+            send(irods::http::fail(http::status::internal_server_error));
+        }
     } // on_read
 
     auto session::on_write(bool close, boost::beast::error_code ec, std::size_t bytes_transferred) -> void

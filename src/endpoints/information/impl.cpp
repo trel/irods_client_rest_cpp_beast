@@ -31,19 +31,11 @@ namespace irods::http::handler
         res.set(field_type::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
+        // TODO Consider including buffer sizes, timeouts, caps, etc.
         res.body() = json{
-            //{"binary_name", irods::http::version::binary_name}, // TODO Remove?
             {"api_version", irods::http::version::api_version},
             {"build", irods::http::version::sha},
-#if 0
-            {"irods_server", {
-                {"host", svr.at("host")},
-                {"port", svr.at("port")},
-                {"zone", svr.at("zone")}
-            }}
-#else
             {"irods_zone", svr.at("zone")}
-#endif
         }.dump();
 
         res.prepare_payload();

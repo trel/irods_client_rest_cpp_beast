@@ -19,12 +19,12 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
-//#include <boost/asio/ip/tcp.hpp> // TODO Remove
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
 
 #include <nlohmann/json.hpp>
 
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -33,9 +33,7 @@
 // clang-format off
 namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
-//namespace net   = boost::asio;      // from <boost/asio.hpp>
-
-//using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
+namespace net   = boost::asio;      // from <boost/asio.hpp>
 
 namespace log = irods::http::log;
 
@@ -44,40 +42,32 @@ using json = nlohmann::json;
 
 namespace
 {
-    // clang-format off
-    using query_arguments_type = decltype(irods::http::url::query); // TODO Could be moved to common.hpp
-    using handler_type         = irods::http::response_type(*)(irods::http::request_type& _req, query_arguments_type& _args);
-    // clang-format on
+    using handler_type = irods::http::response_type(*)(irods::http::request_type&, irods::http::query_arguments_type&);
 
     //
     // Handler function prototypes
     //
 
-    auto handle_execute_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_delay_rule_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_modify_delay_rule_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_list_rule_engines_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_list_delay_rules_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_execute_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_remove_delay_rule_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_list_rule_engines_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
 
     //
     // Operation to Handler mappings
     //
 
     const std::unordered_map<std::string, handler_type> handlers_for_get{
-        {"list_rule_engines", handle_list_rule_engines_op},
-        {"list_delay_rules", handle_list_delay_rules_op}
+        {"list_rule_engines", handle_list_rule_engines_op}
     };
 
     const std::unordered_map<std::string, handler_type> handlers_for_post{
         {"execute", handle_execute_op},
-        {"remove_delay_rule", handle_remove_delay_rule_op},
-        {"modify_delay_rule", handle_modify_delay_rule_op}
+        {"remove_delay_rule", handle_remove_delay_rule_op}
     };
 } // anonymous namespace
 
 namespace irods::http::handler
 {
-    // Handles all requests sent to /rules.
     auto rules(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
         if (_req.method() == verb_type::get) {
@@ -123,7 +113,7 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_execute_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
+    auto handle_execute_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -161,8 +151,8 @@ namespace
             }
 
             MsParamArray param_array{};
-            input.inpParamArray = &param_array; // TODO Need to accept INPUT params.
-            std::strncpy(input.outParamDesc, "ruleExecOut", sizeof(input.outParamDesc)); // TODO Need to accept OUTPUT params.
+            input.inpParamArray = &param_array;
+            std::strncpy(input.outParamDesc, "ruleExecOut", sizeof(input.outParamDesc));
 
             MsParamArray* out_param_array{};
 
@@ -188,12 +178,18 @@ namespace
                 }
 
                 if (auto* msp = getMsParamByLabel(out_param_array, "ruleExecOut"); msp) {
-                    log::debug("{}: ruleExecOut = [{}]", __func__, (char*) msp->inOutStruct);
+                    log::debug("{}: ruleExecOut = [{}]", __func__, static_cast<char*>(msp->inOutStruct));
                 }
             }
 
-            // TODO Probably not needed.
-            //printErrorStack(static_cast<RcComm*>(conn)->rError);
+            {
+                // Log messages stored in the RcComm::rError object.
+                auto* rerr_info = static_cast<RcComm*>(conn)->rError;
+
+                for (auto&& err : std::span(rerr_info->errMsg, rerr_info->len)) {
+                    log::info("{}: RcComm::rError info = [status=[{}], message=[{}]]", __func__, err->status, err->msg);
+                }
+            }
 
             res.body() = json{
                 {"irods_response", {
@@ -221,7 +217,7 @@ namespace
         return res;
     } // handle_execute_op
 
-    auto handle_remove_delay_rule_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
+    auto handle_remove_delay_rule_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -273,15 +269,7 @@ namespace
         return res;
     } // handle_remove_delay_rule_op
 
-    auto handle_modify_delay_rule_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
-    {
-        (void) _req;
-        (void) _args;
-        log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
-    } // handle_modify_delay_rule_op
-
-    auto handle_list_rule_engines_op(irods::http::request_type& _req, query_arguments_type&) -> irods::http::response_type
+    auto handle_list_rule_engines_op(irods::http::request_type& _req, irods::http::query_arguments_type&) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -352,86 +340,4 @@ namespace
 
         return res;
     } // handle_list_rule_engines_op
-
-    auto handle_list_delay_rules_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
-    {
-        const auto result = irods::http::resolve_client_identity(_req);
-        if (result.response) {
-            return *result.response;
-        }
-
-        const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
-
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
-
-        try {
-            // TODO
-            const auto all_rules_iter = _args.find("all-rules");
-            if (all_rules_iter != std::end(_args)) {
-            }
-
-            const auto gql = fmt::format(
-                "select "
-                "RULE_EXEC_ID, "
-                "RULE_EXEC_NAME, "
-                "RULE_EXEC_REI_FILE_PATH, "
-                "RULE_EXEC_USER_NAME, "
-                "RULE_EXEC_ADDRESS, "
-                "RULE_EXEC_TIME, "
-                "RULE_EXEC_FREQUENCY, "
-                "RULE_EXEC_PRIORITY, "
-                "RULE_EXEC_ESTIMATED_EXE_TIME, "
-                "RULE_EXEC_NOTIFICATION_ADDR, "
-                "RULE_EXEC_LAST_EXE_TIME, "
-                "RULE_EXEC_STATUS, "
-#if 0
-                "RULE_EXEC_CONTEXT "
-                "where RULE_EXEC_USER_NAME = '{}'",
-                *username);
-#else
-                "RULE_EXEC_CONTEXT");
-#endif
-
-            json::array_t row;
-            json::array_t rows;
-
-            auto conn = irods::get_connection(client_info->username);
-
-            for (auto&& r : irods::query{static_cast<RcComm*>(conn), gql}) {
-                for (auto&& c : r) {
-                    row.push_back(c);
-                }
-
-                rows.push_back(row);
-                row.clear();
-            }
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }},
-                {"rows", rows}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        return res;
-    } // handle_list_delay_rules_op
 } // anonymous namespace

@@ -11,7 +11,6 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
-//#include <boost/asio/ip/tcp.hpp> // TODO Remove
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
 
@@ -25,9 +24,7 @@
 // clang-format off
 namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
-//namespace net   = boost::asio;      // from <boost/asio.hpp>
-
-//using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
+namespace net   = boost::asio;      // from <boost/asio.hpp>
 
 namespace adm = irods::experimental::administration;
 namespace log = irods::http::log;
@@ -37,19 +34,16 @@ using json = nlohmann::json;
 
 namespace
 {
-    // clang-format off
-    using query_arguments_type = decltype(irods::http::url::query);
-    using handler_type         = irods::http::response_type(*)(irods::http::request_type& _req, query_arguments_type& _args);
-    // clang-format on
+    using handler_type = irods::http::response_type(*)(irods::http::request_type& _req, irods::http::query_arguments_type& _args);
 
     //
     // Handler function prototypes
     //
 
-    auto handle_list_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_stat_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_create_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_list_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_stat_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_create_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
+    auto handle_remove_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
 
     //
     // Operation to Handler mappings
@@ -68,7 +62,6 @@ namespace
 
 namespace irods::http::handler
 {
-    // Handles all requests sent to /tickets.
     auto tickets(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
         if (_req.method() == verb_type::get) {
@@ -114,7 +107,7 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_list_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
+    auto handle_list_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
     {
 #if 0
         const auto result = irods::http::resolve_client_identity(_req);
@@ -156,7 +149,7 @@ namespace
 #endif
     } // handle_list_op
 
-    auto handle_stat_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
+    auto handle_stat_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
     {
 #if 0
         const auto result = irods::http::resolve_client_identity(_req);
@@ -198,7 +191,7 @@ namespace
 #endif
     } // handle_stat_op
 
-    auto handle_create_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
+    auto handle_create_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -320,7 +313,7 @@ namespace
         return res;
     } // handle_create_op
 
-    auto handle_remove_op(irods::http::request_type& _req, query_arguments_type& _args) -> irods::http::response_type
+    auto handle_remove_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
     {
         const auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {

@@ -22,7 +22,6 @@
 #include <irods/dstream.hpp>
 
 #include <boost/asio.hpp>
-//#include <boost/asio/ip/tcp.hpp> // TODO Remove
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
 
@@ -42,8 +41,6 @@ namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
 namespace net   = boost::asio;      // from <boost/asio.hpp>
 
-//using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
-
 namespace fs  = irods::experimental::filesystem;
 namespace io  = irods::experimental::io;
 namespace log = irods::http::log;
@@ -53,10 +50,7 @@ using json = nlohmann::json;
 
 namespace
 {
-    // clang-format off
-    using query_arguments_type = decltype(irods::http::url::query);
-    using handler_type         = void(*)(irods::http::session_pointer_type, irods::http::request_type& _req, query_arguments_type& _args);
-    // clang-format on
+    using handler_type = void(*)(irods::http::session_pointer_type, irods::http::request_type&, irods::http::query_arguments_type&);
 
     class parallel_write_stream
     {
@@ -129,13 +123,6 @@ namespace
         std::vector<std::shared_ptr<parallel_write_stream>> streams;
         std::unique_ptr<std::mutex> mtx;
 
-        // TODO How do we pick a stream?
-        //
-        // Should the client have to worry about this? It's easy to let them target a specific stream.
-        // It's also more deterministic.
-        //
-        // What if the chunk size and other info was passed on parallel_write_init?
-        // Does that give us more performance?
         auto find_available_parallel_write_stream() -> parallel_write_stream*
         {
             std::scoped_lock lk{*mtx};
@@ -161,24 +148,23 @@ namespace
     // Handler function prototypes
     //
 
-    auto handle_read_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_write_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_parallel_write_init_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_parallel_write_shutdown_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_read_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_write_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_parallel_write_init_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_parallel_write_shutdown_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
 
-    auto handle_replicate_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_trim_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_replicate_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_trim_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
 
-    auto handle_set_permission_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_stat_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_set_permission_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_stat_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
 
-    auto handle_register_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_unregister_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_register_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
 
-    auto handle_rename_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_copy_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_remove_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_touch_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_rename_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_copy_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_remove_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_touch_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
 
     //
     // Operation to Handler mappings
@@ -204,21 +190,17 @@ namespace
         {"trim", handle_trim_op},
 
         {"register", handle_register_op},
-        {"unregister", handle_unregister_op},
 
         {"set_permission", handle_set_permission_op}
 
         //{"calculate_checksum", handle_calculate_checksum},
         //{"register_checksum", handle_register_checksum},
         //{"verify_checksum", handle_verify_checksum},
-
-        //{"physical_move", handle_physical_move},
     };
 } // anonymous namespace
 
 namespace irods::http::handler
 {
-    // Handles all requests sent to /data_objects.
     auto data_objects(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
         if (_req.method() == verb_type::get) {
@@ -264,7 +246,7 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_read_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_read_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -279,7 +261,7 @@ namespace
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-            res.set(http::field::content_type, "application/problem-details+json"); // TODO Should we use this?
+            res.set(http::field::content_type, "application/json");
             res.keep_alive(_req.keep_alive());
 
             try {
@@ -374,7 +356,7 @@ namespace
         });
     } // handle_read_op
 
-    auto handle_write_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_write_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -529,7 +511,7 @@ namespace
         });
     } // handle_write_op
 
-    auto handle_parallel_write_init_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_parallel_write_init_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -553,14 +535,6 @@ namespace
                     log::error("{}: Missing [lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
-
-                // TODO
-                // 1. Create a parallel transfer context (PTC).
-                // 2. Open one iRODS connection per stream and store in the PTC.
-                // 3. Generate a transfer handle and associate it with the Bearer/Access token and PTC.
-                // 4. Return transfer handle to client.
-                //
-                // The client is now free to call the write operation as much as they want.
 
                 const auto stream_count_iter = _args.find("stream-count");
                 if (stream_count_iter == std::end(_args)) {
@@ -640,7 +614,6 @@ namespace
                 }.dump();
             }
             catch (const fs::filesystem_error& e) {
-                // TODO Close all open streams!
                 res.result(http::status::bad_request);
                 res.body() = json{
                     {"irods_response", {
@@ -650,7 +623,6 @@ namespace
                 }.dump();
             }
             catch (const irods::exception& e) {
-                // TODO Close all open streams!
                 res.result(http::status::bad_request);
                 res.body() = json{
                     {"irods_response", {
@@ -660,7 +632,6 @@ namespace
                 }.dump();
             }
             catch (const std::exception& e) {
-                // TODO Close all open streams!
                 res.result(http::status::internal_server_error);
             }
 
@@ -670,7 +641,7 @@ namespace
         });
     } // handle_parallel_write_init_op
 
-    auto handle_parallel_write_shutdown_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_parallel_write_shutdown_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -689,7 +660,6 @@ namespace
             res.keep_alive(_req.keep_alive());
 
             try {
-                // TODO
                 // 1. Verify transfer handle and lookup PTC.
                 // 2. Close all streams in reverse order.
                 // 3. Disassociate the transfer handle and PTC.
@@ -764,7 +734,7 @@ namespace
         });
     } // handle_parallel_write_shutdown_op
 
-    auto handle_replicate_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_replicate_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -834,7 +804,7 @@ namespace
         _sess_ptr->send(std::move(res));
     } // handle_replicate_op
 
-    auto handle_trim_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_trim_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -920,7 +890,7 @@ namespace
         _sess_ptr->send(std::move(res));
     } // handle_trim_op
 
-    auto handle_set_permission_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_set_permission_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1011,7 +981,7 @@ namespace
         _sess_ptr->send(std::move(res));
     } // handle_set_permission_op
 
-    auto handle_stat_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_stat_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1061,10 +1031,6 @@ namespace
                 }},
                 {"type", irods::to_object_type_string(status.type())},
                 {"permissions", perms},
-                // TODO Should these be returned upon request?
-                // What should be included under replicas? Data ID, physical path, replica status, replica number? What else?
-                {"replicas", json::array_t{}},
-                // TODO Notice these require additional network calls. Could be avoided by using GenQuery, perhaps.
                 {"size", fs::client::data_object_size(conn, lpath_iter->second)},
                 {"checksum", fs::client::data_object_checksum(conn, lpath_iter->second)},
                 {"registered", fs::client::is_data_object_registered(conn, lpath_iter->second)},
@@ -1100,7 +1066,7 @@ namespace
 
     auto handle_register_op(irods::http::session_pointer_type _sess_ptr,
                             irods::http::request_type& _req,
-                            query_arguments_type& _args) -> void
+                            irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1196,50 +1162,7 @@ namespace
         _sess_ptr->send(std::move(res));
     } // handle_register_op
 
-    // TODO Perhaps this isn't needed because they have "trim" and "remove".
-    auto handle_unregister_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
-    {
-#if 0
-        auto result = irods::http::resolve_client_identity(_req);
-        if (result.response) {
-            return _sess_ptr->send(std::move(*result.response));
-        }
-
-        const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
-
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
-
-        try {
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        _sess_ptr->send(std::move(res));
-#else
-        (void) _req;
-        (void) _args;
-        log::error("{}: Operation not implemented.", __func__);
-        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
-#endif
-    } // handle_unregister_op
-
-    auto handle_remove_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_remove_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1273,7 +1196,6 @@ namespace
 
             fs::extended_remove_options opts{};
 
-            // TODO use-trash? force?
             if (const auto iter = _args.find("no-trash"); iter != std::end(_args) && iter->second == "1") {
                 opts.no_trash = true;
             }
@@ -1312,7 +1234,7 @@ namespace
         _sess_ptr->send(std::move(res));
     } // handle_remove_op
 
-    auto handle_rename_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_rename_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1385,7 +1307,7 @@ namespace
         _sess_ptr->send(std::move(res));
     } // handle_rename_op
 
-    auto handle_copy_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_copy_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1407,31 +1329,44 @@ namespace
                 return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
-            auto conn = irods::get_connection(client_info->username);
-
-            if (!fs::client::is_data_object(conn, src_lpath_iter->second)) {
-                return _sess_ptr->send(irods::http::fail(res, http::status::bad_request, json{
-                    {"irods_response", {
-                        {"error_code", NOT_A_DATA_OBJECT}
-                    }}
-                }.dump()));
-            }
-
             const auto dst_lpath_iter = _args.find("dst-lpath");
             if (dst_lpath_iter == std::end(_args)) {
                 log::error("{}: Missing [dst-lpath] parameter.", __func__);
                 return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
             }
 
-            //fs::copy_options opts; // TODO
+            fs::copy_options opts = fs::copy_options::none;
 
-            fs::client::copy_data_object(conn, src_lpath_iter->second, dst_lpath_iter->second); // TODO Returns a bool. Should it be checked?
+            if (const auto iter = _args.find("option"); iter != std::end(_args)) {
+                if (iter->second == "skip_existing") {
+                    opts = fs::copy_options::skip_existing;
+                }
+                else if (iter->second == "overwrite_existing") {
+                    opts = fs::copy_options::overwrite_existing;
+                }
+                else if (iter->second == "update_existing") {
+                    opts = fs::copy_options::update_existing;
+                }
+                else if (iter->second != "none") {
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+            }
+
+            auto conn = irods::get_connection(client_info->username);
+            const auto copied = fs::client::copy_data_object(conn, src_lpath_iter->second, dst_lpath_iter->second, opts);
+
+            res.body() = json{
+                {"irods_response", {
+                    {"error_code", 0}
+                }},
+                {"copied", copied}
+            }.dump();
         }
         catch (const fs::filesystem_error& e) {
             res.result(http::status::bad_request);
             res.body() = json{
                 {"irods_response", {
-                    {"error_code", e.code().value()},
+                    {"error_code", e.code().value() == INVALID_OBJECT_TYPE ? NOT_A_DATA_OBJECT : e.code().value()},
                     {"error_message", e.what()}
                 }}
             }.dump();
@@ -1454,7 +1389,7 @@ namespace
         _sess_ptr->send(std::move(res));
     } // handle_copy_op
 
-    auto handle_touch_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_touch_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {

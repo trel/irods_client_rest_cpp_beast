@@ -14,7 +14,6 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
-//#include <boost/asio/ip/tcp.hpp> // TODO Remove
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
 
@@ -30,8 +29,6 @@ namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
 namespace net   = boost::asio;      // from <boost/asio.hpp>
 
-//using tcp = boost::asio::ip::tcp;   // from <boost/asio/ip/tcp.hpp> // TODO Remove
-
 namespace log = irods::http::log;
 
 using json = nlohmann::json;
@@ -39,21 +36,18 @@ using json = nlohmann::json;
 
 namespace
 {
-    // clang-format off
-    using query_arguments_type = decltype(irods::http::url::query); // TODO Could be moved to common.hpp
-    using handler_type         = void(*)(irods::http::session_pointer_type, irods::http::request_type&, query_arguments_type&);
-    // clang-format on
+    using handler_type = void(*)(irods::http::session_pointer_type, irods::http::request_type&, irods::http::query_arguments_type&);
 
     //
     // Handler function prototypes
     //
 
-    auto handle_execute_genquery_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_execute_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_list_genquery_columns_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_list_specific_queries_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_add_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
-    auto handle_remove_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void;
+    auto handle_execute_genquery_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_execute_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_list_genquery_columns_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_list_specific_queries_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_add_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    auto handle_remove_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
 
     //
     // Operation to Handler mappings
@@ -74,7 +68,6 @@ namespace
 
 namespace irods::http::handler
 {
-    // Handles all requests sent to /query.
     auto query(session_pointer_type _sess_ptr, request_type& _req) -> void
     {
         if (_req.method() == verb_type::get) {
@@ -120,7 +113,7 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_execute_genquery_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_execute_genquery_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -147,31 +140,30 @@ namespace
             parser = parser_iter->second;
         }
 
-        const auto to_int = [fn = __func__](const std::string& _v) {
-            try {
-                return std::stoi(_v);
-            }
-            catch (const std::exception& e) {
-                log::error("{}: Error: {}", fn, e.what());
-                return -1;
-            }
-        };
-
         int offset = 0;
         if (const auto iter = _args.find("offset"); iter != std::end(_args)) {
-            offset = to_int(iter->second);
+            try {
+                offset = std::stoi(iter->second);
+            }
+            catch (const std::exception& e) {
+                log::error("{}: Could not convert [offset] parameter value into an integer. ", __func__);
+                return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+            }
         }
         offset = std::max(0, offset);
 
-        int count = 32; // TODO Configurable?
+        const auto max_row_count = irods::http::globals::config->at(json::json_pointer{"/irods_client/max_number_of_rows_per_catalog_query"}).get<int>();
+        int count = 0;
         if (const auto iter = _args.find("count"); iter != std::end(_args)) {
-            count = to_int(iter->second);
+            try {
+                count = std::stoi(iter->second);
+            }
+            catch (const std::exception& e) {
+                log::error("{}: Could not convert [count] parameter value into an integer. ", __func__);
+                return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+            }
         }
-        count = std::clamp(count, 1, 32);
-
-        // TODO GenQuery2 is definitely the right answer for this simply because of
-        // pagination features such as OFFSET and LIMIT. We can make that a runtime
-        // configuration option.
+        count = std::clamp(count, 1, max_row_count);
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -190,7 +182,7 @@ namespace
                         char* sql{};
 
                         const auto ec = procApiRequest(static_cast<RcComm*>(conn),
-                                                       1'000'001, // TODO GenQuery2 API number. Need a better way to get this.
+                                                       1'000'001,
                                                        gql.c_str(),
                                                        nullptr,
                                                        reinterpret_cast<void**>(&sql),
@@ -261,7 +253,7 @@ namespace
         });
     } // handle_execute_genquery_op
 
-    auto handle_execute_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_execute_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -277,28 +269,30 @@ namespace
             return _sess_ptr->send(irods::http::fail(http::status::bad_request));
         }
 
-        // TODO This should lead to an error if _v is bad. Progress should be stopped.
-        const auto to_int = [fn = __func__](const std::string& _v) {
-            try {
-                return std::stoi(_v);
-            }
-            catch (const std::exception& e) {
-                log::error("{}: Error: {}", fn, e.what());
-                return -1;
-            }
-        };
-
         int offset = 0;
         if (const auto iter = _args.find("offset"); iter != std::end(_args)) {
-            offset = to_int(iter->second);
+            try {
+                offset = std::stoi(iter->second);
+            }
+            catch (const std::exception& e) {
+                log::error("{}: Could not convert [offset] parameter value into an integer. ", __func__);
+                return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+            }
         }
         offset = std::max(0, offset);
 
-        int count = 32; // TODO Configurable?
+        const auto max_row_count = irods::http::globals::config->at(json::json_pointer{"/irods_client/max_number_of_rows_per_catalog_query"}).get<int>();
+        int count = max_row_count;
         if (const auto iter = _args.find("count"); iter != std::end(_args)) {
-            count = to_int(iter->second);
+            try {
+                count = std::stoi(iter->second);
+            }
+            catch (const std::exception& e) {
+                log::error("{}: Could not convert [count] parameter value into an integer. ", __func__);
+                return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+            }
         }
-        count = std::clamp(count, 1, 32);
+        count = std::clamp(count, 1, max_row_count);
 
         std::vector<std::string> args;
 
@@ -310,10 +304,6 @@ namespace
                 boost::split(args, iter->second, boost::is_any_of(","));
             }
         }
-
-        // TODO GenQuery2 is definitely the right answer for this simply because of
-        // pagination features such as OFFSET and LIMIT. We can make that a runtime
-        // configuration option.
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -384,7 +374,7 @@ namespace
         });
     } // handle_execute_genquery_op
 
-    auto handle_list_genquery_columns_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_list_genquery_columns_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         (void) _req;
         (void) _args;
@@ -392,7 +382,7 @@ namespace
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_list_genquery_columns_op
 
-    auto handle_list_specific_queries_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_list_specific_queries_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         (void) _req;
         (void) _args;
@@ -400,7 +390,7 @@ namespace
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_list_specific_queries_op
 
-    auto handle_add_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_add_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         (void) _req;
         (void) _args;
@@ -408,7 +398,7 @@ namespace
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_add_specific_query_op
 
-    auto handle_remove_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, query_arguments_type& _args) -> void
+    auto handle_remove_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
     {
         (void) _req;
         (void) _args;

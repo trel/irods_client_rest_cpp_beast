@@ -12,7 +12,6 @@
 
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
-//#include <boost/beast/http.hpp>
 
 #include <string>
 
@@ -33,40 +32,44 @@ namespace irods::http::handler
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        const auto url = irods::http::parse_url(_req);
+        boost::asio::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        const auto op_iter = url.query.find("op");
-        if (op_iter == std::end(url.query)) {
-            log::error("{}: Missing [op] parameter.", __func__);
-            return _sess_ptr->send(irods::http::fail(status_type::bad_request));
-        }
+            const auto url = irods::http::parse_url(_req);
 
-        if (op_iter->second != "report") {
-            log::error("{}: Invalid [op] value.", __func__);
-            return _sess_ptr->send(irods::http::fail(status_type::bad_request));
-        }
-
-        BytesBuf* bbuf{};
-        irods::at_scope_exit free_bbuf{[&bbuf] { freeBBuf(bbuf); }};
-
-        {
-            auto conn = irods::get_connection(client_info->username);
-
-            if (const auto ec = rcZoneReport(static_cast<RcComm*>(conn), &bbuf); ec != 0) {
-                log::error("{}: rcZoneReport error: [{}]", __func__, ec);
+            const auto op_iter = url.query.find("op");
+            if (op_iter == std::end(url.query)) {
+                log::error("{}: Missing [op] parameter.", fn);
                 return _sess_ptr->send(irods::http::fail(status_type::bad_request));
             }
-        }
 
-        response_type res{status_type::ok, _req.version()};
-        res.set(field_type::server, BOOST_BEAST_VERSION_STRING);
-        res.set(field_type::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
-        res.body() = std::string_view(static_cast<char*>(bbuf->buf), bbuf->len);
-        res.prepare_payload();
+            if (op_iter->second != "report") {
+                log::error("{}: Invalid [op] value.", fn);
+                return _sess_ptr->send(irods::http::fail(status_type::bad_request));
+            }
 
-        return _sess_ptr->send(std::move(res));
+            BytesBuf* bbuf{};
+            irods::at_scope_exit free_bbuf{[&bbuf] { freeBBuf(bbuf); }};
+
+            {
+                auto conn = irods::get_connection(client_info->username);
+
+                if (const auto ec = rcZoneReport(static_cast<RcComm*>(conn), &bbuf); ec != 0) {
+                    log::error("{}: rcZoneReport error: [{}]", fn, ec);
+                    return _sess_ptr->send(irods::http::fail(status_type::bad_request));
+                }
+            }
+
+            response_type res{status_type::ok, _req.version()};
+            res.set(field_type::server, BOOST_BEAST_VERSION_STRING);
+            res.set(field_type::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
+            res.body() = std::string_view(static_cast<char*>(bbuf->buf), bbuf->len);
+            res.prepare_payload();
+
+            return _sess_ptr->send(std::move(res));
+        });
     } // zones
 } // namespace irods::http::endpoint

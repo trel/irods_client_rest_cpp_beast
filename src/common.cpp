@@ -4,6 +4,7 @@
 #include "log.hpp"
 #include "version.hpp"
 
+#include <irods/irods_exception.hpp>
 #include <irods/process_stash.hpp>
 #include <irods/rodsErrorTable.h>
 #include <irods/switch_user.h>
@@ -128,14 +129,14 @@ namespace irods::http
         std::unique_ptr<CURLU, void(*)(CURLU*)> curl{curl_url(), curl_url_cleanup};
 
         if (!curl) {
-            // TODO Report internal server error.
-            log::error("{}: Could not initialize libcurl.", __func__);
+            log::error("{}: Could not initialize CURLU handle.", __func__);
+            THROW(SYS_LIBRARY_ERROR, "curl_url error.");
         }
 
         // Include a bogus prefix. We only care about the path and query parts of the URL.
         if (const auto ec = curl_url_set(curl.get(), CURLUPART_URL, _url.c_str(), 0); ec) {
-            // TODO Report error.
             log::error("{}: curl_url_set error: {}", __func__, ec);
+            THROW(SYS_LIBRARY_ERROR, "curl_url_set(CURLUPART_URL) error.");
         }
 
         url url;
@@ -152,8 +153,8 @@ namespace irods::http
             }
         }
         else {
-            // TODO Report error.
             log::error("{}: curl_url_get(CURLUPART_PATH) error: {}", __func__, ec);
+            THROW(SYS_LIBRARY_ERROR, "curl_url_get(CURLUPART_PATH) error.");
         }
 
         // Extract the query.
@@ -168,8 +169,8 @@ namespace irods::http
             }
         }
         else {
-            // TODO
             log::error("{}: curl_url_get(CURLUPART_QUERY) error: {}", __func__, ec);
+            THROW(SYS_LIBRARY_ERROR, "curl_url_get(CURLUPART_QUERY) error.");
         }
 
         return url;
@@ -315,7 +316,7 @@ namespace irods
 
         if (const auto ec = rc_switch_user(static_cast<RcComm*>(conn), _username.c_str(), zone.c_str()); ec != 0) {
             irods::http::log::error("{}: rc_switch_user error: {}", __func__, ec);
-            THROW(SYS_INTERNAL_ERR, "");
+            THROW(SYS_INTERNAL_ERR, "rc_switch_user error.");
         }
 
         log::trace("{}: Successfully changed identity associated with connection to [{}].", __func__, _username);
