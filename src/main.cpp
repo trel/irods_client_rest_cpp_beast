@@ -130,12 +130,13 @@ class listener : public std::enable_shared_from_this<listener>
     {
         if (ec) {
             irods::fail(ec, "accept");
-            return; // To avoid infinite loop
+            //return; // To avoid infinite loop
         }
-
-        // Create the session and run it
-        std::make_shared<irods::http::session>(
-            std::move(socket), req_handlers, max_rbuffer_size_, timeout_in_secs_)->run();
+        else {
+            // Create the session and run it
+            std::make_shared<irods::http::session>(
+                std::move(socket), req_handlers, max_rbuffer_size_, timeout_in_secs_)->run();
+        }
 
         // Accept another connection
         do_accept();
@@ -151,7 +152,8 @@ auto print_version_info() -> void
 {
     namespace version = irods::http::version;
     const std::string_view sha = version::sha;
-    fmt::print("{} v{}-{}\n", version::binary_name, version::api_version, sha.substr(0, 7));
+    constexpr auto sha_size = 7;
+    fmt::print("{} v{}-{}\n", version::binary_name, version::api_version, sha.substr(0, sha_size));
 } // print_version_info
 
 auto print_usage() -> void
@@ -309,7 +311,7 @@ auto main(int _argc, char* _argv[]) -> int
         for (auto i = request_thread_count - 1; i > 0; --i) {
             net::post(request_handler_threads, [&ioc] { ioc.run(); });
         }
-        log::trace("Server is ready.");
+        log::info("Server is ready.");
         ioc.run();
 
         request_handler_threads.stop();
