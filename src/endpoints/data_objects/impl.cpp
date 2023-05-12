@@ -405,15 +405,30 @@ namespace
                     // We've found a matching handle!
                     //
 
-                    auto* pw_stream = iter->second.find_available_parallel_write_stream();
-                    if (!pw_stream) {
-                        log::error("{}: Parallel write streams are busy. Client must wait for one to become available.", fn);
-                        return _sess_ptr->send(irods::http::fail(res, http::status::too_many_requests));
+                    if (const auto stream_index_iter = _args.find("stream-index"); stream_index_iter != std::end(_args)) {
+                        log::debug("{}: Client selected [{}] for [stream-index] parameter.", fn, stream_index_iter->second);
+
+                        try {
+                            const auto sindex = std::stoi(stream_index_iter->second);
+                            out_ptr = &iter->second.streams.at(sindex)->stream();
+                        }
+                        catch (const std::exception& e) {
+                            log::error("{}: Invalid argument for [stream-index] parameter.");
+                            return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                        }
+                    }
+                    else {
+                        auto* pw_stream = iter->second.find_available_parallel_write_stream();
+                        if (!pw_stream) {
+                            log::error("{}: Parallel write streams are busy. Client must wait for one to become available.", fn);
+                            return _sess_ptr->send(irods::http::fail(res, http::status::too_many_requests));
+                        }
+
+                        mark_pw_stream_as_usable = std::make_unique<at_scope_exit_type>([pw_stream] { pw_stream->in_use(false); });
+
+                        out_ptr = &pw_stream->stream();
                     }
 
-                    mark_pw_stream_as_usable = std::make_unique<at_scope_exit_type>([pw_stream] { pw_stream->in_use(false); });
-
-                    out_ptr = &pw_stream->stream();
                     log::debug("{}: (write) Parallel Write - stream memory address = [{}].", fn, fmt::ptr(out_ptr));
                 }
                 else {
@@ -462,7 +477,8 @@ namespace
                 }
                 const auto count = std::stoll(iter->second);
 
-                if (count > irods::http::globals::config->at(json::json_pointer{"/irods_client/max_wbuffer_size_in_bytes"}).get<std::int64_t>()) {
+                static const auto max_wbuffer_size = irods::http::globals::config->at(json::json_pointer{"/irods_client/max_wbuffer_size_in_bytes"}).get<std::int64_t>();
+                if (count > max_wbuffer_size) {
                     log::error("{}: Argument for [count] parameter exceeds [/irods_client/wbuffer_size_in_bytes].", fn);
                     res.result(http::status::bad_request);
                     res.prepare_payload();
@@ -475,6 +491,7 @@ namespace
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
+                log::debug("{}: Write buffer: size=[{}], count=[{}].", fn, iter->second.size(), count);
                 out_ptr->write(iter->second.data(), count);
 
                 res.body() = json{
