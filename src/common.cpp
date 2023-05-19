@@ -19,6 +19,7 @@
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include <string>
 
 namespace irods::http
 {
@@ -65,7 +66,20 @@ namespace irods::http
         return result;
     } // decode
 
-    // TODO Create a better name.
+	auto encode(std::string_view _to_encode) -> std::string
+	{
+		char* tmp_encoded_data{curl_easy_escape(nullptr, _to_encode.data(), _to_encode.size())};
+		if (tmp_encoded_data == nullptr) {
+			return {std::cbegin(_to_encode), std::cend(_to_encode)};
+		}
+
+		std::string encoded_data{tmp_encoded_data};
+
+		curl_free(tmp_encoded_data);
+		return encoded_data;
+	} // encode
+
+	// TODO Create a better name.
     auto to_argument_list(const std::string_view _urlencoded_string) -> std::unordered_map<std::string, std::string>
     {
         if (_urlencoded_string.empty()) {
