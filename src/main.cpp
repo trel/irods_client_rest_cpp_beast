@@ -5,6 +5,7 @@
 #include "session.hpp"
 #include "version.hpp"
 
+#include <boost/beast/core/flat_buffer.hpp>
 #include <irods/connection_pool.hpp>
 #include <irods/rcConnect.h>
 #include <irods/rcMisc.h>
@@ -261,6 +262,56 @@ auto main(int _argc, char* _argv[]) -> int
         set_log_level(http_server_config);
         spdlog::set_pattern("[%Y-%m-%d %T.%e] [P:%P] [%^%l%$] [T:%t] %v");
 
+        // Confirm OIDC endpoint is valid (Assume all provide endpoint)
+        log::trace("Verifing OIDC endpoint configuration");
+
+        // Scope as we're likely going to move this part out into a sep func...
+        try {
+            const auto oidc_config{http_server_config.at(json::json_pointer{"/authentication/oidc"})};
+            // Consider reusing context further down main?
+            net::io_context io_ctx;
+            net::ip::tcp::resolver tcp_res{io_ctx};
+            beast::tcp_stream tcp_stream{io_ctx};
+
+            // Load config
+            const auto host{oidc_config.at("config_host").get<const std::string>()};
+            const auto port{oidc_config.at("port").get<const std::string>()};
+            const auto uri{oidc_config.at("uri").get<const std::string>()};
+
+            // Resolve addr
+            const auto resolve{tcp_res.resolve(host, port)};
+
+            // Connect and get config
+            tcp_stream.connect(resolve);
+
+            // Build Request
+            constexpr auto version_number{10};
+            beast::http::request<beast::http::string_body> req{beast::http::verb::get, uri, version_number};
+            req.set(beast::http::field::host, host);
+            req.set(beast::http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+            // Send request
+            beast::http::write(tcp_stream, req);
+
+            // Read back req
+            beast::flat_buffer buffer;
+            beast::http::response<beast::http::string_body> res;
+            beast::http::read(tcp_stream, buffer, res);
+
+            // TODO: Check resposnse code...
+            
+            // Convert http json response to nlomman json response
+            const auto oidc_endpoints{json::parse(res.body())};
+
+            // Close teh socket
+            beast::error_code ec;
+            tcp_stream.socket().shutdown(net::ip::tcp::socket::shutdown_both, ec);
+        } catch (const json::out_of_range& e) {
+            auto msg{fmt::format("Invalid OIDC configuration, ignoring. Reason: {}", e.what())};
+            log::trace(msg);
+        }
+            
+
         // TODO For LONG running tasks, see the following:
         //
         //   - https://stackoverflow.com/questions/17648725/long-running-blocking-operations-in-boost-asio-handlers
@@ -273,7 +324,7 @@ auto main(int _argc, char* _argv[]) -> int
         const auto address = net::ip::make_address(http_server_config.at("host").get_ref<const std::string&>());
         const auto port = http_server_config.at("port").get<std::uint16_t>();
         const auto request_thread_count = std::max(http_server_config.at(json::json_pointer{"/requests/threads"}).get<int>(), 1);
-
+        
         log::trace("Initializing iRODS connection pool.");
         auto conn_pool = init_irods_connection_pool(config);
         irods::http::globals::conn_pool = &conn_pool;
