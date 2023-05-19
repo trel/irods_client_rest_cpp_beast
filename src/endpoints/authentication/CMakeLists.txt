@@ -26,4 +26,5 @@ target_link_libraries(
   ${IRODS_HTTP_ENDPOINT}
   PRIVATE
   CURL::libcurl
+  jwt-cpp::jwt-cpp
   nlohmann_json::nlohmann_json)
