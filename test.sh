@@ -14,6 +14,31 @@ curl_opts='-s'
 #   - https://curl.se/docs/manual.html
 #
 
+# The following function demonstrates how to perform a multipart/form-data POST request.
+# This is required for parallel write operations.
+test_multpart_form_data_via_parallel_write_op()
+{
+    #curl -F 'bytes=KORY;type=application/octect-stream' -F 'key1=value1' -F 'key2=@testfile.txt;type=application/octet-stream' --trace-ascii curl_request_output.txt -s http://localhost:10000 > /dev/null
+
+    pw_handle=$(curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        --data-urlencode 'op=parallel_write_init' \
+        --data-urlencode "lpath=/tempZone/home/kory/mpu.txt" \
+        --data-urlencode 'stream-count=1' \
+        $curl_opts | jq -r .parallel_write_handle)
+    echo "Parallel Write Handle = [${pw_handle}]."
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        -F "parallel-write-handle=$pw_handle" \
+        -F 'op=write' \
+        -F 'count=6' \
+        -F 'bytes=hello;type=application/octet-stream' \
+        $curl_opts | jq
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        --data-urlencode 'op=parallel_write_shutdown' \
+        --data-urlencode "parallel-write-handle=$pw_handle" \
+        $curl_opts | jq
+    exit
+}
+
 #
 # /info
 #

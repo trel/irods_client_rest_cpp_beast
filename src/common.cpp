@@ -61,7 +61,7 @@ namespace irods::http
     } // decode
 
     // TODO Create a better name.
-    auto to_argument_list(const std::string_view& _urlencoded_string) -> std::unordered_map<std::string, std::string>
+    auto to_argument_list(const std::string_view _urlencoded_string) -> std::unordered_map<std::string, std::string>
     {
         if (_urlencoded_string.empty()) {
             return {};
@@ -78,7 +78,9 @@ namespace irods::http
             boost::split(kvp, t, boost::is_any_of("="));
 
             if (kvp.size() == 2) {
-                kvps.insert_or_assign(std::move(kvp[0]), decode(kvp[1]));
+                auto value = decode(kvp[1]);
+                boost::replace_all(value, "+", " ");
+                kvps.insert_or_assign(std::move(kvp[0]), value);
             }
             else if (kvp.size() == 1) {
                 kvps.insert_or_assign(std::move(kvp[0]), "");
