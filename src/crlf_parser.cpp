@@ -60,7 +60,7 @@ namespace irods::http
         while (true) {
             // Find boundary.
             while (p.next_crlf()) {
-                log::trace("LINE => {}", p.data());
+                //log::trace("LINE => {}", p.data());
 
                 if (p.data().starts_with(boundary_end)) {
                     found_boundary_end = true;
@@ -76,6 +76,8 @@ namespace irods::http
                 log::trace("END OF REQUEST");
                 break;
             }
+
+            std::int64_t content_length = -1;
 
             // Read headers.
             // Content-Disposition is a required header. It defines the name of the parameter.
@@ -101,6 +103,14 @@ namespace irods::http
                         }
                     }
                 }
+                else if (boost::istarts_with(p.data(), "content-length:")) {
+                    const auto slen = std::string{p.data().substr(std::strlen("content-length:"))};
+                    try {
+                        content_length = std::stoll(slen);
+                        log::debug("CONTENT LENGTH = [{}]", content_length);
+                    }
+                    catch (...) {}
+                }
                 else if (boost::istarts_with(p.data(), "content-type:")) {
                     if (!boost::icontains(p.data().substr(std::strlen("content-type:")), "application/octet-stream")) {
                         log::trace("INVALID CONTENT-TYPE");
@@ -111,9 +121,10 @@ namespace irods::http
             }
 
             // Read content.
-            p.next_crlf();
+            p.next_crlf(content_length);
+            log::debug("{}: CAPTURED CONTENT SIZE = [{}]", __func__, p.data().size());
             args.insert_or_assign(param_name, std::string{p.data()});
-            log::trace("CONTENT => [{}]", p.data());
+            //log::trace("CONTENT => [{}]", p.data());
             log::trace("END OF CONTENT");
         }
 

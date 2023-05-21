@@ -222,8 +222,6 @@ namespace irods::http::handler
         }
 
         if (_req.method() == verb_type::post) {
-            log::debug("{}: Request body => [{}]", __func__, _req.body());
-
             query_arguments_type args;
 
             if (auto content_type = _req.base()["content-type"]; boost::istarts_with(content_type, "multipart/form-data")) {
@@ -236,12 +234,19 @@ namespace irods::http::handler
 
                 args = irods::http::parse_multipart_form_data(*boundary, _req.body());
             }
+#if 0
             else if (boost::istarts_with(content_type, "application/x-www-form-urlencoded")) {
                 args = irods::http::to_argument_list(_req.body());
             }
             else {
                 log::error("{}: Invalid value for [Content-Type] header.", __func__);
+                return _sess_ptr->send(irods::http::fail(status_type::bad_request));
             }
+#else
+            else {
+                args = irods::http::to_argument_list(_req.body());
+            }
+#endif
 
             const auto op_iter = args.find("op");
             if (op_iter == std::end(args)) {

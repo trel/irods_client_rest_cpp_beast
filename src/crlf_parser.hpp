@@ -16,14 +16,21 @@ namespace irods::http
         {
         }
 
-        auto next_crlf() -> bool
+        auto next_crlf(std::int64_t _count = -1) -> bool
         {
             if (spos_ == 0 && epos_ == 0) {
                 epos_ = data_.find("\r\n");
             }
             else if (epos_ != std::string_view::npos) {
+                // TODO +2 can lead to wrapping if epos_ is unsigned.
                 spos_ = std::clamp(epos_ + 2, epos_, std::string_view::npos); // Skip CRLF.
-                epos_ = data_.find("\r\n", spos_);
+
+                if (_count > -1) {
+                    epos_ = spos_ + _count;
+                }
+                else {
+                    epos_ = data_.find("\r\n", spos_);
+                }
             }
 
             return std::string_view::npos != epos_;
