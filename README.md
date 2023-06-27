@@ -34,4 +34,4 @@ To stop the server, you can use **CTRL-C** or send **SIGINT** or **SIGTERM** to 
 
 ## Documentation
 
-Documentation can be found in the [wiki](https://github.com/korydraughn/irods_client_rest_cpp_beast/wiki).
+Documentation can be found in the [wiki](https://github.com/irods/irods_client_http_api/wiki).
