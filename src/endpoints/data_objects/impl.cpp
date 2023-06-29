@@ -69,10 +69,8 @@ namespace
             conn_.connect(irods::experimental::defer_authentication,
                           client.at("host").get_ref<const std::string&>(),
                           client.at("port").get<int>(),
-                          rodsadmin.at("username").get_ref<const std::string&>(),
-                          zone,
-                          _client_username,
-                          zone);
+                          {rodsadmin.at("username").get_ref<const std::string&>(), zone},
+                          {_client_username, zone});
 
             auto password = rodsadmin.at("password").get<std::string>();
 

@@ -87,7 +87,7 @@ namespace irods::http::handler
                 const auto& zone = svr.at("zone").get_ref<const std::string&>();
 
                 irods::experimental::client_connection conn{
-                    irods::experimental::defer_authentication, host, port, username, zone};
+                    irods::experimental::defer_authentication, host, port, {username, zone}};
 
                 login_successful = (clientLoginWithPassword(static_cast<RcComm*>(conn), password.data()) == 0);
             }

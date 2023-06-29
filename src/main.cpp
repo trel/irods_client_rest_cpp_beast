@@ -210,10 +210,8 @@ auto init_irods_connection_pool(const json& _config) -> irods::connection_pool
         conn_pool.at("size").get<int>(),
         client.at("host").get_ref<const std::string&>(),
         client.at("port").get<int>(),
-        username,
-        zone,
-        username,
-        zone,
+        {{username, zone}},
+        {username, zone},
         conn_pool.at("refresh_timeout_in_seconds").get<int>(),
         [pw = rodsadmin.at("password").get<std::string>()](RcComm& _comm) mutable {
             if (const auto ec = clientLoginWithPassword(&_comm, pw.data()); ec != 0) {
