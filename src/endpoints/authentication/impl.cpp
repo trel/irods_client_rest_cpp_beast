@@ -4,6 +4,7 @@
 #include "globals.hpp"
 #include "log.hpp"
 #include "session.hpp"
+#include "version.hpp"
 
 #include <irods/base64.hpp>
 #include <irods/client_connection.hpp>
@@ -109,7 +110,7 @@ namespace irods::http::handler
             });
 
             response_type res{status_type::ok, _req.version()};
-            res.set(field_type::server, BOOST_BEAST_VERSION_STRING);
+            res.set(field_type::server, irods::http::version::server_name);
             res.set(field_type::content_type, "text/plain");
             res.keep_alive(_req.keep_alive());
             res.body() = std::move(bearer_token);
