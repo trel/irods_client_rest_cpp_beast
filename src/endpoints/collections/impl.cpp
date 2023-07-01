@@ -3,6 +3,7 @@
 #include "common.hpp"
 #include "log.hpp"
 #include "session.hpp"
+#include "version.hpp"
 
 #include <irods/client_connection.hpp>
 #include <irods/filesystem.hpp>
@@ -124,7 +125,7 @@ namespace
         log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::server, irods::http::version::server_name);
         res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
@@ -204,7 +205,7 @@ namespace
         log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::server, irods::http::version::server_name);
         res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
@@ -286,7 +287,7 @@ namespace
         log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::server, irods::http::version::server_name);
         res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
@@ -344,7 +345,7 @@ namespace
         log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::server, irods::http::version::server_name);
         res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
@@ -424,7 +425,7 @@ namespace
         log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::server, irods::http::version::server_name);
         res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
@@ -508,7 +509,7 @@ namespace
         log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::server, irods::http::version::server_name);
         res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 

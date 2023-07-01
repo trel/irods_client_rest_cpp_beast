@@ -4,6 +4,7 @@
 #include "globals.hpp"
 #include "log.hpp"
 #include "session.hpp"
+#include "version.hpp"
 
 #include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
@@ -64,7 +65,7 @@ namespace irods::http::handler
             }
 
             response_type res{status_type::ok, _req.version()};
-            res.set(field_type::server, BOOST_BEAST_VERSION_STRING);
+            res.set(field_type::server, irods::http::version::server_name);
             res.set(field_type::content_type, "application/json");
             res.keep_alive(_req.keep_alive());
             res.body() = std::string_view(static_cast<char*>(bbuf->buf), bbuf->len);
