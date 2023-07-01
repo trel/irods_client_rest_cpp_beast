@@ -5,7 +5,7 @@ irods_password="$2"
 
 set -x
 
-base_url='http://localhost:9000/irods-http/0.9.5'
+base_url='http://localhost:9000/irods-http-api/0.1.0'
 bearer_token=$(curl -X POST --user "${irods_username}:${irods_password}" -s "${base_url}/authenticate")
 curl_opts='-s'
 

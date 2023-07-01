@@ -9,7 +9,7 @@
 ab -A '<username>:<password>' -p <empty_file> -n <total_requests> -c <total_concurrent_requests> 'http://localhost:<port>/irods-http/0.9.5/authenticate'
 
 # To test other things, get a bearer token by running the following first.
-bearer_token=$(curl -s -X POST --user '<username>:<password>' 'http://localhost:<port>/irods-http/0.9.5/authenticate')
+bearer_token=$(curl -s -X POST --user '<username>:<password>' 'http://localhost:<port>/irods-http/0.1.0/authenticate')
 
 # Stat'ing a collection.
 ab -n <total_requests> -c <total_concurrent_requests> -H "Authorization: Bearer $bearer_token" 'http://localhost:<port>/irods-http/0.9.5/collections?op=stat&lpath=/tempZone/home/<username>'
