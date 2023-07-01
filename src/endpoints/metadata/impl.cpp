@@ -60,7 +60,7 @@ namespace
 
 namespace irods::http::handler
 {
-    auto metadata(session_pointer_type _sess_ptr, request_type& _req) -> void
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(metadata)
     {
 #if 0
         if (_req.method() == verb_type::get) {

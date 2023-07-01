@@ -201,7 +201,8 @@ namespace
 
 namespace irods::http::handler
 {
-    auto data_objects(session_pointer_type _sess_ptr, request_type& _req) -> void
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(data_objects)
     {
         if (_req.method() == verb_type::get) {
             auto url = irods::http::parse_url(_req);

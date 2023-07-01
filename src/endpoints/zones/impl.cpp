@@ -17,7 +17,8 @@
 
 namespace irods::http::handler
 {
-    auto zones(session_pointer_type _sess_ptr, request_type& _req) -> void
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(zones)
     {
         namespace log = irods::http::log;
 

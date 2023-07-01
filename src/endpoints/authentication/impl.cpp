@@ -26,7 +26,8 @@
 
 namespace irods::http::handler
 {
-    auto authentication(session_pointer_type _sess_ptr, request_type& _req) -> void
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(authentication)
     {
         if (_req.method() != boost::beast::http::verb::post) {
             return _sess_ptr->send(fail(status_type::method_not_allowed));

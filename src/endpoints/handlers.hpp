@@ -3,31 +3,38 @@
 
 #include "common.hpp"
 
+#ifndef IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE
+// Enables all endpoint function signatures for declarations and definitions to be
+// updated from one location.
+#  define IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(name) \
+    auto name(session_pointer_type _sess_ptr, request_type& _req) -> void
+#endif // IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE
+
 namespace irods::http::handler
 {
-    auto authentication(session_pointer_type _session_ptr, request_type& _request) -> void;
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(authentication);
 
-    auto collections(session_pointer_type _session_ptr, request_type& _request) -> void;
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(collections);
 
-    auto config(session_pointer_type _session_ptr, request_type& _request) -> void;
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(config);
 
-    auto data_objects(session_pointer_type _session_ptr, request_type& _request) -> void;
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(data_objects);
 
-    auto information(session_pointer_type _session_ptr, request_type& _request) -> void;
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(information);
 
-    auto metadata(session_pointer_type _session_ptr, request_type& _request) -> void;
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(metadata);
 
-    auto query(session_pointer_type _session_ptr, request_type& _request) -> void;
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(query);
 
-    auto resources(session_pointer_type _session_ptr, request_type& _request) -> void;
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(resources);
 
-    auto rules(session_pointer_type _session_ptr, request_type& _request) -> void;
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(rules);
 
-    auto tickets(session_pointer_type _session_ptr, request_type& _request) -> void;
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(tickets);
 
-    auto users_groups(session_pointer_type _session_ptr, request_type& _request) -> void;
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(users_groups);
 
-    auto zones(session_pointer_type _session_ptr, request_type& _request) -> void;
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(zones);
 } // namespace irods::http::handler
 
 #endif // IRODS_HTTP_API_HANDLERS_HPP
