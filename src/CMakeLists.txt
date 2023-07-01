@@ -1,6 +1,6 @@
 include(GetGitRevisionDescription)
 
-get_git_head_revision(IRODS_HTTP_GIT_REFSPEC IRODS_HTTP_GIT_SHA1)
+get_git_head_revision(IRODS_HTTP_API_GIT_REFSPEC IRODS_HTTP_API_GIT_SHA1)
 configure_file(
   ${CMAKE_SOURCE_DIR}/src/version.hpp.in
   ${CMAKE_BINARY_DIR}/src/version.hpp
@@ -8,7 +8,7 @@ configure_file(
 
 add_subdirectory(endpoints)
 
-set(EXECUTABLE_NAME ${IRODS_HTTP_BINARY_NAME})
+set(EXECUTABLE_NAME ${IRODS_HTTP_API_BINARY_NAME})
 
 add_executable(
   ${EXECUTABLE_NAME}
@@ -32,8 +32,8 @@ target_compile_definitions(
   # change log levels concurrently across threads.
   SPDLOG_NO_ATOMIC_LEVELS
   # Defines a macro which is used to construct the URL paths to individual
-  # endpoint handlers (e.g. /irods-http/1.0.0/collections).
-  IRODS_HTTP_API_BASE_URL="/irods-http/${IRODS_HTTP_API_VERSION}")
+  # endpoint handlers (e.g. /irods-http-api/0.1.0/collections).
+  IRODS_HTTP_API_BASE_URL="/irods-http-api/${IRODS_HTTP_API_VERSION}")
 
 target_include_directories(
   ${EXECUTABLE_NAME}
@@ -66,3 +66,5 @@ target_link_libraries(
   $<TARGET_OBJECTS:tickets>
   $<TARGET_OBJECTS:users_groups>
   $<TARGET_OBJECTS:zones>)
+
+install(TARGETS ${EXECUTABLE_NAME} DESTINATION usr/bin)
