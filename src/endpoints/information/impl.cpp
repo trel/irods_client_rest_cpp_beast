@@ -32,7 +32,6 @@ namespace irods::http::handler
         res.set(field_type::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
-        // TODO Consider including buffer sizes, timeouts, caps, etc.
         res.body() = json{
             {"api_version", irods::http::version::api_version},
             {"build", irods::http::version::sha},
