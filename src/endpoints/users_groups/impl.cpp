@@ -33,31 +33,34 @@ namespace log = irods::http::log;
 using json = nlohmann::json;
 // clang-format on
 
+#define IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(name) \
+    auto name(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
+
 namespace
 {
-    using handler_type = irods::http::response_type(*)(irods::http::request_type& _req, irods::http::query_arguments_type& _args);
+    using handler_type = void(*)(irods::http::session_pointer_type, irods::http::request_type&, irods::http::query_arguments_type&);
 
     //
     // Handler function prototypes
     //
 
-    auto handle_create_user_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_user_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_set_password_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_set_user_type_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_add_user_auth_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_user_auth_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_user_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_user_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_password_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_user_type_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_user_auth_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_user_auth_op);
 
-    auto handle_create_group_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_group_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_add_to_group_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_from_group_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_group_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_group_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_to_group_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_from_group_op);
 
-    auto handle_users_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_groups_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_members_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_is_member_of_group_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_stat_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_users_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_groups_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_members_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_is_member_of_group_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op);
 
     //
     // Operation to Handler mappings
@@ -100,7 +103,7 @@ namespace irods::http::handler
             }
 
             if (const auto iter = handlers_for_get.find(op_iter->second); iter != std::end(handlers_for_get)) {
-                return _sess_ptr->send((iter->second)(_req, url.query));
+                return (iter->second)(_sess_ptr, _req, url.query);
             }
 
             return _sess_ptr->send(fail(status_type::bad_request));
@@ -116,7 +119,7 @@ namespace irods::http::handler
             }
 
             if (const auto iter = handlers_for_post.find(op_iter->second); iter != std::end(handlers_for_post)) {
-                return _sess_ptr->send((iter->second)(_req, args));
+                return (iter->second)(_sess_ptr, _req, args);
             }
 
             return _sess_ptr->send(fail(status_type::bad_request));
@@ -133,805 +136,865 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_create_user_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_user_op)
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-            const auto name_iter = _args.find("name");
-            if (name_iter == std::end(_args)) {
-                log::error("{}: Missing [name] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
-            }
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-            const auto zone_iter = _args.find("zone");
-            if (zone_iter == std::end(_args)) {
-                log::error("{}: Missing [zone] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
-            }
-
-            auto user_type = adm::user_type::rodsuser;
-            const auto user_type_iter = _args.find("user-type");
-            if (user_type_iter != std::end(_args) && user_type_iter->second != "rodsuser") {
-                if (user_type_iter->second == "rodsadmin") {
-                    user_type = adm::user_type::rodsadmin;
+            try {
+                const auto name_iter = _args.find("name");
+                if (name_iter == std::end(_args)) {
+                    log::error("{}: Missing [name] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
-                else if (user_type_iter->second == "groupadmin") {
-                    user_type = adm::user_type::groupadmin;
+
+                const auto zone_iter = _args.find("zone");
+                if (zone_iter == std::end(_args)) {
+                    log::error("{}: Missing [zone] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
-                else {
-                    log::error("{}: Invalid user-type.", __func__);
-                    return irods::http::fail(res, http::status::bad_request);
+
+                auto user_type = adm::user_type::rodsuser;
+                const auto user_type_iter = _args.find("user-type");
+                if (user_type_iter != std::end(_args) && user_type_iter->second != "rodsuser") {
+                    if (user_type_iter->second == "rodsadmin") {
+                        user_type = adm::user_type::rodsadmin;
+                    }
+                    else if (user_type_iter->second == "groupadmin") {
+                        user_type = adm::user_type::groupadmin;
+                    }
+                    else {
+                        log::error("{}: Invalid user-type.", fn);
+                        return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                    }
                 }
+
+                auto zone_type = adm::zone_type::local;
+                if (const auto& client = irods::http::globals::config->at("irods_client");
+                    zone_iter->second != client.at("zone").get_ref<const std::string&>())
+                {
+                    zone_type = adm::zone_type::remote;
+                }
+
+                auto conn = irods::get_connection(client_info->username);
+                adm::client::add_user(conn, adm::user{name_iter->second, zone_iter->second}, user_type, zone_type);
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            auto zone_type = adm::zone_type::local;
-            if (const auto& client = irods::http::globals::config->at("irods_client");
-                zone_iter->second != client.at("zone").get_ref<const std::string&>())
-            {
-                zone_type = adm::zone_type::remote;
-            }
+            res.prepare_payload();
 
-            auto conn = irods::get_connection(client_info->username);
-            adm::client::add_user(conn, adm::user{name_iter->second, zone_iter->second}, user_type, zone_type);
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        return res;
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_create_user_op
 
-    auto handle_remove_user_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_user_op)
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-            const auto name_iter = _args.find("name");
-            if (name_iter == std::end(_args)) {
-                log::error("{}: Missing [name] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
+
+            try {
+                const auto name_iter = _args.find("name");
+                if (name_iter == std::end(_args)) {
+                    log::error("{}: Missing [name] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                const auto zone_iter = _args.find("zone");
+                if (zone_iter == std::end(_args)) {
+                    log::error("{}: Missing [zone] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                auto conn = irods::get_connection(client_info->username);
+                adm::client::remove_user(conn, adm::user{name_iter->second, zone_iter->second});
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            const auto zone_iter = _args.find("zone");
-            if (zone_iter == std::end(_args)) {
-                log::error("{}: Missing [zone] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
-            }
+            res.prepare_payload();
 
-            auto conn = irods::get_connection(client_info->username);
-            adm::client::remove_user(conn, adm::user{name_iter->second, zone_iter->second});
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        return res;
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_remove_user_op
 
-    auto handle_set_password_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_password_op)
     {
 #if 0
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-        res.prepare_payload();
+            try {
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
+            }
 
-        return res;
+            res.prepare_payload();
+
+            return _sess_ptr->send(std::move(res));
+        });
 #else
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
     } // handle_set_password_op
 
-    auto handle_set_user_type_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_user_type_op)
     {
 #if 0
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-        res.prepare_payload();
+            try {
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
+            }
 
-        return res;
+            res.prepare_payload();
+
+            return _sess_ptr->send(std::move(res));
+        });
 #else
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
     } // handle_set_user_type_op
 
-    auto handle_add_user_auth_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_user_auth_op)
     {
 #if 0
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-        res.prepare_payload();
+            try {
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
+            }
 
-        return res;
+            res.prepare_payload();
+
+            return _sess_ptr->send(std::move(res));
+        });
 #else
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
     } // handle_add_user_auth_op
 
-    auto handle_remove_user_auth_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_user_auth_op)
     {
 #if 0
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-        res.prepare_payload();
+            try {
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
+            }
 
-        return res;
+            res.prepare_payload();
+
+            return _sess_ptr->send(std::move(res));
+        });
 #else
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
     } // handle_remove_user_auth_op
 
-    auto handle_create_group_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_group_op)
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-            const auto name_iter = _args.find("name");
-            if (name_iter == std::end(_args)) {
-                log::error("{}: Missing [name] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
+
+            try {
+                const auto name_iter = _args.find("name");
+                if (name_iter == std::end(_args)) {
+                    log::error("{}: Missing [name] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                auto conn = irods::get_connection(client_info->username);
+                adm::client::add_group(conn, adm::group{name_iter->second});
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            auto conn = irods::get_connection(client_info->username);
-            adm::client::add_group(conn, adm::group{name_iter->second});
+            res.prepare_payload();
 
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        return res;
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_create_group_op
 
-    auto handle_remove_group_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_group_op)
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-            const auto name_iter = _args.find("name");
-            if (name_iter == std::end(_args)) {
-                log::error("{}: Missing [name] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
+
+            try {
+                const auto name_iter = _args.find("name");
+                if (name_iter == std::end(_args)) {
+                    log::error("{}: Missing [name] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                auto conn = irods::get_connection(client_info->username);
+                adm::client::remove_group(conn, adm::group{name_iter->second});
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            auto conn = irods::get_connection(client_info->username);
-            adm::client::remove_group(conn, adm::group{name_iter->second});
+            res.prepare_payload();
 
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        return res;
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_remove_group_op
 
-    auto handle_add_to_group_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_to_group_op)
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-            const auto user_iter = _args.find("user");
-            if (user_iter == std::end(_args)) {
-                log::error("{}: Missing [user] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
+
+            try {
+                const auto user_iter = _args.find("user");
+                if (user_iter == std::end(_args)) {
+                    log::error("{}: Missing [user] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                const auto group_iter = _args.find("group");
+                if (group_iter == std::end(_args)) {
+                    log::error("{}: Missing [group] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                auto conn = irods::get_connection(client_info->username);
+
+                const auto zone_iter = _args.find("zone");
+                if (zone_iter != std::end(_args)) {
+                    adm::client::add_user_to_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second, zone_iter->second});
+                }
+                else {
+                    adm::client::add_user_to_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second});
+                }
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            const auto group_iter = _args.find("group");
-            if (group_iter == std::end(_args)) {
-                log::error("{}: Missing [group] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
-            }
+            res.prepare_payload();
 
-            auto conn = irods::get_connection(client_info->username);
-
-            const auto zone_iter = _args.find("zone");
-            if (zone_iter != std::end(_args)) {
-                adm::client::add_user_to_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second, zone_iter->second});
-            }
-            else {
-                adm::client::add_user_to_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second});
-            }
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        return res;
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_add_to_group_op
 
-    auto handle_remove_from_group_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_from_group_op)
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-            const auto user_iter = _args.find("user");
-            if (user_iter == std::end(_args)) {
-                log::error("{}: Missing [user] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
+
+            try {
+                const auto user_iter = _args.find("user");
+                if (user_iter == std::end(_args)) {
+                    log::error("{}: Missing [user] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                const auto group_iter = _args.find("group");
+                if (group_iter == std::end(_args)) {
+                    log::error("{}: Missing [group] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                auto conn = irods::get_connection(client_info->username);
+
+                const auto zone_iter = _args.find("zone");
+                if (zone_iter != std::end(_args)) {
+                    adm::client::remove_user_from_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second, zone_iter->second});
+                }
+                else {
+                    adm::client::remove_user_from_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second});
+                }
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            const auto group_iter = _args.find("group");
-            if (group_iter == std::end(_args)) {
-                log::error("{}: Missing [group] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
-            }
+            res.prepare_payload();
 
-            auto conn = irods::get_connection(client_info->username);
-
-            const auto zone_iter = _args.find("zone");
-            if (zone_iter != std::end(_args)) {
-                adm::client::remove_user_from_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second, zone_iter->second});
-            }
-            else {
-                adm::client::remove_user_from_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second});
-            }
-
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        return res;
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_remove_from_group_op
 
-    auto handle_users_op(irods::http::request_type& _req, irods::http::query_arguments_type&) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_users_op)
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-            auto conn = irods::get_connection(client_info->username);
-            const auto users = adm::client::users(conn);
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-            std::vector<json> v;
-            v.reserve(users.size());
+            try {
+                auto conn = irods::get_connection(client_info->username);
+                const auto users = adm::client::users(conn);
 
-            for (auto&& u : users) {
-                v.push_back({
-                    {"name", u.name},
-                    {"zone", u.zone}
-                });
+                std::vector<json> v;
+                v.reserve(users.size());
+
+                for (auto&& u : users) {
+                    v.push_back({
+                        {"name", u.name},
+                        {"zone", u.zone}
+                    });
+                }
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0}
+                    }},
+                    {"users", v}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0}
-                }},
-                {"users", v}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
+            res.prepare_payload();
 
-        res.prepare_payload();
-
-        return res;
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_users_op
 
-    auto handle_groups_op(irods::http::request_type& _req, irods::http::query_arguments_type&) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_groups_op)
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-            auto conn = irods::get_connection(client_info->username);
-            auto groups = adm::client::groups(conn);
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-            std::vector<std::string> v;
-            v.reserve(groups.size());
+            try {
+                auto conn = irods::get_connection(client_info->username);
+                auto groups = adm::client::groups(conn);
 
-            for (auto&& g : groups) {
-                v.push_back(std::move(g.name));
+                std::vector<std::string> v;
+                v.reserve(groups.size());
+
+                for (auto&& g : groups) {
+                    v.push_back(std::move(g.name));
+                }
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0}
+                    }},
+                    {"groups", v}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0}
-                }},
-                {"groups", v}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
+            res.prepare_payload();
 
-        res.prepare_payload();
-
-        return res;
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_groups_op
 
-    auto handle_members_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_members_op)
     {
 #if 0
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-        res.prepare_payload();
+            try {
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
+            }
 
-        return res;
+            res.prepare_payload();
+
+            return _sess_ptr->send(std::move(res));
+        });
 #else
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
     } // handle_members_op
 
-    auto handle_is_member_of_group_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_is_member_of_group_op)
     {
 #if 0
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-        res.prepare_payload();
+            try {
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
+            }
 
-        return res;
+            res.prepare_payload();
+
+            return _sess_ptr->send(std::move(res));
+        });
 #else
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
     } // handle_is_member_of_group_op
 
-    auto handle_stat_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op)
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-            const auto name_iter = _args.find("name");
-            if (name_iter == std::end(_args)) {
-                log::error("{}: Missing [name] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
-            }
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-            auto conn = irods::get_connection(client_info->username);
+            try {
+                const auto name_iter = _args.find("name");
+                if (name_iter == std::end(_args)) {
+                    log::error("{}: Missing [name] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
 
-            json info{
-                {"irods_response", {
-                    {"error_code", 0},
-                }},
-                {"exists", false}
-            };
+                auto conn = irods::get_connection(client_info->username);
 
-            // If the zone parameter is provided, we're likely dealing with a user. Otherwise,
-            // we don't know what we're identifying.
-            const auto zone_iter = _args.find("zone");
-            if (zone_iter != std::end(_args)) {
-                const adm::user user{name_iter->second, zone_iter->second};
+                json info{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }},
+                    {"exists", false}
+                };
+
+                // If the zone parameter is provided, we're likely dealing with a user. Otherwise,
+                // we don't know what we're identifying.
+                const auto zone_iter = _args.find("zone");
+                if (zone_iter != std::end(_args)) {
+                    const adm::user user{name_iter->second, zone_iter->second};
+                    if (const auto id = adm::client::id(conn, user); id) {
+                        info.update({
+                            {"exists", true},
+                            {"id", *id},
+                            {"type", adm::to_c_str(*adm::client::type(conn, user))}
+                        });
+                    }
+
+                    res.body() = info.dump();
+                    res.prepare_payload();
+                    return _sess_ptr->send(std::move(res));
+                }
+
+                // The client did not include a zone so we are required to test if the name
+                // identifies a user or group.
+
+                const adm::user user{name_iter->second};
                 if (const auto id = adm::client::id(conn, user); id) {
                     info.update({
                         {"exists", true},
                         {"id", *id},
+                        {"local_unique_name", adm::client::local_unique_name(conn, user)},
                         {"type", adm::to_c_str(*adm::client::type(conn, user))}
                     });
                 }
 
+                const adm::group group{name_iter->second};
+                if (const auto id = adm::client::id(conn, group); id) {
+                    info.update({
+                        {"exists", true},
+                        {"id", *id},
+                        {"type", "rodsgroup"}
+                    });
+                }
+
                 res.body() = info.dump();
-                res.prepare_payload();
-                return res;
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            // The client did not include a zone so we are required to test if the name
-            // identifies a user or group.
+            res.prepare_payload();
 
-            const adm::user user{name_iter->second};
-            if (const auto id = adm::client::id(conn, user); id) {
-                info.update({
-                    {"exists", true},
-                    {"id", *id},
-                    {"local_unique_name", adm::client::local_unique_name(conn, user)},
-                    {"type", adm::to_c_str(*adm::client::type(conn, user))}
-                });
-            }
-
-            const adm::group group{name_iter->second};
-            if (const auto id = adm::client::id(conn, group); id) {
-                info.update({
-                    {"exists", true},
-                    {"id", *id},
-                    {"type", "rodsgroup"}
-                });
-            }
-
-            res.body() = info.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        return res;
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_stat_op
 } // anonymous namespace
