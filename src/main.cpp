@@ -156,6 +156,56 @@ auto print_version_info() -> void
     fmt::print("{} v{}-{}\n", version::binary_name, version::api_version, sha.substr(0, sha_size));
 } // print_version_info
 
+auto print_configuration_template() -> void
+{
+    fmt::print(R"({{
+    "http_server": {{
+        "host": "0.0.0.0",
+        "port": 9000,
+
+        "log_level": "warn",
+
+        "authentication": {{
+            "basic": {{
+                "timeout_in_seconds": 3600
+            }}
+        }},
+
+        "requests": {{
+            "threads": 3,
+            "max_rbuffer_size_in_bytes": 8388608,
+            "timeout_in_seconds": 30
+        }},
+
+        "background_io": {{
+            "threads": 3
+        }}
+    }},
+
+    "irods_client": {{
+        "host": "<string>",
+        "port": 1247,
+        "zone": "<string>",
+
+        "proxy_rodsadmin": {{
+            "username": "<string>",
+            "password": "<string>"
+        }},
+
+        "connection_pool": {{
+            "size": 6,
+            "refresh_timeout_in_seconds": 600
+        }},
+
+        "max_rbuffer_size_in_bytes": 8192,
+        "max_wbuffer_size_in_bytes": 8192,
+
+        "max_number_of_rows_per_catalog_query": 15
+    }}
+}}
+)");
+} // print_configuration_template
+
 auto print_usage() -> void
 {
     fmt::print(R"_(irods_http_api - Exposes the iRODS API over HTTP
@@ -165,9 +215,17 @@ Usage: irods_http_api [OPTION]... CONFIG_FILE_PATH
 CONFIG_FILE_PATH must point to a file containing a JSON structure containing
 configuration options.
 
+--dump-config-template can be used to generate a default configuration file.
+See this option's description for more information.
+
 Options:
-  -h, --help     Display this help message and exit.
-  -v, --version  Display version information and exit.
+      --dump-config-template
+                     Print configuration template to stdout and exit. Some
+                     options have values which act as placeholders. If used
+                     to generate a configuration file, those options will
+                     need to be updated.
+  -h, --help         Display this help message and exit.
+  -v, --version      Display version information and exit.
 
 )_");
 
@@ -226,6 +284,7 @@ auto main(int _argc, char* _argv[]) -> int
     po::options_description opts_desc{""};
     opts_desc.add_options()
         ("config-file,f", po::value<std::string>(), "")
+        ("dump-config-template", "")
         ("help,h", "")
         ("version,v", "");
 
@@ -246,6 +305,11 @@ auto main(int _argc, char* _argv[]) -> int
 
         if (vm.count("version") > 0) {
             print_version_info();
+            return 0;
+        }
+
+        if (vm.count("dump-config-template") > 0) {
+            print_configuration_template();
             return 0;
         }
 
