@@ -35,6 +35,9 @@ namespace log = irods::http::log;
 using json = nlohmann::json;
 // clang-format on
 
+#define IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(name) \
+    auto name(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
+
 namespace
 {
     using handler_type = void(*)(irods::http::session_pointer_type, irods::http::request_type&, irods::http::query_arguments_type&);
@@ -43,12 +46,13 @@ namespace
     // Handler function prototypes
     //
 
-    auto handle_execute_genquery_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
-    auto handle_execute_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
-    auto handle_list_genquery_columns_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
-    auto handle_list_specific_queries_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
-    auto handle_add_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
-    auto handle_remove_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void;
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_execute_genquery_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_execute_specific_query_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_genquery_columns_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_specific_queries_op);
+
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_specific_query_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_specific_query_op);
 
     //
     // Operation to Handler mappings
@@ -115,7 +119,7 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_execute_genquery_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_execute_genquery_op)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -255,7 +259,7 @@ namespace
         });
     } // handle_execute_genquery_op
 
-    auto handle_execute_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_execute_specific_query_op)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -376,7 +380,7 @@ namespace
         });
     } // handle_execute_genquery_op
 
-    auto handle_list_genquery_columns_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_genquery_columns_op)
     {
         (void) _req;
         (void) _args;
@@ -384,7 +388,7 @@ namespace
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_list_genquery_columns_op
 
-    auto handle_list_specific_queries_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_specific_queries_op)
     {
         (void) _req;
         (void) _args;
@@ -392,7 +396,7 @@ namespace
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_list_specific_queries_op
 
-    auto handle_add_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_specific_query_op)
     {
         (void) _req;
         (void) _args;
@@ -400,7 +404,7 @@ namespace
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
     } // handle_add_specific_query_op
 
-    auto handle_remove_specific_query_op(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_specific_query_op)
     {
         (void) _req;
         (void) _args;

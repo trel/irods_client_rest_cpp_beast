@@ -1,6 +1,7 @@
 #include "handlers.hpp"
 
 #include "common.hpp"
+#include "globals.hpp"
 #include "log.hpp"
 #include "session.hpp"
 #include "version.hpp"
@@ -33,18 +34,21 @@ namespace log = irods::http::log;
 using json = nlohmann::json;
 // clang-format on
 
+#define IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(name) \
+    auto name(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
+
 namespace
 {
-    using handler_type = irods::http::response_type(*)(irods::http::request_type& _req, irods::http::query_arguments_type& _args);
+    using handler_type = void(*)(irods::http::session_pointer_type, irods::http::request_type&, irods::http::query_arguments_type&);
 
     //
     // Handler function prototypes
     //
 
-    auto handle_list_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_stat_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_create_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
-    auto handle_remove_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type;
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_op);
 
     //
     // Operation to Handler mappings
@@ -76,7 +80,7 @@ namespace irods::http::handler
             }
 
             if (const auto iter = handlers_for_get.find(op_iter->second); iter != std::end(handlers_for_get)) {
-                return _sess_ptr->send((iter->second)(_req, url.query));
+                return (iter->second)(_sess_ptr, _req, url.query);
             }
 
             return _sess_ptr->send(fail(status_type::bad_request));
@@ -92,7 +96,7 @@ namespace irods::http::handler
             }
 
             if (const auto iter = handlers_for_post.find(op_iter->second); iter != std::end(handlers_for_post)) {
-                return _sess_ptr->send((iter->second)(_req, args));
+                return (iter->second)(_sess_ptr, _req, args);
             }
 
             return _sess_ptr->send(fail(status_type::bad_request));
@@ -109,258 +113,274 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_list_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_op)
     {
 #if 0
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-        res.prepare_payload();
+            try {
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
+            }
 
-        return res;
+            res.prepare_payload();
+
+            return _sess_ptr->send(std::move(res));
+        });
 #else
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
     } // handle_list_op
 
-    auto handle_stat_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op)
     {
 #if 0
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-        res.prepare_payload();
+            try {
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
+            }
 
-        return res;
+            res.prepare_payload();
+
+            return _sess_ptr->send(std::move(res));
+        });
 #else
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
-        return irods::http::fail(http::status::not_implemented);
+        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
     } // handle_stat_op
 
-    auto handle_create_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_op)
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-            const auto lpath_iter = _args.find("lpath");
-            if (lpath_iter == std::end(_args)) {
-                log::error("{}: Missing [lpath] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
-            }
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
 
-            auto ticket_type = adm::ticket::ticket_type::read;
-            const auto type_iter = _args.find("type");
-            if (type_iter != std::end(_args)) {
-                if (type_iter->second == "write") {
-                    ticket_type = adm::ticket::ticket_type::write;
+            try {
+                const auto lpath_iter = _args.find("lpath");
+                if (lpath_iter == std::end(_args)) {
+                    log::error("{}: Missing [lpath] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
-                else if (type_iter->second != "read") {
-                    log::error("{}: Missing [type] parameter.", __func__);
-                    return irods::http::fail(res, http::status::bad_request);
+
+                auto ticket_type = adm::ticket::ticket_type::read;
+                const auto type_iter = _args.find("type");
+                if (type_iter != std::end(_args)) {
+                    if (type_iter->second == "write") {
+                        ticket_type = adm::ticket::ticket_type::write;
+                    }
+                    else if (type_iter->second != "read") {
+                        log::error("{}: Missing [type] parameter.", fn);
+                        return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                    }
                 }
-            }
 
-            auto conn = irods::get_connection(client_info->username);
-            const auto ticket = adm::ticket::client::create_ticket(conn, ticket_type, lpath_iter->second);
+                auto conn = irods::get_connection(client_info->username);
+                const auto ticket = adm::ticket::client::create_ticket(conn, ticket_type, lpath_iter->second);
 
-            auto constraint_iter = _args.find("use-count");
-            if (constraint_iter != std::end(_args)) {
-                const auto count = std::stoi(constraint_iter->second);
-                adm::ticket::client::set_ticket_constraint(conn, ticket, adm::ticket::use_count_constraint{count});
-            }
-            else {
-                adm::ticket::client::set_ticket_constraint(conn, ticket, adm::ticket::use_count_constraint{0});
-            }
-
-            constraint_iter = _args.find("write-data-object-count");
-            if (constraint_iter != std::end(_args)) {
-                const auto count = std::stoi(constraint_iter->second);
-                adm::ticket::client::set_ticket_constraint(conn, ticket, adm::ticket::n_writes_to_data_object_constraint{count});
-            }
-            else {
-                adm::ticket::client::set_ticket_constraint(conn, ticket, adm::ticket::n_writes_to_data_object_constraint{0});
-            }
-
-            constraint_iter = _args.find("write-byte-count");
-            if (constraint_iter != std::end(_args)) {
-                const auto count = std::stoi(constraint_iter->second);
-                adm::ticket::client::set_ticket_constraint(conn, ticket, adm::ticket::n_write_bytes_constraint{count});
-            }
-            else {
-                adm::ticket::client::set_ticket_constraint(conn, ticket, adm::ticket::n_write_bytes_constraint{0});
-            }
-
-            constraint_iter = _args.find("seconds-until-expiration");
-            if (constraint_iter != std::end(_args)) {
-                // TODO Not yet supported by the ticket administration library.
-                log::warn("{}: Ignoring [seconds-until-expiration]. Not implemented at this time.", __func__);
-            }
-
-            constraint_iter = _args.find("users");
-            if (constraint_iter != std::end(_args)) {
-                std::vector<std::string> users;
-                boost::split(users, constraint_iter->second, boost::is_any_of(","));
-                for (const auto& user : users) {
-                    adm::ticket::client::add_ticket_constraint(conn, ticket, adm::ticket::user_constraint{user});
+                auto constraint_iter = _args.find("use-count");
+                if (constraint_iter != std::end(_args)) {
+                    const auto count = std::stoi(constraint_iter->second);
+                    adm::ticket::client::set_ticket_constraint(conn, ticket, adm::ticket::use_count_constraint{count});
                 }
-            }
-
-            constraint_iter = _args.find("groups");
-            if (constraint_iter != std::end(_args)) {
-                std::vector<std::string> groups;
-                boost::split(groups, constraint_iter->second, boost::is_any_of(","));
-                for (const auto& group : groups) {
-                    adm::ticket::client::add_ticket_constraint(conn, ticket, adm::ticket::group_constraint{group});
+                else {
+                    adm::ticket::client::set_ticket_constraint(conn, ticket, adm::ticket::use_count_constraint{0});
                 }
-            }
 
-            constraint_iter = _args.find("hosts");
-            if (constraint_iter != std::end(_args)) {
-                std::vector<std::string> hosts;
-                boost::split(hosts, constraint_iter->second, boost::is_any_of(","));
-                for (const auto& host : hosts) {
-                    adm::ticket::client::add_ticket_constraint(conn, ticket, adm::ticket::host_constraint{host});
+                constraint_iter = _args.find("write-data-object-count");
+                if (constraint_iter != std::end(_args)) {
+                    const auto count = std::stoi(constraint_iter->second);
+                    adm::ticket::client::set_ticket_constraint(conn, ticket, adm::ticket::n_writes_to_data_object_constraint{count});
                 }
+                else {
+                    adm::ticket::client::set_ticket_constraint(conn, ticket, adm::ticket::n_writes_to_data_object_constraint{0});
+                }
+
+                constraint_iter = _args.find("write-byte-count");
+                if (constraint_iter != std::end(_args)) {
+                    const auto count = std::stoi(constraint_iter->second);
+                    adm::ticket::client::set_ticket_constraint(conn, ticket, adm::ticket::n_write_bytes_constraint{count});
+                }
+                else {
+                    adm::ticket::client::set_ticket_constraint(conn, ticket, adm::ticket::n_write_bytes_constraint{0});
+                }
+
+                constraint_iter = _args.find("seconds-until-expiration");
+                if (constraint_iter != std::end(_args)) {
+                    // TODO Not yet supported by the ticket administration library.
+                    log::warn("{}: Ignoring [seconds-until-expiration]. Not implemented at this time.", fn);
+                }
+
+                constraint_iter = _args.find("users");
+                if (constraint_iter != std::end(_args)) {
+                    std::vector<std::string> users;
+                    boost::split(users, constraint_iter->second, boost::is_any_of(","));
+                    for (const auto& user : users) {
+                        adm::ticket::client::add_ticket_constraint(conn, ticket, adm::ticket::user_constraint{user});
+                    }
+                }
+
+                constraint_iter = _args.find("groups");
+                if (constraint_iter != std::end(_args)) {
+                    std::vector<std::string> groups;
+                    boost::split(groups, constraint_iter->second, boost::is_any_of(","));
+                    for (const auto& group : groups) {
+                        adm::ticket::client::add_ticket_constraint(conn, ticket, adm::ticket::group_constraint{group});
+                    }
+                }
+
+                constraint_iter = _args.find("hosts");
+                if (constraint_iter != std::end(_args)) {
+                    std::vector<std::string> hosts;
+                    boost::split(hosts, constraint_iter->second, boost::is_any_of(","));
+                    for (const auto& host : hosts) {
+                        adm::ticket::client::add_ticket_constraint(conn, ticket, adm::ticket::host_constraint{host});
+                    }
+                }
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }},
+                    {"ticket", ticket}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }},
-                {"ticket", ticket}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
+            res.prepare_payload();
 
-        res.prepare_payload();
-
-        return res;
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_create_op
 
-    auto handle_remove_op(irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> irods::http::response_type
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_op)
     {
-        const auto result = irods::http::resolve_client_identity(_req);
+        auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
-            return *result.response;
+            return _sess_ptr->send(std::move(*result.response));
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
+        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
-        try {
-            const auto name_iter = _args.find("name");
-            if (name_iter == std::end(_args)) {
-                log::error("{}: Missing [name] parameter.", __func__);
-                return irods::http::fail(res, http::status::bad_request);
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
+
+            try {
+                const auto name_iter = _args.find("name");
+                if (name_iter == std::end(_args)) {
+                    log::error("{}: Missing [name] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                auto conn = irods::get_connection(client_info->username);
+                adm::ticket::client::delete_ticket(conn, name_iter->second);
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
             }
 
-            auto conn = irods::get_connection(client_info->username);
-            adm::ticket::client::delete_ticket(conn, name_iter->second);
+            res.prepare_payload();
 
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", 0},
-                }}
-            }.dump();
-        }
-        catch (const irods::exception& e) {
-            res.result(http::status::bad_request);
-            res.body() = json{
-                {"irods_response", {
-                    {"error_code", e.code()},
-                    {"error_message", e.client_display_what()}
-                }}
-            }.dump();
-        }
-        catch (const std::exception& e) {
-            res.result(http::status::internal_server_error);
-        }
-
-        res.prepare_payload();
-
-        return res;
+            return _sess_ptr->send(std::move(res));
+        });
     } // handle_remove_op
 } // anonymous namespace
