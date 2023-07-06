@@ -6,7 +6,9 @@
 
 #include <irods/irods_exception.hpp>
 #include <irods/process_stash.hpp>
+#include <irods/rcMisc.h> // For addKeyVal().
 #include <irods/rodsErrorTable.h>
+#include <irods/rodsKeyWdDef.h> // For KW_CLOSE_OPEN_REPLICAS.
 #include <irods/switch_user.h>
 
 #include <boost/any.hpp>
@@ -316,7 +318,12 @@ namespace irods
 
         log::trace("{}: Changing identity associated with connection to [{}].", __func__, _username);
 
-        if (const auto ec = rc_switch_user(static_cast<RcComm*>(conn), _username.c_str(), zone.c_str()); ec != 0) {
+        SwitchUserInput input{};
+        std::strncpy(input.username, _username.c_str(), sizeof(SwitchUserInput::username));
+        std::strncpy(input.zone, zone.c_str(), sizeof(SwitchUserInput::zone));
+        addKeyVal(&input.options, KW_CLOSE_OPEN_REPLICAS, "");
+
+        if (const auto ec = rc_switch_user(static_cast<RcComm*>(conn), &input); ec != 0) {
             irods::http::log::error("{}: rc_switch_user error: {}", __func__, ec);
             THROW(SYS_INTERNAL_ERR, "rc_switch_user error.");
         }
