@@ -17,6 +17,10 @@ target_compile_definitions(
   #
   BOOST_BEAST_USE_STD_STRING_VIEW)
 
+if (IRODS_ENABLE_GENQUERY2)
+  target_compile_definitions(${IRODS_HTTP_ENDPOINT} PRIVATE IRODS_ENABLE_GENQUERY2)
+endif()
+
 target_include_directories(
   ${IRODS_HTTP_ENDPOINT}
   PRIVATE

@@ -1,3 +1,5 @@
+option(IRODS_ENABLE_GENQUERY2 "Enables GenQuery2 support. GenQuery2 package must be installed." NO)
+
 add_subdirectory(authentication)
 add_subdirectory(collections)
 #add_subdirectory(config)

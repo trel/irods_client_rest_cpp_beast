@@ -6,12 +6,17 @@
 #include "session.hpp"
 #include "version.hpp"
 
+#include <irods/irods_at_scope_exit.hpp>
 #include <irods/client_connection.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/irods_query.hpp>
 #include <irods/procApiRequest.h>
 #include <irods/query_builder.hpp>
 #include <irods/rodsErrorTable.h>
+
+#ifdef IRODS_ENABLE_GENQUERY2
+#  include <irods/plugins/api/genquery2_common.h>
+#endif // IRODS_ENABLE_GENQUERY2
 
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
@@ -129,117 +134,143 @@ namespace
         const auto* client_info = result.client_info;
         log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
 
-        const auto query_iter = _args.find("query");
-        if (query_iter == std::end(_args)) {
-            log::error("{}: Missing [query] parameter.", __func__);
-            return _sess_ptr->send(irods::http::fail(http::status::bad_request));
-        }
-
-        std::string parser = "genquery1";
-        const auto parser_iter = _args.find("parser");
-        if (parser_iter != std::end(_args)) {
-            if (parser_iter->second != "genquery1" && parser_iter->second != "genquery2") {
-                log::error("{}: Invalid argument for [parser] parameter.", __func__);
+        irods::http::globals::background_task([fn = __func__, _sess_ptr, req = std::move(_req), args = std::move(_args), client_info]() mutable {
+            auto query_iter = args.find("query");
+            if (query_iter == std::end(args)) {
+                log::error("{}: Missing [query] parameter.", fn);
                 return _sess_ptr->send(irods::http::fail(http::status::bad_request));
             }
 
-            parser = parser_iter->second;
-        }
+            std::string parser = "genquery1";
+            const auto parser_iter = args.find("parser");
+            if (parser_iter != std::end(args)) {
+                if (parser_iter->second != "genquery1" && parser_iter->second != "genquery2") {
+                    log::error("{}: Invalid argument for [parser] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+                }
 
-        int offset = 0;
-        if (const auto iter = _args.find("offset"); iter != std::end(_args)) {
-            try {
-                offset = std::stoi(iter->second);
+                parser = parser_iter->second;
             }
-            catch (const std::exception& e) {
-                log::error("{}: Could not convert [offset] parameter value into an integer. ", __func__);
-                return _sess_ptr->send(irods::http::fail(http::status::bad_request));
-            }
-        }
-        offset = std::max(0, offset);
 
-        static const auto max_row_count = irods::http::globals::configuration().at(json::json_pointer{"/irods_client/max_number_of_rows_per_catalog_query"}).get<int>();
-        int count = 0;
-        if (const auto iter = _args.find("count"); iter != std::end(_args)) {
-            try {
-                count = std::stoi(iter->second);
-            }
-            catch (const std::exception& e) {
-                log::error("{}: Could not convert [count] parameter value into an integer. ", __func__);
-                return _sess_ptr->send(irods::http::fail(http::status::bad_request));
-            }
-        }
-        count = std::clamp(count, 1, max_row_count);
-
-        http::response<http::string_body> res{http::status::ok, _req.version()};
-        res.set(http::field::server, irods::http::version::server_name);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(_req.keep_alive());
-
-        irods::http::globals::background_task([fn = __func__, _sess_ptr, client_info, parser = std::move(parser), gql = query_iter->second, res = std::move(res), offset, count]() mutable {
-            static_cast<void>(fn);
+            http::response<http::string_body> res{http::status::ok, req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(req.keep_alive());
 
             try {
                 json::array_t row;
                 json::array_t rows;
 
-                {
-                    auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info->username);
 
-                    if ("genquery2" == parser) {
-                        char* sql{};
+                if ("genquery2" == parser) {
+#ifdef IRODS_ENABLE_GENQUERY2
+                    genquery2_input input{};
+                    input.query_string = query_iter->second.data();
 
-                        const auto ec = procApiRequest(static_cast<RcComm*>(conn),
-                                                       1'000'001,
-                                                       gql.c_str(),
-                                                       nullptr,
-                                                       reinterpret_cast<void**>(&sql),
-                                                       nullptr);
-
-                        if (ec < 0) {
-                            res.result(http::status::bad_request);
-                            res.body() = json{
-                                {"irods_response", {
-                                    {"error_code", ec},
-                                }}
-                            }.dump();
-                        }
-                        
-                        // The string below contains a format placeholder for the "rows" property
-                        // because this avoids the need to parse the GenQuery2 results into an nlohmann
-                        // JSON object just to serialize it for the response.
-                        constexpr const auto* json_fmt_string = R"_({{"irods_response": {{"error_code": 0}}, {{"rows": {}}}}})_";
-                        res.body() = fmt::format(json_fmt_string, sql);
+                    auto sql_only_iter = args.find("sql-only");
+                    if (sql_only_iter != std::end(args) && "1" == sql_only_iter->second) {
+                        input.sql_only = 1;
                     }
-                    else {
-                        int offset_counter = 0;
-                        int count_counter = 0;
 
-                        for (auto&& r : irods::query{static_cast<RcComm*>(conn), gql}) {
-                            if (offset_counter < offset) {
-                                ++offset_counter;
-                                continue;
-                            }
+                    auto zone_iter = args.find("zone");
+                    if (zone_iter != std::end(args)) {
+                        input.zone = zone_iter->second.data();
+                    }
 
-                            for (auto&& c : r) {
-                                row.push_back(c);
-                            }
+                    char* output{};
+                    irods::at_scope_exit free_output{[&output] { std::free(output); }};
 
-                            rows.push_back(row);
-                            row.clear();
+                    const auto ec = procApiRequest(static_cast<RcComm*>(conn),
+                                                   IRODS_APN_GENQUERY2,
+                                                   &input,
+                                                   nullptr,
+                                                   reinterpret_cast<void**>(&output),
+                                                   nullptr);
 
-                            if (++count_counter == count) {
-                                break;
-                            }
-                        }
-
+                    if (ec < 0) {
+                        res.result(http::status::bad_request);
                         res.body() = json{
                             {"irods_response", {
-                                {"error_code", 0},
-                            }},
-                            {"rows", rows}
+                                {"error_code", ec}
+                            }}
                         }.dump();
                     }
+
+                    if (0 == input.sql_only) {
+                        // The string below contains a format placeholder for the "results" property
+                        // because this avoids the need to parse the GenQuery2 results into an nlohmann
+                        // JSON object just to serialize it for the response.
+                        constexpr const auto* json_fmt_string = R"_({{"irods_response":{{"error_code":0}},"results":{}}})_";
+                        res.body() = fmt::format(json_fmt_string, output);
+                    }
+                    else {
+                        constexpr const auto* json_fmt_string = R"_({{"irods_response":{{"error_code":0}},"results":"{}"}})_";
+                        res.body() = fmt::format(json_fmt_string, output);
+                    }
+#else
+                    res.result(http::status::bad_request);
+                    res.body() = json{
+                        {"irods_response", {
+                            {"error_code", 0},
+                            {"error_message", "GenQuery2 not enabled. Use GenQuery1 parser."}
+                        }}
+                    }.dump();
+#endif // IRODS_ENABLE_GENQUERY2
+                }
+                else {
+                    int offset = 0;
+                    if (const auto iter = args.find("offset"); iter != std::end(args)) {
+                        try {
+                            offset = std::stoi(iter->second);
+                        }
+                        catch (const std::exception& e) {
+                            log::error("{}: Could not convert [offset] parameter value into an integer. ", fn);
+                            return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+                        }
+                    }
+                    offset = std::max(0, offset);
+
+                    static const auto max_row_count = irods::http::globals::configuration().at(json::json_pointer{"/irods_client/max_number_of_rows_per_catalog_query"}).get<int>();
+                    int count = 0;
+                    if (const auto iter = args.find("count"); iter != std::end(args)) {
+                        try {
+                            count = std::stoi(iter->second);
+                        }
+                        catch (const std::exception& e) {
+                            log::error("{}: Could not convert [count] parameter value into an integer. ", fn);
+                            return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+                        }
+                    }
+                    count = std::clamp(count, 1, max_row_count);
+
+                    int offset_counter = 0;
+                    int count_counter = 0;
+
+                    for (auto&& r : irods::query{static_cast<RcComm*>(conn), query_iter->second}) {
+                        if (offset_counter < offset) {
+                            ++offset_counter;
+                            continue;
+                        }
+
+                        for (auto&& c : r) {
+                            row.push_back(c);
+                        }
+
+                        rows.push_back(row);
+                        row.clear();
+
+                        if (++count_counter == count) {
+                            break;
+                        }
+                    }
+
+                    res.body() = json{
+                        {"irods_response", {
+                            {"error_code", 0},
+                        }},
+                        {"rows", rows}
+                    }.dump();
                 }
             }
             catch (const irods::exception& e) {

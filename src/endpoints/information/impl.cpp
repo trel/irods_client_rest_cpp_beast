@@ -32,10 +32,18 @@ namespace irods::http::handler
         res.set(field_type::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
+#ifdef IRODS_ENABLE_GENQUERY2
+#  define GENQUERY2_ENABLED true
+#else
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+#  define GENQUERY2_ENABLED false
+#endif // IRODS_ENABLE_GENQUERY2
+
         res.body() = json{
             {"api_version", irods::http::version::api_version},
             {"build", irods::http::version::sha},
-            {"irods_zone", svr.at("zone")}
+            {"irods_zone", svr.at("zone")},
+            {"genquery2_enabled", GENQUERY2_ENABLED},
         }.dump();
 
         res.prepare_payload();

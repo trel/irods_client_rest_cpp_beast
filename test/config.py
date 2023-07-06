@@ -11,5 +11,7 @@ test_config = {
         'password': 'http_api'
     },
 
-    'irods_zone': 'tempZone'
+    'irods_zone': 'tempZone',
+
+    "run_genquery2_tests": False
 }
