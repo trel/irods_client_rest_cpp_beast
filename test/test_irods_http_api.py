@@ -466,6 +466,7 @@ class test_information_endpoint(unittest.TestCase):
         self.assertIn('api_version', info)
         self.assertIn('build', info)
         self.assertIn('irods_zone', info)
+        self.assertIn('genquery2_enabled', info)
 
 class test_metadata_endpoint(unittest.TestCase):
 
@@ -578,25 +579,54 @@ class test_query_endpoint(unittest.TestCase):
 
         result = r.json()
         self.assertEqual(result['irods_response']['error_code'], 0)
-        self.assertGreaterEqual(len(result['rows']), 0)
+        self.assertGreater(len(result['rows']), 0)
 
-    @unittest.skip('Requires GenQuery2 be compiled into the binary.')
-    def test_support_for_genquery2(self):
+    def test_genquery2_query(self):
+        if not config.test_config.get('run_genquery2_tests', False):
+            self.skipTest('GenQuery2 tests not enabled. Check [run_genquery2_tests] in test configuration file.')
+
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
-        params = {'op': 'execute_genquery', 'parser': 'genquery2', 'query': 'select COLL_NAME'}
-        r = requests.get(self.url_endpoint, headers=headers, params=params)
-        print(r.content) # Debug
+        r = requests.get(self.url_endpoint, headers=headers, params={
+            'op': 'execute_genquery',
+            'parser': 'genquery2',
+            'query': 'select COLL_NAME'
+        })
+        #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
         self.assertEqual(result['irods_response']['error_code'], 0)
-        self.assertGreaterEqual(len(result['rows']), 0)
+        self.assertGreater(len(result['results']), 0)
+        self.assertIn(['/tempZone/home/http_api'], result['results'])
+        self.assertIn(['/tempZone/trash/home/http_api'], result['results'])
+
+    def test_genquery2_sql_only_option(self):
+        if not config.test_config.get('run_genquery2_tests', False):
+            self.skipTest('GenQuery2 tests not enabled. Check [run_genquery2_tests] in test configuration file.')
+
+        headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        r = requests.get(self.url_endpoint, headers=headers, params={
+            'op': 'execute_genquery',
+            'parser': 'genquery2',
+            'query': 'select COLL_NAME',
+            'sql-only': 1
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertGreater(len(result['results']), 0)
 
     def test_support_for_specific_queries(self):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
         collection_path = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'common_ops')
-        params = {'op': 'execute_specific_query', 'name': 'ShowCollAcls', 'args': collection_path, 'count': 100}
-        r = requests.get(self.url_endpoint, headers=headers, params=params)
+        r = requests.get(self.url_endpoint, headers=headers, params={
+            'op': 'execute_specific_query',
+            'name': 'ShowCollAcls',
+            'args': collection_path,
+            'count': 100
+        })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
 
