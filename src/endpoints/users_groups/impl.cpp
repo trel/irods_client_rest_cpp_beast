@@ -6,7 +6,6 @@
 #include "session.hpp"
 #include "version.hpp"
 
-#include <irods/client_connection.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/rodsErrorTable.h>
 #include <irods/user_administration.hpp>
@@ -15,8 +14,10 @@
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
 
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
+#include <array>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -278,7 +279,6 @@ namespace
 
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_password_op)
     {
-#if 0
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
             return _sess_ptr->send(std::move(*result.response));
@@ -296,6 +296,35 @@ namespace
             res.keep_alive(_req.keep_alive());
 
             try {
+                const auto name_iter = _args.find("name");
+                if (name_iter == std::end(_args)) {
+                    log::error("{}: Missing [name] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                const auto zone_iter = _args.find("zone");
+                if (zone_iter == std::end(_args)) {
+                    log::error("{}: Missing [zone] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                const auto new_password_iter = _args.find("new-password");
+                if (new_password_iter == std::end(_args)) {
+                    log::error("{}: Missing [new-password] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                static const auto& proxy_user_password = irods::http::globals::configuration().at(json::json_pointer{"/irods_client/rodsadmin/password"}).get_ref<const std::string&>();
+                const adm::user_password_property prop{new_password_iter->second, proxy_user_password};
+
+                auto conn = irods::get_connection(client_info->username);
+                adm::client::modify_user(conn, adm::user{name_iter->second, zone_iter->second}, prop);
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0}
+                    }}
+                }.dump();
             }
             catch (const irods::exception& e) {
                 res.result(http::status::bad_request);
@@ -314,17 +343,10 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-#else
-        (void) _req;
-        (void) _args;
-        log::error("{}: Operation not implemented.", __func__);
-        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
-#endif
     } // handle_set_password_op
 
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_user_type_op)
     {
-#if 0
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
             return _sess_ptr->send(std::move(*result.response));
@@ -342,6 +364,34 @@ namespace
             res.keep_alive(_req.keep_alive());
 
             try {
+                const auto name_iter = _args.find("name");
+                if (name_iter == std::end(_args)) {
+                    log::error("{}: Missing [name] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                const auto zone_iter = _args.find("zone");
+                if (zone_iter == std::end(_args)) {
+                    log::error("{}: Missing [zone] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                const auto new_user_type_iter = _args.find("new-user-type");
+                if (new_user_type_iter == std::end(_args)) {
+                    log::error("{}: Missing [new-user-type] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                const adm::user_type_property prop{adm::to_user_type(new_user_type_iter->second)};
+
+                auto conn = irods::get_connection(client_info->username);
+                adm::client::modify_user(conn, adm::user{name_iter->second, zone_iter->second}, prop);
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0},
+                    }}
+                }.dump();
             }
             catch (const irods::exception& e) {
                 res.result(http::status::bad_request);
@@ -360,12 +410,6 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-#else
-        (void) _req;
-        (void) _args;
-        log::error("{}: Operation not implemented.", __func__);
-        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
-#endif
     } // handle_set_user_type_op
 
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_user_auth_op)
@@ -591,6 +635,12 @@ namespace
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
+                const auto zone_iter = _args.find("zone");
+                if (zone_iter == std::end(_args)) {
+                    log::error("{}: Missing [zone] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
                 const auto group_iter = _args.find("group");
                 if (group_iter == std::end(_args)) {
                     log::error("{}: Missing [group] parameter.", fn);
@@ -598,14 +648,7 @@ namespace
                 }
 
                 auto conn = irods::get_connection(client_info->username);
-
-                const auto zone_iter = _args.find("zone");
-                if (zone_iter != std::end(_args)) {
-                    adm::client::add_user_to_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second, zone_iter->second});
-                }
-                else {
-                    adm::client::add_user_to_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second});
-                }
+                adm::client::add_user_to_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second, zone_iter->second});
 
                 res.body() = json{
                     {"irods_response", {
@@ -657,6 +700,12 @@ namespace
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
+                const auto zone_iter = _args.find("zone");
+                if (zone_iter == std::end(_args)) {
+                    log::error("{}: Missing [zone] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
                 const auto group_iter = _args.find("group");
                 if (group_iter == std::end(_args)) {
                     log::error("{}: Missing [group] parameter.", fn);
@@ -664,14 +713,7 @@ namespace
                 }
 
                 auto conn = irods::get_connection(client_info->username);
-
-                const auto zone_iter = _args.find("zone");
-                if (zone_iter != std::end(_args)) {
-                    adm::client::remove_user_from_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second, zone_iter->second});
-                }
-                else {
-                    adm::client::remove_user_from_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second});
-                }
+                adm::client::remove_user_from_group(conn, adm::group{group_iter->second}, adm::user{user_iter->second, zone_iter->second});
 
                 res.body() = json{
                     {"irods_response", {
@@ -859,7 +901,6 @@ namespace
 
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_is_member_of_group_op)
     {
-#if 0
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
             return _sess_ptr->send(std::move(*result.response));
@@ -877,6 +918,35 @@ namespace
             res.keep_alive(_req.keep_alive());
 
             try {
+                const auto group_iter = _args.find("group");
+                if (group_iter == std::end(_args)) {
+                    log::error("{}: Missing [group] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                const auto user_iter = _args.find("user");
+                if (user_iter == std::end(_args)) {
+                    log::error("{}: Missing [user] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                const auto zone_iter = _args.find("zone");
+                if (zone_iter == std::end(_args)) {
+                    log::error("{}: Missing [zone] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                auto conn = irods::get_connection(client_info->username);
+
+                const adm::group group{adm::group{group_iter->second}};
+                const adm::user user{adm::user{user_iter->second, zone_iter->second}};
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0}
+                    }},
+                    {"is_member", adm::client::user_is_member_of_group(conn, group, user)}
+                }.dump();
             }
             catch (const irods::exception& e) {
                 res.result(http::status::bad_request);
@@ -895,12 +965,6 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-#else
-        (void) _req;
-        (void) _args;
-        log::error("{}: Operation not implemented.", __func__);
-        return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
-#endif
     } // handle_is_member_of_group_op
 
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op)
@@ -946,6 +1010,7 @@ namespace
                         info.update({
                             {"exists", true},
                             {"id", *id},
+                            {"local_unique_name", fmt::format("{}#{}", name_iter->second, zone_iter->second)},
                             {"type", adm::to_c_str(*adm::client::type(conn, user))}
                         });
                     }
@@ -967,14 +1032,15 @@ namespace
                         {"type", adm::to_c_str(*adm::client::type(conn, user))}
                     });
                 }
-
-                const adm::group group{name_iter->second};
-                if (const auto id = adm::client::id(conn, group); id) {
-                    info.update({
-                        {"exists", true},
-                        {"id", *id},
-                        {"type", "rodsgroup"}
-                    });
+                else {
+                    const adm::group group{name_iter->second};
+                    if (const auto id = adm::client::id(conn, group); id) {
+                        info.update({
+                            {"exists", true},
+                            {"id", *id},
+                            {"type", "rodsgroup"}
+                        });
+                    }
                 }
 
                 res.body() = info.dump();
