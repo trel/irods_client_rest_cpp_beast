@@ -187,14 +187,12 @@ namespace
                     }
 
                     if (auto* msp = getMsParamByLabel(out_param_array, "ruleExecOut"); msp) {
-                        log::debug("{}: ruleExecOut = [{}]", fn, static_cast<char*>(msp->inOutStruct));
+                        log::debug("{}: ruleExecOut = [{}]", fn, static_cast<const char*>(msp->inOutStruct));
                     }
                 }
 
-                {
-                    // Log messages stored in the RcComm::rError object.
-                    auto* rerr_info = static_cast<RcComm*>(conn)->rError;
-
+                // Log messages stored in the RcComm::rError object.
+                if (auto* rerr_info = static_cast<RcComm*>(conn)->rError; rerr_info) {
                     for (auto&& err : std::span(rerr_info->errMsg, rerr_info->len)) {
                         log::info("{}: RcComm::rError info = [status=[{}], message=[{}]]", fn, err->status, err->msg);
                     }
