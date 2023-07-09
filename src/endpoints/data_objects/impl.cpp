@@ -1273,6 +1273,12 @@ namespace
 
                 // There's no admin flag for removal.
                 fs::client::remove(conn, lpath_iter->second, opts);
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", 0}
+                    }}
+                }.dump();
             }
             catch (const fs::filesystem_error& e) {
                 res.result(http::status::bad_request);
