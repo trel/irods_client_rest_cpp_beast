@@ -34,9 +34,8 @@ namespace irods::http::handler
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        boost::asio::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             const auto url = irods::http::parse_url(_req);

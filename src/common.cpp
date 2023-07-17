@@ -15,6 +15,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include <curl/curl.h>
+#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 namespace irods::http
@@ -311,10 +312,10 @@ namespace irods
     auto get_connection(const std::string& _username) -> irods::connection_pool::connection_proxy
     {
         namespace log = irods::http::log;
+        using json_pointer = nlohmann::json::json_pointer;
 
-        auto& cp = irods::http::globals::conn_pool;
-        auto conn = cp->get_connection();
-        const auto& zone = irods::http::globals::config->at("irods_client").at("zone").get_ref<const std::string&>();
+        auto conn = irods::http::globals::connection_pool().get_connection();
+        static const auto& zone = irods::http::globals::configuration().at(json_pointer{"/irods_client/zone"}).get_ref<const std::string&>();
 
         log::trace("{}: Changing identity associated with connection to [{}].", __func__, _username);
 

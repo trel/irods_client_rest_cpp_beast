@@ -34,9 +34,7 @@ namespace irods::http::handler
             return _sess_ptr->send(fail(status_type::method_not_allowed));
         }
 
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
-
-        boost::asio::post(thread_pool, [fn = __func__, _sess_ptr, _req = std::move(_req)] {
+        irods::http::globals::background_task([fn = __func__, _sess_ptr, _req = std::move(_req)] {
             const auto& hdrs = _req.base();
             const auto iter = hdrs.find("authorization");
             if (iter == std::end(hdrs)) {
@@ -83,7 +81,7 @@ namespace irods::http::handler
             bool login_successful = false;
 
             try {
-                const auto& svr = irods::http::globals::config->at("irods_client");
+                const auto& svr = irods::http::globals::configuration().at("irods_client");
                 const auto& host = svr.at("host").get_ref<const std::string&>();
                 const auto port = svr.at("port").get<std::uint16_t>();
                 const auto& zone = svr.at("zone").get_ref<const std::string&>();
@@ -101,7 +99,7 @@ namespace irods::http::handler
                 return _sess_ptr->send(fail(status_type::unauthorized));
             }
 
-            static const auto seconds = irods::http::globals::config->at(nlohmann::json::json_pointer{"/http_server/authentication/basic/timeout_in_seconds"}).get<int>();
+            static const auto seconds = irods::http::globals::configuration().at(nlohmann::json::json_pointer{"/http_server/authentication/basic/timeout_in_seconds"}).get<int>();
             auto bearer_token = irods::process_stash::insert(authenticated_client_info{
                 .auth_scheme = authorization_scheme::basic,
                 .username = std::move(username),

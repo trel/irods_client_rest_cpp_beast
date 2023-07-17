@@ -133,7 +133,7 @@ namespace
 
         log::trace("{}: Scheduling atomic metadata operations on long-running task thread pool.", __func__);
 
-        net::post(*irods::http::globals::thread_pool_bg, [fn = __func__, _sess_ptr, client_info, res = std::move(res), json_input = data_iter->second]() mutable {
+        irods::http::globals::background_task([fn = __func__, _sess_ptr, client_info, res = std::move(res), json_input = data_iter->second]() mutable {
             try {
                 log::trace("{}: Executing metadata operations.", fn);
 

@@ -66,7 +66,7 @@ namespace
                               const std::string& _path,
                               const irods::experimental::io::odstream* _base = nullptr)
         {
-            const auto& client = irods::http::globals::config->at("irods_client");
+            const auto& client = irods::http::globals::configuration().at("irods_client");
             const auto& zone = client.at("zone").get_ref<const std::string&>();
             const auto& rodsadmin = client.at("rodsadmin");
 
@@ -283,9 +283,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -331,7 +330,7 @@ namespace
                     try {
                         const auto count = std::stoi(iter->second);
 
-                        if (count > irods::http::globals::config->at(json::json_pointer{"/irods_client/max_rbuffer_size_in_bytes"}).get<int>()) {
+                        if (count > irods::http::globals::configuration().at(json::json_pointer{"/irods_client/max_rbuffer_size_in_bytes"}).get<int>()) {
                             res.result(http::status::bad_request);
                             res.prepare_payload();
                             return _sess_ptr->send(std::move(res));
@@ -393,9 +392,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -506,7 +504,7 @@ namespace
                 }
                 const auto count = std::stoll(iter->second);
 
-                static const auto max_wbuffer_size = irods::http::globals::config->at(json::json_pointer{"/irods_client/max_wbuffer_size_in_bytes"}).get<std::int64_t>();
+                static const auto max_wbuffer_size = irods::http::globals::configuration().at(json::json_pointer{"/irods_client/max_wbuffer_size_in_bytes"}).get<std::int64_t>();
                 if (count > max_wbuffer_size) {
                     log::error("{}: Argument for [count] parameter exceeds [/irods_client/wbuffer_size_in_bytes].", fn);
                     res.result(http::status::bad_request);
@@ -565,9 +563,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -589,7 +586,7 @@ namespace
                 }
 
                 const auto stream_count = std::stoi(stream_count_iter->second);
-                if (stream_count > irods::http::globals::config->at(json::json_pointer{"/irods_client/max_number_of_parallel_write_streams"}).get<int>()) {
+                if (stream_count > irods::http::globals::configuration().at(json::json_pointer{"/irods_client/max_number_of_parallel_write_streams"}).get<int>()) {
                     log::error("{}: Argument for [stream-count] parameter exceeds maximum number of streams allowed.", fn, stream_count_iter->second);
                     res.result(http::status::bad_request);
                     res.prepare_payload();
@@ -695,9 +692,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -788,9 +784,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -862,9 +857,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -952,9 +946,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -1047,9 +1040,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -1134,9 +1126,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -1234,9 +1225,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -1316,9 +1306,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -1393,9 +1382,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -1479,9 +1467,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};

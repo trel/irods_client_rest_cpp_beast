@@ -127,9 +127,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -233,9 +232,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -289,9 +287,8 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        auto& thread_pool = *irods::http::globals::thread_pool_bg;
 
-        net::post(thread_pool, [fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
             log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
