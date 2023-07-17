@@ -12,10 +12,11 @@ set(EXECUTABLE_NAME ${IRODS_HTTP_API_BINARY_NAME})
 
 add_executable(
   ${EXECUTABLE_NAME}
-  ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/session.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/common.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/crlf_parser.cpp)
+  ${CMAKE_CURRENT_SOURCE_DIR}/crlf_parser.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/globals.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/session.cpp)
 
 target_compile_definitions(
   ${EXECUTABLE_NAME}

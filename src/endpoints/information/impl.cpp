@@ -23,7 +23,7 @@ namespace irods::http::handler
             return _sess_ptr->send(fail(status_type::method_not_allowed));
         }
 
-        const auto& svr = irods::http::globals::config->at("irods_client");
+        const auto& svr = irods::http::globals::configuration().at("irods_client");
 
         using json = nlohmann::json;
 

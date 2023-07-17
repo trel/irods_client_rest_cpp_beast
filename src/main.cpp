@@ -319,7 +319,7 @@ auto main(int _argc, char* _argv[]) -> int
         }
 
         const auto config = json::parse(std::ifstream{vm["config-file"].as<std::string>()});
-        irods::http::globals::config = &config;
+        irods::http::globals::set_configuration(config);
 
         const auto& http_server_config = config.at("http_server");
         set_log_level(http_server_config);
@@ -340,12 +340,12 @@ auto main(int _argc, char* _argv[]) -> int
 
         log::trace("Initializing iRODS connection pool.");
         auto conn_pool = init_irods_connection_pool(config);
-        irods::http::globals::conn_pool = &conn_pool;
+        irods::http::globals::set_connection_pool(conn_pool);
 
         // The io_context is required for all I/O.
         log::trace("Initializing HTTP components.");
         net::io_context ioc{request_thread_count};
-        irods::http::globals::req_handler_ioc = &ioc;
+        irods::http::globals::set_request_handler_io_context(ioc);
 
         // Create and launch a listening port.
         log::trace("Initializing listening socket (host=[{}], port=[{}]).", address.to_string(), port);
@@ -365,7 +365,7 @@ auto main(int _argc, char* _argv[]) -> int
         // These threads are used for long running tasks (e.g. reading/writing bytes, database, etc.)
         log::trace("Initializing thread pool for long running I/O tasks.");
         net::thread_pool io_threads(std::max(http_server_config.at(json::json_pointer{"/background_io/threads"}).get<int>(), 1));
-        irods::http::globals::thread_pool_bg = &io_threads;
+        irods::http::globals::set_background_thread_pool(io_threads);
 
         // Run the I/O service on the requested number of threads.
         log::trace("Initializing thread pool for HTTP requests.");

@@ -158,7 +158,7 @@ namespace
         }
         offset = std::max(0, offset);
 
-        const auto max_row_count = irods::http::globals::config->at(json::json_pointer{"/irods_client/max_number_of_rows_per_catalog_query"}).get<int>();
+        static const auto max_row_count = irods::http::globals::configuration().at(json::json_pointer{"/irods_client/max_number_of_rows_per_catalog_query"}).get<int>();
         int count = 0;
         if (const auto iter = _args.find("count"); iter != std::end(_args)) {
             try {
@@ -176,7 +176,9 @@ namespace
         res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
-        net::post(*irods::http::globals::thread_pool_bg, [_sess_ptr, client_info, parser = std::move(parser), gql = query_iter->second, res = std::move(res), offset, count]() mutable {
+        irods::http::globals::background_task([fn = __func__, _sess_ptr, client_info, parser = std::move(parser), gql = query_iter->second, res = std::move(res), offset, count]() mutable {
+            static_cast<void>(fn);
+
             try {
                 json::array_t row;
                 json::array_t rows;
@@ -287,7 +289,7 @@ namespace
         }
         offset = std::max(0, offset);
 
-        const auto max_row_count = irods::http::globals::config->at(json::json_pointer{"/irods_client/max_number_of_rows_per_catalog_query"}).get<int>();
+        static const auto max_row_count = irods::http::globals::configuration().at(json::json_pointer{"/irods_client/max_number_of_rows_per_catalog_query"}).get<int>();
         int count = max_row_count;
         if (const auto iter = _args.find("count"); iter != std::end(_args)) {
             try {
@@ -316,7 +318,9 @@ namespace
         res.set(http::field::content_type, "application/json");
         res.keep_alive(_req.keep_alive());
 
-        net::post(*irods::http::globals::thread_pool_bg, [_sess_ptr, client_info, name = name_iter->second, res = std::move(res), offset, count, args = std::move(args)]() mutable {
+        irods::http::globals::background_task([fn = __func__, _sess_ptr, client_info, name = name_iter->second, res = std::move(res), offset, count, args = std::move(args)]() mutable {
+            static_cast<void>(fn);
+
             try {
                 json::array_t row;
                 json::array_t rows;
