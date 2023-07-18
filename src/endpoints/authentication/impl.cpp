@@ -58,8 +58,7 @@ namespace irods::http::handler
             log::debug("{}: Authorization value (trimmed): [{}]", fn, authorization);
 
             constexpr auto max_creds_size = 128;
-            unsigned long size = max_creds_size;
-            //std::vector<std::uint8_t> creds(size);
+            std::uint64_t size = max_creds_size;
             std::array<std::uint8_t, max_creds_size> creds{};
             // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
             const auto ec = irods::base64_decode(reinterpret_cast<unsigned char*>(authorization.data()), authorization.size(), creds.data(), &size);
@@ -67,7 +66,7 @@ namespace irods::http::handler
 
             // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
             std::string_view sv{reinterpret_cast<char*>(creds.data()), size}; 
-            log::debug("{}: base64 decode credentials = [{}]", fn, sv); // TODO Don't print the password
+            //log::debug("{}: base64 decode credentials = [{}]", fn, sv); // BE CAREFUL!!! THIS LOGS THE USER'S PASSWORD!
 
             const auto colon = sv.find(':');
             if (colon == std::string_view::npos) {
@@ -76,7 +75,7 @@ namespace irods::http::handler
 
             std::string username{sv.substr(0, colon)};
             std::string password{sv.substr(colon + 1)};
-            log::debug("{}: username=[{}], password=[{}]", fn, username, password); // TODO Don't print the password
+            //log::debug("{}: username=[{}], password=[{}]", fn, username, password); // BE CAREFUL!!! THIS LOGS THE USER'S PASSWORD!
 
             bool login_successful = false;
 

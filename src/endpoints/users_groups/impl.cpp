@@ -147,7 +147,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -227,7 +227,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -285,7 +285,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -352,7 +352,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -419,7 +419,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -464,7 +464,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -508,7 +508,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -560,7 +560,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -612,7 +612,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -676,7 +676,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -740,7 +740,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -797,7 +797,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -852,7 +852,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -896,7 +896,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -963,7 +963,7 @@ namespace
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);

@@ -132,7 +132,7 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        log::info("{}: client_info->username = [{}]", __func__, client_info->username);
 
         irods::http::globals::background_task([fn = __func__, _sess_ptr, req = std::move(_req), args = std::move(_args), client_info]() mutable {
             auto query_iter = args.find("query");
@@ -300,7 +300,7 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        log::info("{}: client_info->username = [{}]", __func__, client_info->username);
 
         const auto name_iter = _args.find("name");
         if (name_iter == std::end(_args)) {
