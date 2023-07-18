@@ -6,6 +6,7 @@
 #include "version.hpp"
 
 #include <irods/connection_pool.hpp>
+#include <irods/process_stash.hpp>
 #include <irods/rcConnect.h>
 #include <irods/rcMisc.h>
 #include <irods/rodsClient.h>
@@ -166,6 +167,8 @@ auto print_configuration_template() -> void
         "log_level": "warn",
 
         "authentication": {{
+            "eviction_check_interval_in_seconds": 60,
+
             "basic": {{
                 "timeout_in_seconds": 3600
             }}
@@ -279,6 +282,51 @@ auto init_irods_connection_pool(const json& _config) -> irods::connection_pool
     };
 } // init_irods_connection_pool
 
+class bearer_token_eviction_manager
+{
+    net::steady_timer timer_;
+    std::chrono::seconds interval_;
+
+  public:
+    bearer_token_eviction_manager(net::io_context& _io, std::chrono::seconds _eviction_check_interval)
+        : timer_{_io}
+        , interval_{_eviction_check_interval}
+    {
+        evict();
+    } // constructor
+
+  private:
+    auto evict() -> void
+    {
+        timer_.expires_after(interval_);
+        timer_.async_wait([this](const auto& _ec) {
+            if (_ec) {
+                return;
+            }
+
+            log::trace("Evicting expired bearer tokens ...");
+            irods::process_stash::erase_if([](const auto& _k, const auto& _v) {
+                try {
+                    const auto* p = boost::any_cast<const irods::http::authenticated_client_info>(&_v);
+                    const auto erase_token = (p && std::chrono::steady_clock::now() >= p->expires_at);
+
+                    if (erase_token) {
+                        log::debug("Evicted bearer token [{}].", _k);
+                    }
+
+                    return erase_token;
+                }
+                catch (...) {
+                }
+
+                return false;
+            });
+
+            evict();
+        });
+    } // evict
+}; // class bearer_token_eviction_manager
+
 auto main(int _argc, char* _argv[]) -> int
 {
     po::options_description opts_desc{""};
@@ -373,6 +421,11 @@ auto main(int _argc, char* _argv[]) -> int
         for (auto i = request_thread_count - 1; i > 0; --i) {
             net::post(request_handler_threads, [&ioc] { ioc.run(); });
         }
+
+        // Launch eviction check for expired bearer tokens.
+        const auto eviction_check_interval = http_server_config.at(json::json_pointer{"/authentication/eviction_check_interval_in_seconds"}).get<int>();
+        bearer_token_eviction_manager eviction_mgr{ioc, std::chrono::seconds{eviction_check_interval}};
+
         log::info("Server is ready.");
         ioc.run();
 
