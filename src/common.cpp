@@ -223,11 +223,10 @@ namespace irods::http
         const auto* p = boost::any_cast<authenticated_client_info>(&*object);
         if (std::chrono::steady_clock::now() >= p->expires_at) {
             log::error("{}: Session for bearer token [{}] has expired.", __func__, bearer_token);
-            irods::process_stash::erase(bearer_token);
             return {.response = fail(status_type::unauthorized)};
         }
 
-        log::debug("{}: Client is authenticated.", __func__);
+        log::trace("{}: Client is authenticated.", __func__);
         return {.client_info = p};
     } // resolve_client_identity
 } // namespace irods::http
