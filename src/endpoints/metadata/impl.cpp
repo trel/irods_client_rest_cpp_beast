@@ -118,7 +118,7 @@ namespace
         }
 
         const auto* client_info = result.client_info;
-        log::info("{}: client_info = ({}, {})", __func__, client_info->username, client_info->password);
+        log::info("{}: client_info->username = [{}]", __func__, client_info->username);
 
         http::response<http::string_body> res{http::status::ok, _req.version()};
         res.set(http::field::server, irods::http::version::server_name);

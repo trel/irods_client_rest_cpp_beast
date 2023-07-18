@@ -36,7 +36,7 @@ namespace irods::http::handler
         const auto* client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req)] {
-            log::info("{}: client_info = ({}, {})", fn, client_info->username, client_info->password);
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
 
             const auto url = irods::http::parse_url(_req);
 
