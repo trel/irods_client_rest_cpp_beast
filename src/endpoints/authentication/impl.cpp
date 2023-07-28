@@ -7,10 +7,12 @@
 #include "version.hpp"
 
 #include <irods/base64.hpp>
+#include <irods/check_auth_credentials.h>
 #include <irods/client_connection.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/process_stash.hpp>
 #include <irods/rcConnect.h>
+#include <irods/user_administration.hpp>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
@@ -80,18 +82,37 @@ namespace irods::http::handler
             bool login_successful = false;
 
             try {
-                const auto& svr = irods::http::globals::configuration().at("irods_client");
-                const auto& host = svr.at("host").get_ref<const std::string&>();
-                const auto port = svr.at("port").get<std::uint16_t>();
-                const auto& zone = svr.at("zone").get_ref<const std::string&>();
+                static const auto& rodsadmin_username = irods::http::globals::configuration().at(nlohmann::json::json_pointer{"/irods_client/rodsadmin/username"}).get_ref<const std::string&>();
+                static const auto& rodsadmin_password = irods::http::globals::configuration().at(nlohmann::json::json_pointer{"/irods_client/rodsadmin/password"}).get_ref<const std::string&>();
+                static const auto& zone = irods::http::globals::configuration().at(nlohmann::json::json_pointer{"/irods_client/zone"}).get_ref<const std::string&>();
 
-                irods::experimental::client_connection conn{
-                    irods::experimental::defer_authentication, host, port, {username, zone}};
+                CheckAuthCredentialsInput input{};
+                username.copy(input.username, sizeof(CheckAuthCredentialsInput::username));
+                zone.copy(input.zone, sizeof(CheckAuthCredentialsInput::zone));
 
-                login_successful = (clientLoginWithPassword(static_cast<RcComm*>(conn), password.data()) == 0);
+                namespace adm = irods::experimental::administration;
+                const adm::user_password_property prop{password, rodsadmin_password};
+                const auto obfuscated_password = irods::experimental::administration::obfuscate_password(prop);
+                obfuscated_password.copy(input.password, sizeof(CheckAuthCredentialsInput::password));
+
+                int* correct{};
+
+                auto conn = irods::get_connection(rodsadmin_username);
+
+                if (const auto ec = rc_check_auth_credentials(static_cast<RcComm*>(conn), &input, &correct); ec < 0) {
+                    log::error("{}: Error verifying native authentication credentials for user [{}]: error code [{}].", fn, username, ec);
+                }
+                else {
+                    log::debug("{}: correct = [{}]", fn, fmt::ptr(correct));
+                    log::debug("{}: *correct = [{}]", fn, (correct ? *correct : -1));
+                    login_successful = (correct && 1 == *correct);
+                }
             }
             catch (const irods::exception& e) {
-                log::error(e.client_display_what());
+                log::error("{}: Error verifying native authentication credentials for user [{}]: {}", fn, username, e.client_display_what());
+            }
+            catch (const std::exception& e) {
+                log::error("{}: Error verifying native authentication credentials for user [{}]: {}", fn, username, e.what());
             }
 
             if (!login_successful) {
