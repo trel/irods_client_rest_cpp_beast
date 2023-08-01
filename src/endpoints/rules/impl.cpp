@@ -6,7 +6,6 @@
 #include "session.hpp"
 #include "version.hpp"
 
-#include <irods/client_connection.hpp>
 #include <irods/execCmd.h>
 #include <irods/execMyRule.h>
 #include <irods/irods_at_scope_exit.hpp>

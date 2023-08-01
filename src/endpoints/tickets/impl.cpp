@@ -6,7 +6,6 @@
 #include "session.hpp"
 #include "version.hpp"
 
-#include <irods/client_connection.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/rodsErrorTable.h>
 #include <irods/ticket_administration.hpp>

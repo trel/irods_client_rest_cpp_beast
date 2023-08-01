@@ -8,7 +8,6 @@
 
 #include <irods/base64.hpp>
 #include <irods/check_auth_credentials.h>
-#include <irods/client_connection.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/process_stash.hpp>
 #include <irods/rcConnect.h>

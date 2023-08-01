@@ -7,7 +7,6 @@
 #include "version.hpp"
 
 #include <irods/irods_at_scope_exit.hpp>
-#include <irods/client_connection.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/irods_query.hpp>
 #include <irods/procApiRequest.h>
