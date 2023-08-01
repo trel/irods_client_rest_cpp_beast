@@ -7,7 +7,6 @@
 #include "version.hpp"
 
 #include <irods/atomic_apply_metadata_operations.h>
-#include <irods/client_connection.hpp>
 #include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/rodsErrorTable.h>
