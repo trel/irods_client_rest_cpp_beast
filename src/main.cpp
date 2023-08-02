@@ -6,6 +6,7 @@
 #include "version.hpp"
 
 #include <irods/connection_pool.hpp>
+#include <irods/irods_configuration_keywords.hpp>
 #include <irods/process_stash.hpp>
 #include <irods/rcConnect.h>
 #include <irods/rcMisc.h>
@@ -21,7 +22,7 @@
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/thread_pool.hpp>
 #include <boost/config.hpp>
-//#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
 
 #include <fmt/format.h>
@@ -31,6 +32,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -190,6 +192,14 @@ auto print_configuration_template() -> void
         "port": 1247,
         "zone": "<string>",
 
+        "tls": {{
+            "client_server_policy": "<string>",
+            "ca_certificate_file": "<string>",
+            "certificate_chain_file": "<string>",
+            "dh_params_file": "<string>",
+            "verify_server": "<string>"
+        }},
+
         "proxy_rodsadmin": {{
             "username": "<string>",
             "password": "<string>"
@@ -258,6 +268,26 @@ auto set_log_level(const json& _config) -> void
 
     spdlog::set_level(lvl_enum);
 } // set_log_level
+
+auto init_tls(const json& _config) -> void
+{
+    const auto set_env_var = [&](const auto& _json_ptr_path, const char* _env_var, const char* _default_value = "")
+    {
+        using json_ptr = json::json_pointer;
+
+        if (const auto v = _config.value(json_ptr{_json_ptr_path}, _default_value); !v.empty()) {
+            const auto env_var_upper = boost::to_upper_copy<std::string>(_env_var);
+            log::trace("Setting environment variable [{}] to [{}].", env_var_upper, v);
+            setenv(env_var_upper.c_str(), v.c_str(), 1); // NOLINT(concurrency-mt-unsafe)
+        }
+    };
+
+    set_env_var("/irods_client/tls/client_server_policy", irods::KW_CFG_IRODS_CLIENT_SERVER_POLICY, "CS_NEG_REFUSE");
+    set_env_var("/irods_client/tls/ca_certificate_file", irods::KW_CFG_IRODS_SSL_CA_CERTIFICATE_FILE);
+    set_env_var("/irods_client/tls/certificate_chain_file", irods::KW_CFG_IRODS_SSL_CERTIFICATE_CHAIN_FILE);
+    set_env_var("/irods_client/tls/dh_params_file", irods::KW_CFG_IRODS_SSL_DH_PARAMS_FILE);
+    set_env_var("/irods_client/tls/verify_server", irods::KW_CFG_IRODS_SSL_VERIFY_SERVER, "cert");
+} // init_tls
 
 auto init_irods_connection_pool(const json& _config) -> irods::connection_pool
 {
@@ -373,6 +403,8 @@ auto main(int _argc, char* _argv[]) -> int
         set_log_level(http_server_config);
         spdlog::set_pattern("[%Y-%m-%d %T.%e] [P:%P] [%^%l%$] [T:%t] %v");
 
+        log::info("Initializing server.");
+
         // TODO For LONG running tasks, see the following:
         //
         //   - https://stackoverflow.com/questions/17648725/long-running-blocking-operations-in-boost-asio-handlers
@@ -385,6 +417,9 @@ auto main(int _argc, char* _argv[]) -> int
         const auto address = net::ip::make_address(http_server_config.at("host").get_ref<const std::string&>());
         const auto port = http_server_config.at("port").get<std::uint16_t>();
         const auto request_thread_count = std::max(http_server_config.at(json::json_pointer{"/requests/threads"}).get<int>(), 1);
+
+        log::trace("Initializing TLS.");
+        init_tls(config);
 
         log::trace("Initializing iRODS connection pool.");
         auto conn_pool = init_irods_connection_pool(config);
@@ -441,6 +476,10 @@ auto main(int _argc, char* _argv[]) -> int
         log::info("Shutdown complete.");
 
         return 0;
+    }
+    catch (const irods::exception& e) {
+        fmt::print(stderr, "Error: {}\n", e.client_display_what());
+        return 1;
     }
     catch (const std::exception& e) {
         fmt::print(stderr, "Error: {}\n", e.what());
