@@ -130,6 +130,46 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
         // The zone of the target iRODS server.
         "zone": "<string>",
 
+        // Defines options for secure communication with the target iRODS server.
+        "tls": {
+            // Controls whether the client and server communicate using TLS.
+            //
+            // The following values are supported:
+            // - CS_NEG_REFUSE:    Do not use secure communication.
+            // - CS_NEG_REQUIRE:   Demand secure communication.
+            // - CS_NEG_DONT_CARE: Let the server decide.
+            "client_server_policy": "CS_NEG_REFUSE",
+
+            // The file containing trusted CA certificates in PEM format.
+            //
+            // Note that the certificates in this file are used in conjunction
+            // with the system default trusted certificates.
+            "ca_certificate_file": "<string>",
+
+            // The file containing the server's certificate chain.
+            //
+            // The certificates must be in PEM format and must be sorted
+            // starting with the subject's certificate (actual client or server
+            // certificate), followed by intermediate CA certificates if
+            // applicable, and ending at the highest level (root) CA.
+            "certificate_chain_file": "<string>",
+
+            // The file containing Diffie-Hellman parameters.
+            "dh_params_file": "<string>",
+
+            // Defines the level of server certificate authentication to
+            // perform.
+            //
+            // The following values are supported:
+            // - none:     Authentication is skipped.
+            // - cert:     The server verifies the certificate is signed by
+            //             a trusted CA.
+            // - hostname: Equivalent to "cert", but also verifies the FQDN
+            //             of the iRODS server matches either the common
+            //             name or one of the subjectAltNames.
+            "verify_server": "cert"
+        },
+
         // The credentials for the rodsadmin user that will act as a proxy
         // for all authenticated users.
         "proxy_rodsadmin": {
