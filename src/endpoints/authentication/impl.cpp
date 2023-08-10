@@ -214,6 +214,9 @@ namespace irods::http::handler
 
 			if (did_except) {
 				irods::http::globals::background_task([fn = __func__, _sess_ptr, _req = std::move(_req)] {
+					const auto timeout{irods::http::globals::oidc_configuration().at("state_timeout_in_seconds").get<int>()};
+					const auto state{irods::http::process_stash::insert(std::chrono::steady_clock::now() + std::chrono::seconds(timeout))};
+
 					body_arguments args{
 						{"client_id",
 					     irods::http::globals::oidc_configuration().at("client_id").get_ref<const std::string&>()},
@@ -221,7 +224,7 @@ namespace irods::http::handler
 						{"scope", "openid"},
 						{"redirect_uri",
 					     irods::http::globals::oidc_configuration().at("redirect_uri").get_ref<const std::string&>()},
-						{"state", "placeholder"}};
+						{"state", state}};
 
 					const auto auth_endpoint{irods::http::globals::oidc_endpoint_configuration()
 					                             .at("authorization_endpoint")
@@ -254,7 +257,29 @@ namespace irods::http::handler
 						return _sess_ptr->send(fail(status_type::bad_request));
 					}
 
-					auto is_state_valid{[](std::string_view in_state) { return in_state.compare("placeholder") == 0; }};
+					const auto is_state_valid{[](const std::string& _in_state) {
+					  const auto mapped_value{irods::http::process_stash::find(_in_state)};
+					  if (!mapped_value) {
+						return false;
+					  }
+					  
+					  const auto* expire_time{boost::any_cast<const std::chrono::steady_clock::time_point>(&*mapped_value)};
+					  if (expire_time == nullptr) {
+						return false;
+					  }
+
+					  // Ensure state is not expired...
+					  const auto is_expired{std::chrono::steady_clock::now() >= *expire_time};
+
+					  // Remove item from valid states
+					  if (!irods::http::process_stash::erase(_in_state)) {
+						// Someone else got validated first!
+						return false;
+					  }
+
+					  // Return state validity
+					  return !is_expired;
+					}};
 
 					// The state is invalid (i.e. doesn't exist, or have been used)
 					if (!is_state_valid(state_iter->second)) {

@@ -408,13 +408,13 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 	}
 } // load_oidc_configuration
 
-class bearer_token_eviction_manager
+class process_stash_eviction_manager
 {
     net::steady_timer timer_;
     std::chrono::seconds interval_;
 
   public:
-    bearer_token_eviction_manager(net::io_context& _io, std::chrono::seconds _eviction_check_interval)
+    process_stash_eviction_manager(net::io_context& _io, std::chrono::seconds _eviction_check_interval)
         : timer_{_io}
         , interval_{_eviction_check_interval}
     {
@@ -430,28 +430,33 @@ class bearer_token_eviction_manager
                 return;
             }
 
-            log::trace("Evicting expired bearer tokens ...");
+            log::trace("Evicting expired items...");
             irods::http::process_stash::erase_if([](const auto& _k, const auto& _v) {
-                try {
-                    const auto* p = boost::any_cast<const irods::http::authenticated_client_info>(&_v);
-                    const auto erase_token = (p && std::chrono::steady_clock::now() >= p->expires_at);
+			  // Check for client bearer token
+			  const auto* client_info{boost::any_cast<const irods::http::authenticated_client_info>(&_v)};
+			  const auto erase_token{(client_info && std::chrono::steady_clock::now() >= client_info->expires_at)};
 
-                    if (erase_token) {
-                        log::debug("Evicted bearer token [{}].", _k);
-                    }
+			  // Check for OAuth 2.0 state param
+			  const auto* expire_time{boost::any_cast<const std::chrono::steady_clock::time_point>(&_v)};
+			  const auto erase_state{(expire_time && std::chrono::steady_clock::now() >= *expire_time)};
 
-                    return erase_token;
-                }
-                catch (...) {
-                }
+			  // Determine if value need to be deleted
+			  const auto erase_value{erase_token || erase_state};
 
-                return false;
+			  if (erase_token) {
+				log::debug("Evicted bearer token [{}].", _k);
+			  }
+			  else if (erase_state) {
+				log::debug("Evicted state [{}].", _k);
+			  }
+
+			  return erase_value;
             });
 
             evict();
         });
     } // evict
-}; // class bearer_token_eviction_manager
+}; // class process_stash_eviction_manager
 
 auto main(int _argc, char* _argv[]) -> int
 {
@@ -567,7 +572,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         // Launch eviction check for expired bearer tokens.
         const auto eviction_check_interval = http_server_config.at(json::json_pointer{"/authentication/eviction_check_interval_in_seconds"}).get<int>();
-        bearer_token_eviction_manager eviction_mgr{ioc, std::chrono::seconds{eviction_check_interval}};
+        process_stash_eviction_manager eviction_mgr{ioc, std::chrono::seconds{eviction_check_interval}};
 
         log::info("Server is ready.");
         ioc.run();
