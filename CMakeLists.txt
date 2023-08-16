@@ -22,7 +22,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-rdynamic -Wl,--export-dynamic -Wl,--enable-new-dtags -Wl,--as-needed -Wl,-z,defs")
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE_INIT "-Wl,--gc-sections -Wl,-z,combreloc")
 
-project(${IRODS_HTTP_API_BINARY_NAME} VERSION "${IRODS_VERSION}" LANGUAGES CXX)
+project(${IRODS_HTTP_API_BINARY_NAME} VERSION "${IRODS_HTTP_API_VERSION}" LANGUAGES CXX)
 
 find_package(Threads REQUIRED)
 
