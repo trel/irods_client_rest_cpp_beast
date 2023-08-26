@@ -22,7 +22,8 @@ namespace irods::http::handler
             return _sess_ptr->send(fail(status_type::method_not_allowed));
         }
 
-        const auto& svr = irods::http::globals::configuration().at("irods_client");
+        const auto& http_server_config = irods::http::globals::configuration().at("http_server");
+        const auto& irods_client_config = irods::http::globals::configuration().at("irods_client");
 
         using json = nlohmann::json;
 
@@ -41,8 +42,12 @@ namespace irods::http::handler
         res.body() = json{
             {"api_version", irods::http::version::api_version},
             {"build", irods::http::version::sha},
-            {"irods_zone", svr.at("zone")},
             {"genquery2_enabled", GENQUERY2_ENABLED},
+            {"irods_zone", irods_client_config.at("zone")},
+            // TODO These may not be defined.
+            {"max_http_request_size_in_bytes", http_server_config.at(json::json_pointer{"/requests/max_rbuffer_size_in_bytes"})},
+            {"max_number_of_parallel_write_streams", irods_client_config.at("max_number_of_parallel_write_streams")},
+            {"max_number_of_rows_per_catalog_query", irods_client_config.at("max_number_of_rows_per_catalog_query")}
         }.dump();
 
         res.prepare_payload();
