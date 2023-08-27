@@ -402,6 +402,10 @@ namespace
             res.keep_alive(_req.keep_alive());
 
             try {
+                // Used to determine whether the data object should be closed following the write
+                // operation or by the parallel_write_shutdown HTTP API operation.
+                bool is_parallel_write = false;
+
                 irods::connection_pool::connection_proxy conn;
                 std::unique_ptr<io::client::native_transport> tp;
 
@@ -431,6 +435,8 @@ namespace
                     //
                     // We've found a matching handle!
                     //
+
+                    is_parallel_write = true;
 
                     if (const auto stream_index_iter = _args.find("stream-index"); stream_index_iter != std::end(_args)) {
                         log::debug("{}: Client selected [{}] for [stream-index] parameter.", fn, stream_index_iter->second);
@@ -470,7 +476,14 @@ namespace
 
                     conn = irods::get_connection(client_info->username);
                     tp = std::make_unique<io::client::native_transport>(conn);
-                    out = std::make_unique<io::odstream>(*tp, lpath_iter->second);
+
+                    if (const auto iter = _args.find("resource"); iter != std::end(_args)) {
+                        out = std::make_unique<io::odstream>(*tp, lpath_iter->second, io::root_resource_name{iter->second});
+                    }
+                    else {
+                        out = std::make_unique<io::odstream>(*tp, lpath_iter->second);
+                    }
+
                     out_ptr = out.get();
                 }
 
@@ -520,6 +533,13 @@ namespace
 
                 log::debug("{}: Write buffer: size=[{}], count=[{}].", fn, iter->second.size(), count);
                 out_ptr->write(iter->second.data(), count);
+
+                // If we're performing a normal write, close the stream before returning a response.
+                // This is required so that the iRODS server triggers appropriate policy before handing
+                // back control to the client. For example, replication resources and synchronous replication.
+                if (!is_parallel_write) {
+                    out_ptr->close();
+                }
 
                 res.body() = json{
                     {"irods_response", {
