@@ -7,6 +7,8 @@ import socket
 import sys
 import time
 import unittest
+import http.client
+import concurrent.futures
 
 def setup_class(cls, opts):
     '''Initializes shared state needed by all test cases.
@@ -23,12 +25,22 @@ def setup_class(cls, opts):
     cls._class_init_error = False
     cls._remove_rodsuser = False
 
-    if config.test_config.get('irods_http_api_url', None) == None:
-        #print('Missing configuration property: irods_http_api_url') # Debug
+    if config.test_config.get('host', None) == None:
+        #print('Missing configuration property: host') # Debug
         cls._class_init_error = True
         return
 
-    cls.url_base = config.test_config['irods_http_api_url']
+    if config.test_config.get('port', None) == None:
+        #print('Missing configuration property: port') # Debug
+        cls._class_init_error = True
+        return
+
+    if config.test_config.get('url_base', None) == None:
+        #print('Missing configuration property: url_base') # Debug
+        cls._class_init_error = True
+        return
+
+    cls.url_base = f"http://{config.test_config['host']}:{config.test_config['port']}{config.test_config['url_base']}"
     cls.url_endpoint = f'{cls.url_base}/{opts["endpoint_name"]}'
 
     cls.zone_name = config.test_config['irods_zone']
@@ -437,6 +449,105 @@ class test_data_objects_endpoint(unittest.TestCase):
 
         # Remove the resource.
         r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={'op': 'remove', 'name': resc_name})
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+    def multipart_form_data_upload(self, **args):
+        boundary = '------testing_http_api------'
+
+        body = ''
+
+        for fname, fvalue in args['fields'].items():
+            body += f'--{boundary}\r\n'
+            body += f'Content-Disposition: form-data; name={fname}\r\n\r\n'
+            body += f'{fvalue}\r\n'
+
+        body += f'--{boundary}\r\n'
+        body += f'Content-Disposition: form-data; name=bytes\r\n'
+        body += f'Content-Type: application/octet-stream\r\n'
+        body += f"Content-Length: {len(args['bytes'])}\r\n"
+        body += '\r\n'
+        body += f"{args['bytes']}\r\n"
+
+        body += f'--{boundary}--\r\n'
+
+        #print('body = ' + body) # Debug
+
+        conn = http.client.HTTPConnection(config.test_config['host'], config.test_config['port'])
+        conn.request('POST', config.test_config['url_base'] + '/data-objects', bytes(body, 'utf-8'), {
+            'Authorization': f"Bearer {args['bearer_token']}",
+            'Content-Type': f'multipart/form-data; boundary={boundary}'
+        })
+
+        response = conn.getresponse()
+        result = json.loads(response.read().decode('utf-8'))
+        #print(result) # Debug
+        conn.close()
+
+        self.assertEqual(response.status, 200)
+
+        return result
+
+    def test_parallel_writes(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+
+        # Tell the server we're about to do a parallel write.
+        data_object = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'parallel_write.txt')
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'parallel_write_init',
+            'lpath': data_object,
+            'stream-count': 3
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        parallel_write_handle = result['parallel_write_handle']
+
+        # Write to the data object using the parallel write handle.
+        futures = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            for e in enumerate(['A', 'B', 'C']):
+                count = 10
+                futures.append(executor.submit(self.multipart_form_data_upload, **{
+                    'bearer_token': self.rodsuser_bearer_token,
+                    'fields': {
+                        'op': 'write',
+                        'parallel-write-handle': parallel_write_handle,
+                        'offset': e[0] * count,
+                        'count': count,
+                        'stream-index': e[0]
+                    },
+                    'bytes': e[1] * count
+                }))
+
+            for f in concurrent.futures.as_completed(futures):
+                result = f.result()
+                #print(result) # Debug
+                self.assertEqual(result['irods_response']['error_code'], 0)
+
+        # End the parallel write.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'parallel_write_shutdown',
+            'parallel-write-handle': parallel_write_handle
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Read the contents of the data object and show it contains exactly what we expect.
+        r = requests.get(self.url_endpoint, headers=headers, params={
+            'op': 'read',
+            'lpath': data_object,
+            'count': 30
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.content.decode('utf-8'), 'A' * 10 + 'B' * 10 + 'C' * 10)
+
+        # Remove the data object.
+        r = requests.post(self.url_endpoint, headers=headers, data={'op': 'remove', 'lpath': data_object, 'no-trash': 1})
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['error_code'], 0)

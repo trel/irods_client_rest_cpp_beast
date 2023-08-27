@@ -1,5 +1,7 @@
 test_config = {
-    'irods_http_api_url': 'http://localhost:9000/irods-http-api/0.1.0',
+    'host': 'localhost',
+    'port': 9000,
+    'url_base': '/irods-http-api/0.1.0',
 
     'rodsadmin': {
         'username': 'rods',
