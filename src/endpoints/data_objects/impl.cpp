@@ -515,15 +515,7 @@ namespace
                     res.prepare_payload();
                     return _sess_ptr->send(std::move(res));
                 }
-                const auto count = std::stoll(iter->second);
-
-                static const auto max_wbuffer_size = irods::http::globals::configuration().at(json::json_pointer{"/irods_client/max_wbuffer_size_in_bytes"}).get<std::int64_t>();
-                if (count > max_wbuffer_size) {
-                    log::error("{}: Argument for [count] parameter exceeds [/irods_client/wbuffer_size_in_bytes].", fn);
-                    res.result(http::status::bad_request);
-                    res.prepare_payload();
-                    return _sess_ptr->send(std::move(res));
-                }
+                auto remaining_bytes = std::stoll(iter->second);
 
                 iter = _args.find("bytes");
                 if (iter == std::end(_args)) {
@@ -531,8 +523,21 @@ namespace
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
-                log::debug("{}: Write buffer: size=[{}], count=[{}].", fn, iter->second.size(), count);
-                out_ptr->write(iter->second.data(), count);
+                static const auto max_wbuffer_size = irods::http::globals::configuration().at(json::json_pointer{"/irods_client/max_wbuffer_size_in_bytes"}).get<std::int64_t>();
+                const char* p = iter->second.data();
+
+                while (remaining_bytes > 0) {
+                    if (!*out_ptr) {
+                        log::error("{}: Output stream is in a bad state. Client should restart the entire transfer.", fn);
+                        return _sess_ptr->send(irods::http::fail(res, http::status::internal_server_error));
+                    }
+
+                    const auto to_send = std::min<std::streamsize>(remaining_bytes, max_wbuffer_size);
+                    log::debug("{}: Write buffer: remaining=[{}], sending=[{}].", fn, remaining_bytes, to_send);
+                    out_ptr->write(p, to_send);
+                    p += to_send;
+                    remaining_bytes -= to_send;
+                }
 
                 // If we're performing a normal write, close the stream before returning a response.
                 // This is required so that the iRODS server triggers appropriate policy before handing
