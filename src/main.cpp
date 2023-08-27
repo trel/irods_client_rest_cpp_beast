@@ -297,18 +297,32 @@ auto init_irods_connection_pool(const json& _config) -> irods::connection_pool
     const auto& rodsadmin = client.at("rodsadmin");
     const auto& username = rodsadmin.at("username").get_ref<const std::string&>();
 
+    irods::connection_pool_options opts;
+
+    if (const auto iter = conn_pool.find("refresh_time_in_seconds"); iter != std::end(conn_pool)) {
+        opts.number_of_seconds_before_connection_refresh = std::chrono::seconds{iter->get<int>()};
+    }
+
+    if (const auto iter = conn_pool.find("max_retrievals_before_refresh"); iter != std::end(conn_pool)) {
+        opts.number_of_retrievals_before_connection_refresh = iter->get<std::int16_t>();
+    }
+
+    if (const auto iter = conn_pool.find("refresh_when_resource_changes_detected"); iter != std::end(conn_pool)) {
+        opts.refresh_connections_when_resource_changes_detected = iter->get<bool>();
+    }
+
     return {
         conn_pool.at("size").get<int>(),
         client.at("host").get_ref<const std::string&>(),
         client.at("port").get<int>(),
         {{username, zone}},
         {username, zone},
-        conn_pool.at("refresh_timeout_in_seconds").get<int>(),
         [pw = rodsadmin.at("password").get<std::string>()](RcComm& _comm) mutable {
             if (const auto ec = clientLoginWithPassword(&_comm, pw.data()); ec != 0) {
                 throw std::invalid_argument{fmt::format("Could not authenticate rodsadmin user: [{}]", ec)};
             }
-        }
+        },
+        opts
     };
 } // init_irods_connection_pool
 

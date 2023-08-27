@@ -184,7 +184,15 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
 
             // The amount of time that must pass before a connection is
             // renewed (i.e. replaced).
-            "refresh_timeout_in_seconds": 600
+            "refresh_timeout_in_seconds": 600,
+
+            // The number of times a connection can be fetched from the pool
+            // before it is refreshed.
+            "max_retrievals_before_refresh": 16,
+
+            // Instructs the connection pool to track changes in resources.
+            // If a change is detected, all connections will be refreshed.
+            "refresh_when_resource_changes_detected": true
         },
 
         // The buffer size used for read operations.

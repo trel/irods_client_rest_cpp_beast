@@ -319,19 +319,18 @@ class test_data_objects_endpoint(unittest.TestCase):
         rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
         rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
 
-        # TODO Cannot run until issue #39 is resolved.
-#        # Create a unixfilesystem resource.
-#        resc_name = 'test_ufs_common_ops_resc'
-#        r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
-#            'op': 'create',
-#            'name': resc_name,
-#            'type': 'unixfilesystem',
-#            'host': socket.gethostname(),
-#            'vault-path': os.path.join('/tmp', f'{resc_name}_vault')
-#        })
-#        #print(r.content) # Debug
-#        self.assertEqual(r.status_code, 200)
-#        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        # Create a unixfilesystem resource.
+        resc_name = 'test_ufs_common_ops_resc'
+        r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
+            'op': 'create',
+            'name': resc_name,
+            'type': 'unixfilesystem',
+            'host': socket.gethostname(),
+            'vault-path': os.path.join('/tmp', f'{resc_name}_vault')
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
 
         # Create a non-empty data object.
         data_object = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'common_ops.txt')
@@ -346,39 +345,38 @@ class test_data_objects_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['error_code'], 0)
 
-        # TODO Cannot run until issue #39 is resolved.
-#        # Replicate the data object.
-#        r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
-#            'op': 'replicate',
-#            'lpath': data_object,
-#            'dst-resource': resc_name
-#        })
-#        #print(r.content) # Debug
-#        self.assertEqual(r.status_code, 200)
-#        self.assertEqual(r.json()['irods_response']['error_code'], 0)
-#
-#        # Show there are two replicas.
-#        coll_name = os.path.dirname(data_object)
-#        data_name = os.path.basename(data_object)
-#        r = requests.get(f'{self.url_base}/query', headers=rodsuser_headers, params={
-#            'op': 'execute_genquery',
-#            'query': f"select DATA_NAME, RESC_NAME where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
-#        })
-#        #print(r.content) # Debug
-#        self.assertEqual(r.status_code, 200)
-#        result = r.json()
-#        self.assertEqual(result['irods_response']['error_code'], 0)
-#        self.assertEqual(len(result['rows']), 2)
-#
-#        # Trim the first replica.
-#        r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
-#            'op': 'trim',
-#            'lpath': data_object,
-#            'replica-number': 0
-#        })
-#        #print(r.content) # Debug
-#        self.assertEqual(r.status_code, 200)
-#        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        # Replicate the data object.
+        r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+            'op': 'replicate',
+            'lpath': data_object,
+            'dst-resource': resc_name
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show there are two replicas.
+        coll_name = os.path.dirname(data_object)
+        data_name = os.path.basename(data_object)
+        r = requests.get(f'{self.url_base}/query', headers=rodsuser_headers, params={
+            'op': 'execute_genquery',
+            'query': f"select DATA_NAME, RESC_NAME where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(len(result['rows']), 2)
+
+        # Trim the first replica.
+        r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+            'op': 'trim',
+            'lpath': data_object,
+            'replica-number': 0
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
 
         # Rename the data object.
         data_object_renamed = f'{data_object}.renamed'
@@ -437,12 +435,11 @@ class test_data_objects_endpoint(unittest.TestCase):
                 self.assertEqual(r.status_code, 200)
                 self.assertEqual(r.json()['irods_response']['error_code'], 0)
 
-        # TODO Cannot run until issue #39 is resolved.
-#        # Remove the resource.
-#        r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={'op': 'remove', 'name': resc_name})
-#        #print(r.content) # Debug
-#        self.assertEqual(r.status_code, 200)
-#        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        # Remove the resource.
+        r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={'op': 'remove', 'name': resc_name})
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
 
     @unittest.skip('Test needs to be implemented.')
     def test_return_error_on_missing_parameters(self):
@@ -647,7 +644,6 @@ class test_resources_endpoint(unittest.TestCase):
     def setUp(self):
         self.assertFalse(self._class_init_error, 'Class initialization failed. Cannot continue.')
 
-    @unittest.skip('Cannot run until issue #39 is resolved.')
     def test_common_operations(self):
         headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
 
@@ -656,7 +652,7 @@ class test_resources_endpoint(unittest.TestCase):
         resc_ufs0 = 'test_ufs0'
         resc_ufs1 = 'test_ufs1'
 
-        # Create three resources (replication w/ two ufs resources).
+        # Create three resources (replication w/ two unixfilesystem resources).
         r = requests.post(self.url_endpoint, headers=headers, data={
             'op': 'create',
             'name': resc_repl,
@@ -668,7 +664,7 @@ class test_resources_endpoint(unittest.TestCase):
         result = r.json()
         self.assertEqual(result['irods_response']['error_code'], 0)
 
-        # Show that the replicate resource was created.
+        # Show the replication resource was created.
         r = requests.get(self.url_endpoint, headers=headers, params={'op': 'stat', 'name': resc_repl})
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
@@ -695,13 +691,13 @@ class test_resources_endpoint(unittest.TestCase):
         # Capture the replication resource's id.
         # This resource is going to be the parent of the unixfilesystem resources.
         # This value is needed to verify the relationship.
-        resc_repl_id = result['info']['parent_id']
+        resc_repl_id = result['info']['id']
 
         for resc_name in [resc_ufs0, resc_ufs1]:
             with self.subTest(f'Create and attach resource [{resc_name}] to [{resc_repl}]'):
                 vault_path = os.path.join('/tmp', f'{resc_name}_vault')
 
-                # Create ufs resource.
+                # Create a unixfilesystem resource.
                 r = requests.post(self.url_endpoint, headers=headers, data={
                     'op': 'create',
                     'name': resc_name,
@@ -711,11 +707,9 @@ class test_resources_endpoint(unittest.TestCase):
                 })
                 #print(r.content) # Debug
                 self.assertEqual(r.status_code, 200)
+                self.assertEqual(r.json()['irods_response']['error_code'], 0)
 
-                result = r.json()
-                self.assertEqual(result['irods_response']['error_code'], 0)
-
-                # Add ufs resource as a child of the replication resource.
+                # Add the unixfilesystem resource as a child of the replication resource.
                 r = requests.post(self.url_endpoint, headers=headers, data={
                     'op': 'add_child',
                     'parent-name': resc_repl,
@@ -723,9 +717,7 @@ class test_resources_endpoint(unittest.TestCase):
                 })
                 #print(r.content) # Debug
                 self.assertEqual(r.status_code, 200)
-
-                result = r.json()
-                self.assertEqual(result['irods_response']['error_code'], 0)
+                self.assertEqual(r.json()['irods_response']['error_code'], 0)
 
                 # Show that the resource was created and configured successfully.
                 r = requests.get(self.url_endpoint, headers=headers, params={'op': 'stat', 'name': resc_name})
@@ -752,7 +744,7 @@ class test_resources_endpoint(unittest.TestCase):
                 self.assertIn('last_modified', result['info'])
 
         # Create a data object targeting the replication resource.
-        data_object = os.path.join('/', self.zone_name, self.rodsadmin_username, 'test_object_for_resources')
+        data_object = os.path.join('/', self.zone_name, 'home', self.rodsadmin_username, 'test_object_for_resources')
         contents = 'hello, iRODS HTTP API!'
         r = requests.post(f'{self.url_base}/data-objects', headers=headers, data={
             'op': 'write',
@@ -764,14 +756,12 @@ class test_resources_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-
-        result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
 
         # Show there are two replicas under the replication resource hierarchy.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
             'op': 'execute_genquery',
-            'query': 'select DATA_NAME, RESC_NAME'
+            'query': f"select DATA_NAME, RESC_NAME where DATA_NAME = '{os.path.basename(data_object)}'"
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
@@ -787,7 +777,8 @@ class test_resources_endpoint(unittest.TestCase):
         r = requests.post(f'{self.url_base}/data-objects', headers=headers, data={
             'op': 'trim',
             'lpath': data_object,
-            'resource': resc_ufs0
+            'replica-number': 0
+            #'resource': resc_ufs0 # TODO Why does this result in a DIRECT_CHILD_ACCESS error? Is that correct?
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
@@ -795,10 +786,10 @@ class test_resources_endpoint(unittest.TestCase):
         result = r.json()
         self.assertEqual(result['irods_response']['error_code'], 0)
 
-        # Show there is only one replicas under the replication resource hierarchy.
+        # Show there is only one replica under the replication resource hierarchy.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
             'op': 'execute_genquery',
-            'query': 'select DATA_NAME, RESC_NAME'
+            'query': f"select DATA_NAME, RESC_NAME where DATA_NAME = '{os.path.basename(data_object)}'"
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
@@ -823,7 +814,11 @@ class test_resources_endpoint(unittest.TestCase):
         #
 
         # Remove data object.
-        r = requests.post(f'{self.url_base}/data-objects', headers=headers, data={'op': 'remove', 'lpath': data_object})
+        r = requests.post(f'{self.url_base}/data-objects', headers=headers, data={
+            'op': 'remove',
+            'lpath': data_object,
+            'no-trash': 1
+        })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
 
