@@ -231,7 +231,7 @@ namespace
                     offset = std::max(0, offset);
 
                     static const auto max_row_count = irods::http::globals::configuration().at(json::json_pointer{"/irods_client/max_number_of_rows_per_catalog_query"}).get<int>();
-                    int count = 0;
+                    int count = max_row_count;
                     if (const auto iter = args.find("count"); iter != std::end(args)) {
                         try {
                             count = std::stoi(iter->second);
