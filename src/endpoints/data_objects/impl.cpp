@@ -910,13 +910,15 @@ namespace
                     addKeyVal(&input.condInput, ADMIN_KW, "");
                 }
 
+                addKeyVal(&input.condInput, COPIES_KW, "1");
+
                 auto conn = irods::get_connection(client_info->username);
                 const auto ec = rcDataObjTrim(static_cast<RcComm*>(conn), &input);
 
                 res.body() = json{
                     {"irods_response", {
-                        {"error_code", ec},
-                    }},
+                        {"error_code", ec < 0 ? ec : 0}
+                    }}
                 }.dump();
             }
             catch (const irods::exception& e) {
