@@ -9,6 +9,7 @@
 
 #include <irods/client_connection.hpp>
 #include <irods/connection_pool.hpp>
+#include <irods/dataObjChksum.h>
 #include <irods/dataObjRepl.h>
 #include <irods/dataObjTrim.h>
 #include <irods/filesystem.hpp>
@@ -170,13 +171,17 @@ namespace
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_op);
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_touch_op);
 
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_calculate_checksum_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_verify_checksum_op);
+
     //
     // Operation to Handler mappings
     //
 
     const std::unordered_map<std::string, handler_type> handlers_for_get{
         {"read", handle_read_op},
-        {"stat", handle_stat_op}
+        {"stat", handle_stat_op},
+        {"verify_checksum", handle_verify_checksum_op},
     };
 
     const std::unordered_map<std::string, handler_type> handlers_for_post{
@@ -195,11 +200,9 @@ namespace
 
         {"register", handle_register_op},
 
-        {"set_permission", handle_set_permission_op}
+        {"set_permission", handle_set_permission_op},
 
-        //{"calculate_checksum", handle_calculate_checksum},
-        //{"register_checksum", handle_register_checksum},
-        //{"verify_checksum", handle_verify_checksum},
+        {"calculate_checksum", handle_calculate_checksum_op},
     };
 } // anonymous namespace
 
@@ -1581,4 +1584,182 @@ namespace
             _sess_ptr->send(std::move(res));
         });
     } // handle_touch_op
+
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_calculate_checksum_op)
+    {
+        auto result = irods::http::resolve_client_identity(_req);
+        if (result.response) {
+            return _sess_ptr->send(std::move(*result.response));
+        }
+
+        const auto* client_info = result.client_info;
+
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
+
+            try {
+                DataObjInp input{};
+                irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
+
+                if (const auto iter = _args.find("lpath"); iter != std::end(_args)) {
+                    std::strncpy(input.objPath, iter->second.c_str(), sizeof(DataObjInp::objPath));
+                }
+                else {
+                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                if (const auto iter = _args.find("resource"); iter != std::end(_args)) {
+                    addKeyVal(&input.condInput, RESC_NAME_KW, iter->second.c_str());
+                }
+
+                if (const auto iter = _args.find("replica-number"); iter != std::end(_args)) {
+                    addKeyVal(&input.condInput, REPL_NUM_KW, iter->second.c_str());
+                }
+
+                if (const auto iter = _args.find("force"); iter != std::end(_args) && iter->second == "1") {
+                    addKeyVal(&input.condInput, FORCE_CHKSUM_KW, "");
+                }
+
+                if (const auto iter = _args.find("all"); iter != std::end(_args) && iter->second == "1") {
+                    addKeyVal(&input.condInput, CHKSUM_ALL_KW, "");
+                }
+
+                if (const auto iter = _args.find("admin"); iter != std::end(_args) && iter->second == "1") {
+                    addKeyVal(&input.condInput, ADMIN_KW, "");
+                }
+
+                char* checksum{};
+                irods::at_scope_exit free_checksum{[&checksum] { std::free(checksum); }};
+
+                auto conn = irods::get_connection(client_info->username);
+                const auto ec = rcDataObjChksum(static_cast<RcComm*>(conn), &input, &checksum);
+
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", ec}
+                    }},
+                    {"checksum", checksum}
+                }.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
+            }
+
+            res.prepare_payload();
+
+            _sess_ptr->send(std::move(res));
+        });
+    } // handle_calculate_checksum_op
+
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_verify_checksum_op)
+    {
+        auto result = irods::http::resolve_client_identity(_req);
+        if (result.response) {
+            return _sess_ptr->send(std::move(*result.response));
+        }
+
+        const auto* client_info = result.client_info;
+
+        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+
+            http::response<http::string_body> res{http::status::ok, _req.version()};
+            res.set(http::field::server, irods::http::version::server_name);
+            res.set(http::field::content_type, "application/json");
+            res.keep_alive(_req.keep_alive());
+
+            try {
+                DataObjInp input{};
+                irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
+
+                if (const auto iter = _args.find("lpath"); iter != std::end(_args)) {
+                    std::strncpy(input.objPath, iter->second.c_str(), sizeof(DataObjInp::objPath));
+                }
+                else {
+                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+                }
+
+                addKeyVal(&input.condInput, VERIFY_CHKSUM_KW, "");
+
+                if (const auto iter = _args.find("resource"); iter != std::end(_args)) {
+                    addKeyVal(&input.condInput, RESC_NAME_KW, iter->second.c_str());
+                }
+
+                if (const auto iter = _args.find("replica-number"); iter != std::end(_args)) {
+                    addKeyVal(&input.condInput, REPL_NUM_KW, iter->second.c_str());
+                }
+
+                if (const auto iter = _args.find("compute-checksums"); iter != std::end(_args) && iter->second == "0") {
+                    addKeyVal(&input.condInput, NO_COMPUTE_KW, "");
+                }
+
+                if (const auto iter = _args.find("admin"); iter != std::end(_args) && iter->second == "1") {
+                    addKeyVal(&input.condInput, ADMIN_KW, "");
+                }
+
+                char* results{};
+                irods::at_scope_exit free_results{[&results] { std::free(results); }};
+
+                auto conn = irods::get_connection(client_info->username);
+                const auto ec = rcDataObjChksum(static_cast<RcComm*>(conn), &input, &results);
+
+                json response{
+                    {"irods_response", {
+                        {"error_code", ec}
+                    }}
+                };
+
+                if (ec == CHECK_VERIFICATION_RESULTS) {
+                    response["results"] = json::parse(results);
+                }
+
+                if (auto* rerr_info = static_cast<RcComm*>(conn)->rError; rerr_info) {
+                    json error_info;
+
+                    for (auto&& err : std::span(rerr_info->errMsg, rerr_info->len)) {
+                        error_info.push_back(json{
+                            {"status", err->status},
+                            {"message", err->msg},
+                        });
+                    }
+
+                    response["r_error_info"] = error_info;
+                }
+
+                res.body() = response.dump();
+            }
+            catch (const irods::exception& e) {
+                res.result(http::status::bad_request);
+                res.body() = json{
+                    {"irods_response", {
+                        {"error_code", e.code()},
+                        {"error_message", e.client_display_what()}
+                    }}
+                }.dump();
+            }
+            catch (const std::exception& e) {
+                res.result(http::status::internal_server_error);
+            }
+
+            res.prepare_payload();
+
+            _sess_ptr->send(std::move(res));
+        });
+    } // handle_verify_checksum_op
 } // anonymous namespace

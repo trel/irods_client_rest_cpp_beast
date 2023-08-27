@@ -347,6 +347,15 @@ test_rules_endpoint()
 
 test_data_objects_endpoint()
 {
+    data_object="/tempZone/home/$irods_username/fake_bucket/foo"
+
+    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        --data-urlencode 'op=verify_checksum' \
+        --data-urlencode "lpath=$data_object" \
+        --data-urlencode "compute-checksums=0" \
+        $curl_opts | jq
+    exit
+
     data_object="/tempZone/home/$irods_username/http_file.txt"
 
     # Create a new empty data object.
