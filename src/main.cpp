@@ -12,12 +12,9 @@
 #include <irods/rcMisc.h>
 #include <irods/rodsClient.h>
 
-//#include <curl/curl.h>
-
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
-//#include <boost/asio/dispatch.hpp>
 #include <boost/asio/strand.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/thread_pool.hpp>
@@ -43,6 +40,23 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+// __has_feature is a Clang specific feature.
+// The preprocessor code below exists so that other compilers can be used (e.g. GCC).
+#ifndef __has_feature
+#  define __has_feature(feature) 0
+#endif
+
+#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+// Defines default options for running the HTTP API with Address Sanitizer enabled.
+// This is a convenience function which allows the HTTP API to start without needing the
+// administrator to specify options via environment variables.
+extern "C" const char* __asan_default_options()
+{
+    // See root CMakeLists.txt file for definition.
+    return IRODS_ADDRESS_SANITIZER_DEFAULT_OPTIONS;
+} // __asan_default_options
+#endif
 
 // clang-format off
 namespace beast = boost::beast; // from <boost/beast.hpp>
