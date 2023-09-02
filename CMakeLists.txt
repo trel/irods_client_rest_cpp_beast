@@ -19,8 +19,7 @@ include(IrodsCXXCompiler)
 set(CMAKE_CXX_STANDARD ${IRODS_CXX_STANDARD})
 set(CMAKE_CXX_EXTENSIONS OFF)
 # export-dynamic so stacktrace entries from executables have function names.
-set(CMAKE_EXE_LINKER_FLAGS_INIT "-rdynamic -Wl,--export-dynamic -Wl,--enable-new-dtags -Wl,--as-needed -Wl,-z,defs")
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE_INIT "-Wl,--gc-sections -Wl,-z,combreloc")
+set(CMAKE_EXE_LINKER_FLAGS_INIT "-Wl,--export-dynamic -Wl,--enable-new-dtags -Wl,--as-needed")
 include(IrodsRunpathDefaults)
 
 project(${IRODS_HTTP_API_BINARY_NAME} VERSION "${IRODS_HTTP_API_VERSION}" LANGUAGES CXX)
@@ -59,6 +58,34 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 add_compile_options(-Wall -Wextra -Wpedantic)
+
+option(IRODS_ENABLE_ADDRESS_SANITIZER "Enables detection of memory leaks and other features provided by Address Sanitizer." OFF)
+if (IRODS_ENABLE_ADDRESS_SANITIZER)
+  # Make sure the correct llvm-symbolizer binary is available to Address Sanitizer. This binary
+  # allows debug symbols to be reported appropriately. There are two ways to do this:
+  #
+  #     export PATH=/opt/irods-externals/clang13.0.0-0/bin:$PATH
+  #
+  # - or -
+  #
+  #     export ASAN_SYMBOLIZER_PATH=/opt/irods-externals/clang13.0.0-0/bin/llvm-symbolizer
+  #
+  # detect_container_overflow is disabled to guard against false positives which occur when
+  # parts of the binary are compiled with ASAN and other parts are not.
+  add_compile_definitions(IRODS_ADDRESS_SANITIZER_DEFAULT_OPTIONS="log_path=/tmp/irods_client_http_api_asan_output:detect_container_overflow=0")
+  add_compile_options(
+    -fsanitize=address
+    -fno-omit-frame-pointer
+    -fno-optimize-sibling-calls
+    -O1)
+  add_link_options(
+    -fsanitize=address
+    -fno-omit-frame-pointer
+    -fno-optimize-sibling-calls
+    -O1)
+else()
+  set(CMAKE_EXE_LINKER_FLAGS_INIT "${CMAKE_EXE_LINKER_FLAGS_INIT} -Wl,-z,defs")
+endif()
 
 add_subdirectory(src)
 
