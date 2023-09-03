@@ -100,6 +100,7 @@ namespace irods::http::shared_api_operations
                 }.dump();
 
                 char* output{};
+                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory, cppcoreguidelines-no-malloc)
                 irods::at_scope_exit_unsafe free_output{[&output] { std::free(output); }};
 
                 const auto ec = rc_atomic_apply_acl_operations(static_cast<RcComm*>(conn), json_input.c_str(), &output);
@@ -209,6 +210,7 @@ namespace irods::http::shared_api_operations
                 }.dump();
 
                 char* output{};
+                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory, cppcoreguidelines-no-malloc)
                 irods::at_scope_exit_unsafe free_output{[&output] { std::free(output); }};
 
                 auto conn = irods::get_connection(client_info->username);

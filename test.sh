@@ -354,7 +354,34 @@ test_rules_endpoint()
 
 test_data_objects_endpoint()
 {
-    data_object="/tempZone/home/$irods_username/fake_bucket/foo"
+    data_object="/tempZone/home/rods/fruit"
+
+    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        --data-urlencode 'op=read' \
+        --data-urlencode "lpath=$data_object" \
+        --data-urlencode "count=100" \
+        -v && echo $?
+    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        --data-urlencode 'op=read' \
+        --data-urlencode "lpath=$data_object" \
+        --data-urlencode "count=100" \
+        --data-urlencode "ticket=qyTdzCNKq9ggPa5" \
+        -v $curl_opts
+    exit
+
+    data_object="/tempZone/home/$irods_username/goobar"
+
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        --data-urlencode 'op=register' \
+        --data-urlencode "lpath=$data_object" \
+        --data-urlencode "ppath=/var/lib/irods/Vault/home/$irods_username/goobar" \
+        --data-urlencode "data-size=199" \
+        $curl_opts | jq
+    curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
+        --data-urlencode 'op=stat' \
+        --data-urlencode "lpath=$data_object" \
+        $curl_opts | jq
+    exit
 
     curl -G -H "authorization: Bearer $bearer_token" "${base_url}/data-objects" \
         --data-urlencode 'op=verify_checksum' \
@@ -530,12 +557,12 @@ test_users_groups_endpoint()
 
 #test_collections_endpoint
 #test_configuration_endpoint
-#test_data_objects_endpoint
+test_data_objects_endpoint
 #test_information_endpoint
 #test_metadata_endpoint
 #test_query_endpoint
 #test_resource_endpoint
 #test_rules_endpoint
 #test_tickets_endpoint
-test_users_groups_endpoint
+#test_users_groups_endpoint
 #test_zones_endpoint
