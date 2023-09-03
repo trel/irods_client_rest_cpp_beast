@@ -41,7 +41,7 @@ namespace log = irods::http::log;
 using json = nlohmann::json;
 // clang-format on
 
-#define IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(name) \
+#define IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(name) \
     auto name(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
 
 namespace
@@ -52,21 +52,21 @@ namespace
     // Handler function prototypes
     //
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_execute_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_delay_rule_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_rule_engines_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_execute);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_delay_rule);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_list_rule_engines);
 
     //
     // Operation to Handler mappings
     //
 
     const std::unordered_map<std::string, handler_type> handlers_for_get{
-        {"list_rule_engines", handle_list_rule_engines_op}
+        {"list_rule_engines", op_list_rule_engines}
     };
 
     const std::unordered_map<std::string, handler_type> handlers_for_post{
-        {"execute", handle_execute_op},
-        {"remove_delay_rule", handle_remove_delay_rule_op}
+        {"execute", op_execute},
+        {"remove_delay_rule", op_remove_delay_rule}
     };
 } // anonymous namespace
 
@@ -118,7 +118,7 @@ namespace
     // Operation handler implementations
     //
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_execute_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_execute)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -221,9 +221,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_execute_op
+    } // op_execute
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_delay_rule_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_delay_rule)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -276,9 +276,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_remove_delay_rule_op
+    } // op_remove_delay_rule
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_rule_engines_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_list_rule_engines)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -351,5 +351,5 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_list_rule_engines_op
+    } // op_list_rule_engines
 } // anonymous namespace

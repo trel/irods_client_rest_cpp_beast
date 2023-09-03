@@ -35,7 +35,7 @@ namespace log = irods::http::log;
 using json = nlohmann::json;
 // clang-format on
 
-#define IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(name) \
+#define IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(name) \
     auto name(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
 
 namespace
@@ -46,49 +46,49 @@ namespace
     // Handler function prototypes
     //
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_user_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_user_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_password_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_user_type_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_user_auth_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_user_auth_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_create_user);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_user);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_set_password);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_set_user_type);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_add_user_auth);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_user_auth);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_metadata);
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_group_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_group_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_to_group_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_from_group_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_create_group);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_group);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_add_to_group);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_from_group);
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_users_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_groups_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_members_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_is_member_of_group_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_users);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_groups);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_members);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_is_member_of_group);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_stat);
 
     //
     // Operation to Handler mappings
     //
 
     const std::unordered_map<std::string, handler_type> handlers_for_get{
-        {"users", handle_users_op},
-        {"groups", handle_groups_op},
-        {"members", handle_members_op},
-        {"is_member_of_group", handle_is_member_of_group_op},
-        {"stat", handle_stat_op}
+        {"users", op_users},
+        {"groups", op_groups},
+        {"members", op_members},
+        {"is_member_of_group", op_is_member_of_group},
+        {"stat", op_stat}
     };
 
     const std::unordered_map<std::string, handler_type> handlers_for_post{
-        {"create_user", handle_create_user_op},
-        {"remove_user", handle_remove_user_op},
-        {"set_password", handle_set_password_op},
-        {"set_user_type", handle_set_user_type_op},
-        {"add_user_auth", handle_add_user_auth_op},
-        {"remove_user_auth", handle_remove_user_auth_op},
-        {"create_group", handle_create_group_op},
-        {"remove_group", handle_remove_group_op},
-        {"add_to_group", handle_add_to_group_op},
-        {"remove_from_group", handle_remove_from_group_op},
-        {"modify_metadata", handle_modify_metadata_op}
+        {"create_user", op_create_user},
+        {"remove_user", op_remove_user},
+        {"set_password", op_set_password},
+        {"set_user_type", op_set_user_type},
+        {"add_user_auth", op_add_user_auth},
+        {"remove_user_auth", op_remove_user_auth},
+        {"create_group", op_create_group},
+        {"remove_group", op_remove_group},
+        {"add_to_group", op_add_to_group},
+        {"remove_from_group", op_remove_from_group},
+        {"modify_metadata", op_modify_metadata}
     };
 } // anonymous namespace
 
@@ -140,7 +140,7 @@ namespace
     // Operation handler implementations
     //
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_user_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_create_user)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -218,9 +218,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_create_user_op
+    } // op_create_user
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_user_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_user)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -276,9 +276,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_remove_user_op
+    } // op_remove_user
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_password_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_set_password)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -343,9 +343,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_set_password_op
+    } // op_set_password
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_user_type_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_set_user_type)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -409,9 +409,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_set_user_type_op
+    } // op_set_user_type
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_user_auth_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_add_user_auth)
     {
 #if 0
         auto result = irods::http::resolve_client_identity(_req);
@@ -454,9 +454,9 @@ namespace
         log::error("{}: Operation not implemented.", __func__);
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
-    } // handle_add_user_auth_op
+    } // op_add_user_auth
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_user_auth_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_user_auth)
     {
 #if 0
         auto result = irods::http::resolve_client_identity(_req);
@@ -499,9 +499,9 @@ namespace
         log::error("{}: Operation not implemented.", __func__);
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
-    } // handle_remove_user_auth_op
+    } // op_remove_user_auth
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_group_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_create_group)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -551,9 +551,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_create_group_op
+    } // op_create_group
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_group_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_group)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -603,9 +603,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_remove_group_op
+    } // op_remove_group
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_to_group_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_add_to_group)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -667,9 +667,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_add_to_group_op
+    } // op_add_to_group
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_from_group_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_from_group)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -731,9 +731,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_remove_from_group_op
+    } // op_remove_from_group
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_users_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_users)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -788,9 +788,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_users_op
+    } // op_users
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_groups_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_groups)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -842,9 +842,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_groups_op
+    } // op_groups
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_members_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_members)
     {
 #if 0
         auto result = irods::http::resolve_client_identity(_req);
@@ -887,9 +887,9 @@ namespace
         log::error("{}: Operation not implemented.", __func__);
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
-    } // handle_members_op
+    } // op_members
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_is_member_of_group_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_is_member_of_group)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -954,9 +954,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_is_member_of_group_op
+    } // op_is_member_of_group
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_stat)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1050,11 +1050,11 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_stat_op
+    } // op_stat
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_metadata)
     {
         using namespace irods::http::shared_api_operations;
         return op_atomic_apply_metadata_operations(_sess_ptr, _req, _args, entity_type::user);
-    } // handle_modify_metadata_op
+    } // op_modify_metadata
 } // anonymous namespace

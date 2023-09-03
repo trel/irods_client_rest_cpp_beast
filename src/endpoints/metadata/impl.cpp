@@ -40,7 +40,7 @@ namespace
     // Handler function prototypes
     //
 
-    auto handle_execute_op(irods::http::session_pointer_type& _sess_ptr,
+    auto op_execute(irods::http::session_pointer_type& _sess_ptr,
                            irods::http::request_type& _req,
                            irods::http::query_arguments_type& _args) -> void;
 
@@ -54,7 +54,7 @@ namespace
 #endif
 
     const std::unordered_map<std::string, handler_type> handlers_for_post{
-        {"execute", handle_execute_op}
+        {"execute", op_execute}
     };
 } // anonymous namespace
 
@@ -107,7 +107,7 @@ namespace
     // Operation handler implementations
     //
 
-    auto handle_execute_op(irods::http::session_pointer_type& _sess_ptr,
+    auto op_execute(irods::http::session_pointer_type& _sess_ptr,
                                   irods::http::request_type& _req,
                                   irods::http::query_arguments_type& _args) -> void
     {
@@ -176,5 +176,5 @@ namespace
             log::trace("{}: Metadata operations complete. Sending response.", fn);
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_execute_op
+    } // op_execute
 } // anonymous namespace

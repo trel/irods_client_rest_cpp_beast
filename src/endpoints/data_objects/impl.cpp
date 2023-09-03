@@ -54,7 +54,7 @@ namespace log = irods::http::log;
 using json = nlohmann::json;
 // clang-format on
 
-#define IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(name) \
+#define IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(name) \
     auto name(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
 
 namespace
@@ -163,62 +163,62 @@ namespace
     // Handler function prototypes
     //
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_read_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_write_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_parallel_write_init_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_parallel_write_shutdown_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_read);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_write);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_parallel_write_init);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_parallel_write_shutdown);
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_replicate_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_trim_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_replicate);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_trim);
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_permission_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_permissions_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_set_permission);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_permissions);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_stat);
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_register_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_register);
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_rename_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_copy_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_touch_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_rename);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_copy);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_touch);
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_calculate_checksum_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_verify_checksum_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_calculate_checksum);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_verify_checksum);
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_metadata);
 
     //
     // Operation to Handler mappings
     //
 
     const std::unordered_map<std::string, handler_type> handlers_for_get{
-        {"read", handle_read_op},
-        {"stat", handle_stat_op},
-        {"verify_checksum", handle_verify_checksum_op},
+        {"read", op_read},
+        {"stat", op_stat},
+        {"verify_checksum", op_verify_checksum},
     };
 
     const std::unordered_map<std::string, handler_type> handlers_for_post{
-        {"touch", handle_touch_op},
-        {"remove", handle_remove_op},
+        {"touch", op_touch},
+        {"remove", op_remove},
 
-        {"write", handle_write_op},
-        {"parallel_write_init", handle_parallel_write_init_op},
-        {"parallel_write_shutdown", handle_parallel_write_shutdown_op},
+        {"write", op_write},
+        {"parallel_write_init", op_parallel_write_init},
+        {"parallel_write_shutdown", op_parallel_write_shutdown},
 
-        {"rename", handle_rename_op},
-        {"copy", handle_copy_op},
+        {"rename", op_rename},
+        {"copy", op_copy},
 
-        {"replicate", handle_replicate_op},
-        {"trim", handle_trim_op},
+        {"replicate", op_replicate},
+        {"trim", op_trim},
 
-        {"register", handle_register_op},
+        {"register", op_register},
 
-        {"set_permission", handle_set_permission_op},
-        {"modify_permissions", handle_modify_permissions_op},
+        {"set_permission", op_set_permission},
+        {"modify_permissions", op_modify_permissions},
 
-        {"calculate_checksum", handle_calculate_checksum_op},
+        {"calculate_checksum", op_calculate_checksum},
 
-        {"modify_metadata", handle_modify_metadata_op},
+        {"modify_metadata", op_modify_metadata},
     };
 } // anonymous namespace
 
@@ -294,7 +294,7 @@ namespace
     // Operation handler implementations
     //
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_read_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_read)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -417,9 +417,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_read_op
+    } // op_read
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_write_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_write)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -629,9 +629,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_write_op
+    } // op_write
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_parallel_write_init_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_parallel_write_init)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -764,9 +764,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_parallel_write_init_op
+    } // op_parallel_write_init
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_parallel_write_shutdown_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_parallel_write_shutdown)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -856,9 +856,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_parallel_write_shutdown_op
+    } // op_parallel_write_shutdown
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_replicate_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_replicate)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -929,9 +929,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_replicate_op
+    } // op_replicate
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_trim_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_trim)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1007,9 +1007,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_trim_op
+    } // op_trim
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_permission_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_set_permission)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1101,15 +1101,15 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_set_permission_op
+    } // op_set_permission
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_permissions_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_permissions)
     {
         using namespace irods::http::shared_api_operations;
         return op_atomic_apply_acl_operations(_sess_ptr, _req, _args, entity_type::data_object);
-    } // handle_modify_permissions_op
+    } // op_modify_permissions
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_stat)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1208,9 +1208,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_stat_op
+    } // op_stat
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_register_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_register)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1302,9 +1302,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_register_op
+    } // op_register
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1383,9 +1383,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_remove_op
+    } // op_remove
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_rename_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_rename)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1459,9 +1459,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_rename_op
+    } // op_rename
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_copy_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_copy)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1544,9 +1544,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_copy_op
+    } // op_copy
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_touch_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_touch)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1640,9 +1640,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_touch_op
+    } // op_touch
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_calculate_checksum_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_calculate_checksum)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1721,9 +1721,9 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_calculate_checksum_op
+    } // op_calculate_checksum
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_verify_checksum_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_verify_checksum)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -1818,11 +1818,11 @@ namespace
 
             _sess_ptr->send(std::move(res));
         });
-    } // handle_verify_checksum_op
+    } // op_verify_checksum
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_metadata)
     {
         using namespace irods::http::shared_api_operations;
         return op_atomic_apply_metadata_operations(_sess_ptr, _req, _args, entity_type::data_object);
-    } // handle_modify_metadata_op
+    } // op_modify_metadata
 } // anonymous namespace
