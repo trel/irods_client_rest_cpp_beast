@@ -21,6 +21,8 @@
 #include <unordered_map>
 #include <vector>
 
+struct RcComm;
+
 namespace irods::http
 {
     class session;
@@ -118,6 +120,8 @@ namespace irods
     auto get_connection(const std::string& _username) -> irods::connection_pool::connection_proxy;
 
     auto fail(boost::beast::error_code ec, char const* what) -> void;
+
+    auto enable_ticket(RcComm& _comm, const std::string& _ticket) -> int;
 } // namespace irods
 
 #endif // IRODS_HTTP_API_ENDPOINT_COMMON_HPP

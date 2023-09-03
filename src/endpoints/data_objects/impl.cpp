@@ -20,6 +20,7 @@
 #include <irods/rcMisc.h>
 #include <irods/rodsErrorTable.h>
 #include <irods/rodsKeyWdDef.h>
+#include <irods/ticketAdmin.h>
 #include <irods/touch.h>
 
 #include <irods/transport/default_transport.hpp>
@@ -66,6 +67,7 @@ namespace
         // TODO May need to accept a zone for the client (i.e. federation).
         parallel_write_stream(const std::string& _client_username,
                               const std::string& _path,
+                              const std::optional<std::string> _ticket,
                               const irods::experimental::io::odstream* _base = nullptr)
         {
             const auto& client = irods::http::globals::configuration().at("irods_client");
@@ -83,6 +85,13 @@ namespace
             if (clientLoginWithPassword(static_cast<RcComm*>(conn_), password.data()) != 0) {
                 conn_.disconnect();
                 THROW(SYS_INTERNAL_ERR, "Could not connect to iRODS server as proxied user.");
+            }
+
+            // Enable ticket if the request includes one.
+            if (_ticket) {
+                if (const auto ec = irods::enable_ticket(conn_, *_ticket); ec < 0) {
+                    THROW(ec, "Error enabling ticket on connection.");
+                }
             }
 
             tp_ = std::make_unique<irods::experimental::io::client::native_transport>(conn_);
@@ -310,6 +319,22 @@ namespace
                 }
 
                 auto conn = irods::get_connection(client_info->username);
+
+                // Enable ticket if the request includes one.
+                if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
+                    if (const auto ec = irods::enable_ticket(conn, iter->second); ec < 0) {
+                        res.result(http::status::internal_server_error);
+                        res.body() = json{
+                            {"irods_response", {
+                                {"error_code", ec},
+                                {"error_message", "Error enabling ticket on connection."}
+                            }}
+                        }.dump();
+                        res.prepare_payload();
+                        return _sess_ptr->send(std::move(res));
+                    }
+                }
+
                 io::client::native_transport tp{conn};
                 io::idstream in{tp, lpath_iter->second};
 
@@ -485,6 +510,22 @@ namespace
                     log::trace("{}: (write) Initializing for single buffer write.", fn);
 
                     conn = irods::get_connection(client_info->username);
+
+                    // Enable ticket if the request includes one.
+                    if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
+                        if (const auto ec = irods::enable_ticket(conn, iter->second); ec < 0) {
+                            res.result(http::status::internal_server_error);
+                            res.body() = json{
+                                {"irods_response", {
+                                    {"error_code", ec},
+                                    {"error_message", "Error enabling ticket on connection."}
+                                }}
+                            }.dump();
+                            res.prepare_payload();
+                            return _sess_ptr->send(std::move(res));
+                        }
+                    }
+
                     tp = std::make_unique<io::client::native_transport>(conn);
 
                     if (const auto iter = _args.find("resource"); iter != std::end(_args)) {
@@ -636,8 +677,13 @@ namespace
                 pw_streams.reserve(stream_count);
 
                 try {
+                    std::optional<std::string> ticket;
+                    if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
+                        ticket = iter->second;
+                    }
+
                     // Open the first stream.
-                    pw_streams.emplace_back(std::make_shared<parallel_write_stream>(client_info->username, lpath_iter->second));
+                    pw_streams.emplace_back(std::make_shared<parallel_write_stream>(client_info->username, lpath_iter->second, ticket));
 
                     auto& first_stream = pw_streams.front()->stream();
                     log::debug("{}: replica token=[{}], replica number=[{}], leaf resource name=[{}]",
@@ -650,6 +696,7 @@ namespace
                     for (int i = 0; i < stream_count; ++i) {
                         pw_streams.emplace_back(std::make_shared<parallel_write_stream>(client_info->username,
                                                                                         lpath_iter->second,
+                                                                                        ticket,
                                                                                         &pw_streams.front()->stream()));
                     }
                 }
@@ -1087,6 +1134,21 @@ namespace
                 }
 
                 auto conn = irods::get_connection(client_info->username);
+
+                // Enable ticket if the request includes one.
+                if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
+                    if (const auto ec = irods::enable_ticket(conn, iter->second); ec < 0) {
+                        res.result(http::status::internal_server_error);
+                        res.body() = json{
+                            {"irods_response", {
+                                {"error_code", ec},
+                                {"error_message", "Error enabling ticket on connection."}
+                            }}
+                        }.dump();
+                        res.prepare_payload();
+                        return _sess_ptr->send(std::move(res));
+                    }
+                }
 
                 const auto status = fs::client::status(conn, lpath_iter->second);
 

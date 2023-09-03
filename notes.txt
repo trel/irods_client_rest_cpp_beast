@@ -123,3 +123,13 @@ to how empty strings are handled. basically, empty strings appear as lines conta
     --------------------------65fd63b92908dbad--
 
 notice that both outputs end with a CRLF (the terminal boundary).
+
+- which endpoints/operations should support tickets?
+    - /data-objects
+        - read
+        - write
+        - parallel_write_init
+        - stat
+        - touch (does not support tickets yet)
+    - /query
+        - execute_genquery

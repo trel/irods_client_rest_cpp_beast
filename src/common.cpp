@@ -10,6 +10,7 @@
 #include <irods/rodsErrorTable.h>
 #include <irods/rodsKeyWdDef.h> // For KW_CLOSE_OPEN_REPLICAS.
 #include <irods/switch_user.h>
+#include <irods/ticketAdmin.h>
 
 #include <boost/any.hpp>
 #include <boost/algorithm/string.hpp>
@@ -337,4 +338,14 @@ namespace irods
     {
         irods::http::log::error("{}: {}: {}", __func__, what, ec.message());
     } // fail
+
+    auto enable_ticket(RcComm& _comm, const std::string& _ticket) -> int
+    {
+        TicketAdminInput input{};
+        input.arg1 = const_cast<char*>("session"); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+        input.arg2 = const_cast<char*>(_ticket.c_str()); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+        input.arg3 = const_cast<char*>(""); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+
+        return rcTicketAdmin(&_comm, &input);
+    } // enable_ticket
 } // namespace irods

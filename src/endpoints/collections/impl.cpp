@@ -148,6 +148,21 @@ namespace
 
                 auto conn = irods::get_connection(client_info->username);
 
+                // Enable ticket if the request includes one.
+                if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
+                    if (const auto ec = irods::enable_ticket(conn, iter->second); ec < 0) {
+                        res.result(http::status::internal_server_error);
+                        res.body() = json{
+                            {"irods_response", {
+                                {"error_code", ec},
+                                {"error_message", "Error enabling ticket on connection."}
+                            }}
+                        }.dump();
+                        res.prepare_payload();
+                        return _sess_ptr->send(std::move(res));
+                    }
+                }
+
                 if (!fs::client::is_collection(conn, lpath_iter->second)) {
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request, json{
                         {"irods_response", {
@@ -230,6 +245,21 @@ namespace
                 }
 
                 auto conn = irods::get_connection(client_info->username);
+
+                // Enable ticket if the request includes one.
+                if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
+                    if (const auto ec = irods::enable_ticket(conn, iter->second); ec < 0) {
+                        res.result(http::status::internal_server_error);
+                        res.body() = json{
+                            {"irods_response", {
+                                {"error_code", ec},
+                                {"error_message", "Error enabling ticket on connection."}
+                            }}
+                        }.dump();
+                        res.prepare_payload();
+                        return _sess_ptr->send(std::move(res));
+                    }
+                }
 
                 const auto status = fs::client::status(conn, lpath_iter->second);
 
