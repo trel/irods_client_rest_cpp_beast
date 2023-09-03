@@ -1250,7 +1250,7 @@ namespace
                     addKeyVal(&input.condInput, DEST_RESC_NAME_KW, iter->second.c_str());
                 }
 
-                if (const auto iter = _args.find("replica-number"); iter != std::end(_args) && iter->second == "1") {
+                if (const auto iter = _args.find("as-replica"); iter != std::end(_args) && iter->second == "1") {
                     addKeyVal(&input.condInput, REG_REPL_KW, "");
                 }
 
@@ -1258,13 +1258,8 @@ namespace
                     addKeyVal(&input.condInput, DATA_SIZE_KW, iter->second.c_str());
                 }
 
-                if (const auto iter = _args.find("checksum"); iter != std::end(_args)) {
-                    if (iter->second == "register") {
-                        addKeyVal(&input.condInput, REG_CHKSUM_KW, "");
-                    }
-                    else if (iter->second == "verify") {
-                        addKeyVal(&input.condInput, VERIFY_CHKSUM_KW, "");
-                    }
+                if (const auto iter = _args.find("checksum"); iter != std::end(_args) && iter->second == "1") {
+                    addKeyVal(&input.condInput, REG_CHKSUM_KW, "");
                 }
 
                 if (const auto iter = _args.find("force"); iter != std::end(_args)) {
@@ -1277,7 +1272,7 @@ namespace
                     res.result(http::status::bad_request);
                     res.body() = json{
                         {"irods_response", {
-                            {"error_code", ec},
+                            {"error_code", ec}
                         }}
                     }.dump();
                     res.prepare_payload();
@@ -1286,7 +1281,7 @@ namespace
 
                 res.body() = json{
                     {"irods_response", {
-                        {"error_code", 0},
+                        {"error_code", 0}
                     }}
                 }.dump();
             }
