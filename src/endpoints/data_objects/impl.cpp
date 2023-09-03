@@ -361,26 +361,25 @@ namespace
                 std::vector<char> buffer;
 
                 iter = _args.find("count");
-                if (iter != std::end(_args)) {
-                    try {
-                        const auto count = std::stoi(iter->second);
+                if (iter == std::end(_args)) {
+                    res.result(http::status::bad_request);
+                    res.prepare_payload();
+                    return _sess_ptr->send(std::move(res));
+                }
 
-                        if (count > irods::http::globals::configuration().at(json::json_pointer{"/irods_client/max_rbuffer_size_in_bytes"}).get<int>()) {
-                            res.result(http::status::bad_request);
-                            res.prepare_payload();
-                            return _sess_ptr->send(std::move(res));
-                        }
+                try {
+                    const auto count = std::stoi(iter->second);
 
-                        buffer.resize(count);
-                    }
-                    catch (const std::exception& e) {
-                        log::error("{}: Could not initialize read buffer to size [{}] for data object [{}].", fn, iter->second, lpath_iter->second);
+                    if (count > irods::http::globals::configuration().at(json::json_pointer{"/irods_client/max_rbuffer_size_in_bytes"}).get<int>()) {
                         res.result(http::status::bad_request);
                         res.prepare_payload();
                         return _sess_ptr->send(std::move(res));
                     }
+
+                    buffer.resize(count);
                 }
-                else {
+                catch (const std::exception& e) {
+                    log::error("{}: Could not initialize read buffer to size [{}] for data object [{}].", fn, iter->second, lpath_iter->second);
                     res.result(http::status::bad_request);
                     res.prepare_payload();
                     return _sess_ptr->send(std::move(res));
@@ -883,7 +882,7 @@ namespace
                     std::strncpy(input.objPath, iter->second.c_str(), sizeof(DataObjInp::objPath));
                 }
                 else {
-                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    log::error("{}: Missing [lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -891,7 +890,7 @@ namespace
                     addKeyVal(&input.condInput, DEST_RESC_NAME_KW, iter->second.c_str());
                 }
                 else {
-                    log::error("{}: Missing [dst-resource] parameter.", __func__);
+                    log::error("{}: Missing [dst-resource] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(http::status::bad_request));
                 }
 
@@ -956,7 +955,7 @@ namespace
                     std::strncpy(input.objPath, iter->second.c_str(), sizeof(DataObjInp::objPath));
                 }
                 else {
-                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    log::error("{}: Missing [lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -1029,7 +1028,7 @@ namespace
             try {
                 const auto lpath_iter = _args.find("lpath");
                 if (lpath_iter == std::end(_args)) {
-                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    log::error("{}: Missing [lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -1045,19 +1044,19 @@ namespace
 
                 const auto entity_name_iter = _args.find("entity-name");
                 if (entity_name_iter == std::end(_args)) {
-                    log::error("{}: Missing [entity-name] parameter.", __func__);
+                    log::error("{}: Missing [entity-name] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
                 const auto perm_iter = _args.find("permission");
                 if (perm_iter == std::end(_args)) {
-                    log::error("{}: Missing [permission] parameter.", __func__);
+                    log::error("{}: Missing [permission] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
                 const auto perm_enum = irods::to_permission_enum(perm_iter->second);
                 if (!perm_enum) {
-                    log::error("{}: Invalid value for [permission] parameter.", __func__);
+                    log::error("{}: Invalid value for [permission] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -1129,7 +1128,7 @@ namespace
             try {
                 const auto lpath_iter = _args.find("lpath");
                 if (lpath_iter == std::end(_args)) {
-                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    log::error("{}: Missing [lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -1234,7 +1233,7 @@ namespace
                     std::strncpy(input.objPath, lpath_iter->second.c_str(), sizeof(DataObjInp::objPath) - 1);
                 }
                 else {
-                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    log::error("{}: Missing [lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -1242,7 +1241,7 @@ namespace
                     addKeyVal(&input.condInput, FILE_PATH_KW, iter->second.c_str());
                 }
                 else {
-                    log::error("{}: Missing [ppath] parameter.", __func__);
+                    log::error("{}: Missing [ppath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -1324,7 +1323,7 @@ namespace
             try {
                 const auto lpath_iter = _args.find("lpath");
                 if (lpath_iter == std::end(_args)) {
-                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    log::error("{}: Missing [lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -1405,7 +1404,7 @@ namespace
             try {
                 const auto old_lpath_iter = _args.find("old-lpath");
                 if (old_lpath_iter == std::end(_args)) {
-                    log::error("{}: Missing [old-lpath] parameter.", __func__);
+                    log::error("{}: Missing [old-lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -1421,7 +1420,7 @@ namespace
 
                 const auto new_lpath_iter = _args.find("new-lpath");
                 if (new_lpath_iter == std::end(_args)) {
-                    log::error("{}: Missing [new-lpath] parameter.", __func__);
+                    log::error("{}: Missing [new-lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -1481,13 +1480,13 @@ namespace
             try {
                 const auto src_lpath_iter = _args.find("src-lpath");
                 if (src_lpath_iter == std::end(_args)) {
-                    log::error("{}: Missing [src-lpath] parameter.", __func__);
+                    log::error("{}: Missing [src-lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
                 const auto dst_lpath_iter = _args.find("dst-lpath");
                 if (dst_lpath_iter == std::end(_args)) {
-                    log::error("{}: Missing [dst-lpath] parameter.", __func__);
+                    log::error("{}: Missing [dst-lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -1566,7 +1565,7 @@ namespace
             try {
                 const auto lpath_iter = _args.find("lpath");
                 if (lpath_iter == std::end(_args)) {
-                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    log::error("{}: Missing [lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -1583,7 +1582,7 @@ namespace
                         options["replica_number"] = std::stoi(opt_iter->second);
                     }
                     catch (const std::exception& e) {
-                        log::error("{}: Could not convert replica number [{}] into an integer.", __func__, opt_iter->second);
+                        log::error("{}: Could not convert replica number [{}] into an integer.", fn, opt_iter->second);
                         return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                     }
                 }
@@ -1599,7 +1598,7 @@ namespace
                         options["seconds_since_epoch"] = std::stoi(opt_iter->second);
                     }
                     catch (const std::exception& e) {
-                        log::error("{}: Could not convert seconds-since-epoch [{}] into an integer.", __func__, opt_iter->second);
+                        log::error("{}: Could not convert seconds-since-epoch [{}] into an integer.", fn, opt_iter->second);
                         return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                     }
                 }
@@ -1667,7 +1666,7 @@ namespace
                     std::strncpy(input.objPath, iter->second.c_str(), sizeof(DataObjInp::objPath));
                 }
                 else {
-                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    log::error("{}: Missing [lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
@@ -1748,7 +1747,7 @@ namespace
                     std::strncpy(input.objPath, iter->second.c_str(), sizeof(DataObjInp::objPath));
                 }
                 else {
-                    log::error("{}: Missing [lpath] parameter.", __func__);
+                    log::error("{}: Missing [lpath] parameter.", fn);
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
