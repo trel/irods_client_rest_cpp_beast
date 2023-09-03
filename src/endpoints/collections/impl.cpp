@@ -33,7 +33,7 @@ namespace log = irods::http::log;
 using json = nlohmann::json;
 // clang-format on
 
-#define IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(name) \
+#define IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(name) \
     auto name(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
 
 namespace
@@ -44,33 +44,33 @@ namespace
     // Handler function prototypes
     //
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_rename_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_permission_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_permissions_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_list);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_stat);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_create);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_rename);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_set_permission);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_permissions);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_metadata);
 
     //
     // Operation to Handler mappings
     //
 
     const std::unordered_map<std::string, handler_type> handlers_for_get{
-        {"list", handle_list_op},
-        {"stat", handle_stat_op}
+        {"list", op_list},
+        {"stat", op_stat}
     };
 
     const std::unordered_map<std::string, handler_type> handlers_for_post{
-        {"create", handle_create_op},
-        {"remove", handle_remove_op},
-        {"rename", handle_rename_op},
-        //{"copy", handle_copy_op}, // TODO
-        {"set_permission", handle_set_permission_op},
-        //{"enable_inheritance", handle_enable_inheritance_op} // TODO set_permission handles inheritance?
-        {"modify_permissions", handle_modify_permissions_op},
-        {"modify_metadata", handle_modify_metadata_op},
+        {"create", op_create},
+        {"remove", op_remove},
+        {"rename", op_rename},
+        //{"copy", op_copy}, // TODO
+        {"set_permission", op_set_permission},
+        //{"enable_inheritance", op_enable_inheritance} // TODO set_permission handles inheritance?
+        {"modify_permissions", op_modify_permissions},
+        {"modify_metadata", op_modify_metadata},
     };
 } // anonymous namespace
 
@@ -122,7 +122,7 @@ namespace
     // Operation handler implementations
     //
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_list)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -218,9 +218,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_list_op
+    } // op_list
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_stat)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -318,9 +318,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_stat_op
+    } // op_stat
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_create)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -379,9 +379,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_create_op
+    } // op_create
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -462,9 +462,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_remove_op
+    } // op_remove
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_rename_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_rename)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -549,9 +549,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_rename_op
+    } // op_rename
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_permission_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_set_permission)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -653,17 +653,17 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_set_permission_op
+    } // op_set_permission
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_permissions_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_permissions)
     {
         using namespace irods::http::shared_api_operations;
         return op_atomic_apply_acl_operations(_sess_ptr, _req, _args, entity_type::collection);
-    } // handle_modify_permissions_op
+    } // op_modify_permissions
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_metadata)
     {
         using namespace irods::http::shared_api_operations;
         return op_atomic_apply_metadata_operations(_sess_ptr, _req, _args, entity_type::collection);
-    } // handle_modify_metadata_op
+    } // op_modify_metadata
 } // anonymous namespace

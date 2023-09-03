@@ -39,7 +39,7 @@ namespace log = irods::http::log;
 using json = nlohmann::json;
 // clang-format on
 
-#define IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(name) \
+#define IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(name) \
     auto name(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
 
 namespace
@@ -50,28 +50,28 @@ namespace
     // Handler function prototypes
     //
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_execute_genquery_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_execute_specific_query_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_genquery_columns_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_specific_queries_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_execute_genquery);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_execute_specific_query);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_list_genquery_columns);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_list_specific_queries);
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_specific_query_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_specific_query_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_add_specific_query);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_specific_query);
 
     //
     // Operation to Handler mappings
     //
 
     const std::unordered_map<std::string, handler_type> handlers_for_get{
-        {"execute_genquery", handle_execute_genquery_op},
-        {"execute_specific_query", handle_execute_specific_query_op},
-        {"list_genquery_columns", handle_list_genquery_columns_op},
-        {"list_specific_queries", handle_list_specific_queries_op}
+        {"execute_genquery", op_execute_genquery},
+        {"execute_specific_query", op_execute_specific_query},
+        {"list_genquery_columns", op_list_genquery_columns},
+        {"list_specific_queries", op_list_specific_queries}
     };
 
     const std::unordered_map<std::string, handler_type> handlers_for_post{
-        {"add_specific_query", handle_add_specific_query_op},
-        {"remove_specific_query", handle_remove_specific_query_op}
+        {"add_specific_query", op_add_specific_query},
+        {"remove_specific_query", op_remove_specific_query}
     };
 } // anonymous namespace
 
@@ -123,7 +123,7 @@ namespace
     // Operation handler implementations
     //
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_execute_genquery_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_execute_genquery)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -289,9 +289,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_execute_genquery_op
+    } // op_execute_genquery
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_execute_specific_query_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_execute_specific_query)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -412,37 +412,37 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_execute_genquery_op
+    } // op_execute_genquery
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_genquery_columns_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_list_genquery_columns)
     {
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
-    } // handle_list_genquery_columns_op
+    } // op_list_genquery_columns
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_specific_queries_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_list_specific_queries)
     {
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
-    } // handle_list_specific_queries_op
+    } // op_list_specific_queries
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_specific_query_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_add_specific_query)
     {
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
-    } // handle_add_specific_query_op
+    } // op_add_specific_query
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_specific_query_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_specific_query)
     {
         (void) _req;
         (void) _args;
         log::error("{}: Operation not implemented.", __func__);
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
-    } // handle_remove_specific_query_op
+    } // op_remove_specific_query
 } // anonymous namespace

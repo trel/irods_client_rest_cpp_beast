@@ -33,7 +33,7 @@ namespace log = irods::http::log;
 using json = nlohmann::json;
 // clang-format on
 
-#define IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(name) \
+#define IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(name) \
     auto name(irods::http::session_pointer_type _sess_ptr, irods::http::request_type& _req, irods::http::query_arguments_type& _args) -> void
 
 namespace
@@ -44,23 +44,23 @@ namespace
     // Handler function prototypes
     //
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_op);
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_op);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_list);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_stat);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_create);
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove);
 
     //
     // Operation to Handler mappings
     //
 
     const std::unordered_map<std::string, handler_type> handlers_for_get{
-        {"list", handle_list_op},
-        {"stat", handle_stat_op}
+        {"list", op_list},
+        {"stat", op_stat}
     };
 
     const std::unordered_map<std::string, handler_type> handlers_for_post{
-        {"create", handle_create_op},
-        {"remove", handle_remove_op}
+        {"create", op_create},
+        {"remove", op_remove}
     };
 } // anonymous namespace
 
@@ -112,7 +112,7 @@ namespace
     // Operation handler implementations
     //
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_list_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_list)
     {
 #if 0
         auto result = irods::http::resolve_client_identity(_req);
@@ -155,9 +155,9 @@ namespace
         log::error("{}: Operation not implemented.", __func__);
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
-    } // handle_list_op
+    } // op_list
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_stat)
     {
 #if 0
         auto result = irods::http::resolve_client_identity(_req);
@@ -200,9 +200,9 @@ namespace
         log::error("{}: Operation not implemented.", __func__);
         return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
-    } // handle_stat_op
+    } // op_stat
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_create)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -325,9 +325,9 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_create_op
+    } // op_create
 
-    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_op)
+    IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove)
     {
         auto result = irods::http::resolve_client_identity(_req);
         if (result.response) {
@@ -377,5 +377,5 @@ namespace
 
             return _sess_ptr->send(std::move(res));
         });
-    } // handle_remove_op
+    } // op_remove
 } // anonymous namespace
