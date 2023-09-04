@@ -913,28 +913,15 @@ namespace
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
-                {
-                    const auto resc_iter = _args.find("resource");
-                    const auto found_resc = (resc_iter != std::end(_args));
-
-                    const auto repl_iter = _args.find("replica-number");
-                    const auto found_repl = (repl_iter != std::end(_args));
-
-                    if (found_resc && found_repl) {
-                        log::error("{}: [resource] and [replica-number] cannot be used at the same time.", __func__);
-                        return _sess_ptr->send(irods::http::fail(http::status::bad_request));
-                    }
-
-                    if (found_resc) {
-                        addKeyVal(&input.condInput, RESC_NAME_KW, resc_iter->second.c_str());
-                    }
-                    else if (found_repl) {
-                        addKeyVal(&input.condInput, REPL_NUM_KW, repl_iter->second.c_str());
-                    }
-                    else {
-                        log::error("{}: Missing parameter: [resource] or [replica-number]", __func__);
-                        return _sess_ptr->send(irods::http::fail(http::status::bad_request));
-                    }
+                if (auto iter = _args.find("resource"); iter != std::end(_args)) {
+                    addKeyVal(&input.condInput, RESC_NAME_KW, iter->second.c_str());
+                }
+                else if (iter = _args.find("replica-number"); iter != std::end(_args)) {
+                    addKeyVal(&input.condInput, REPL_NUM_KW, iter->second.c_str());
+                }
+                else {
+                    log::error("{}: Missing [resource] or [replica-number] parameter.", fn);
+                    return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
                 if (const auto iter = _args.find("unregister"); iter != std::end(_args) && iter->second == "1") {
