@@ -20,12 +20,15 @@ target_include_directories(
   ${IRODS_EXTERNALS_FULLPATH_BOOST}/include
   ${IRODS_EXTERNALS_FULLPATH_FMT}/include
   ${IRODS_EXTERNALS_FULLPATH_SPDLOG}/include
-  CURL::libcurl
-  #nlohmann_json::nlohmann_json
-  ${IRODS_EXTERNALS_FULLPATH_JSON}/include
   ${CMAKE_BINARY_DIR}/src # For version.hpp
   ${CMAKE_SOURCE_DIR}/src # For log.hpp
   ${CMAKE_SOURCE_DIR}/src/endpoints)
+
+target_link_libraries(
+  ${IRODS_HTTP_SHARED_API_OPERATIONS}
+  PRIVATE
+  CURL::libcurl
+  nlohmann_json::nlohmann_json)
 
 add_subdirectory(authentication)
 add_subdirectory(collections)
