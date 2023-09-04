@@ -5,6 +5,7 @@
 #include "globals.hpp"
 #include "log.hpp"
 #include "session.hpp"
+#include "shared_api_operations.hpp"
 #include "version.hpp"
 
 #include <irods/client_connection.hpp>
@@ -162,6 +163,7 @@ namespace
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_trim_op);
 
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_permission_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_permissions_op);
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op);
 
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_register_op);
@@ -173,6 +175,8 @@ namespace
 
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_calculate_checksum_op);
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_verify_checksum_op);
+
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op);
 
     //
     // Operation to Handler mappings
@@ -201,8 +205,11 @@ namespace
         {"register", handle_register_op},
 
         {"set_permission", handle_set_permission_op},
+        {"modify_permissions", handle_modify_permissions_op},
 
         {"calculate_checksum", handle_calculate_checksum_op},
+
+        {"modify_metadata", handle_modify_metadata_op},
     };
 } // anonymous namespace
 
@@ -1062,6 +1069,12 @@ namespace
         });
     } // handle_set_permission_op
 
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_permissions_op)
+    {
+        using namespace irods::http::shared_api_operations;
+        return op_atomic_apply_acl_operations(_sess_ptr, _req, _args, entity_type::data_object);
+    } // handle_modify_permissions_op
+
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op)
     {
         auto result = irods::http::resolve_client_identity(_req);
@@ -1762,4 +1775,10 @@ namespace
             _sess_ptr->send(std::move(res));
         });
     } // handle_verify_checksum_op
+
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op)
+    {
+        using namespace irods::http::shared_api_operations;
+        return op_atomic_apply_metadata_operations(_sess_ptr, _req, _args, entity_type::data_object);
+    } // handle_modify_metadata_op
 } // anonymous namespace

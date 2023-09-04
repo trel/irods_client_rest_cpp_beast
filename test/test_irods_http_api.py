@@ -310,6 +310,134 @@ class test_collections_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['error_code'], 0)
 
+    def test_modifying_metadata_atomically(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        collection = os.path.join('/', self.zone_name, 'home', self.rodsuser_username)
+
+        # Add metadata to the collection.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_metadata',
+            'lpath': collection,
+            'operations': json.dumps([
+                {
+                    'operation': 'add',
+                    'attribute': 'a1',
+                    'value': 'v1',
+                    'units': 'u1'
+                }
+            ])
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the metadata exists on the collection.
+        r = requests.get(f'{self.url_base}/query', headers=headers, params={
+            'op': 'execute_genquery',
+            'query': "select COLL_NAME where META_COLL_ATTR_NAME = 'a1' and META_COLL_ATTR_VALUE = 'v1' and META_COLL_ATTR_UNITS = 'u1'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['rows'][0][0], collection)
+
+        # Remove the metadata from the collection.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_metadata',
+            'lpath': collection,
+            'operations': json.dumps([
+                {
+                    'operation': 'remove',
+                    'attribute': 'a1',
+                    'value': 'v1',
+                    'units': 'u1'
+                }
+            ])
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the metadata no longer exists on the collection.
+        r = requests.get(f'{self.url_base}/query', headers=headers, params={
+            'op': 'execute_genquery',
+            'query': "select COLL_NAME where META_COLL_ATTR_NAME = 'a1' and META_COLL_ATTR_VALUE = 'v1' and META_COLL_ATTR_UNITS = 'u1'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(len(result['rows']), 0)
+
+    def test_modifying_permissions_atomically(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        collection = os.path.join('/', self.zone_name, 'home', self.rodsuser_username)
+
+        # Give the rodsadmin read permission on the rodsuser's home collection.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_permissions',
+            'lpath': collection,
+            'operations': json.dumps([
+                {
+                    'entity_name': self.rodsadmin_username,
+                    'acl': 'read'
+                }
+            ])
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the rodsadmin now has permission to read the collection.
+        r = requests.get(self.url_endpoint, headers=headers, params={
+            'op': 'stat',
+            'lpath': collection
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(len(result['permissions']), 2)
+        #self.assertEqual(result['permissions'][0]['name'], self.rodsuser_username)
+        #self.assertEqual(result['permissions'][0]['zone'], self.zone_name)
+        #self.assertEqual(result['permissions'][0]['type'], 'rodsuser')
+        #self.assertEqual(result['permissions'][0]['perm'], 'own')
+
+        # Remove rodsadmin's permission on the collection.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_permissions',
+            'lpath': collection,
+            'operations': json.dumps([
+                {
+                    'entity_name': self.rodsadmin_username,
+                    'acl': 'null'
+                }
+            ])
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the permissions have been removed.
+        r = requests.get(self.url_endpoint, headers=headers, params={
+            'op': 'stat',
+            'lpath': collection
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(len(result['permissions']), 1)
+        #self.assertEqual(result['permissions'][0]['name'], self.rodsuser_username)
+        #self.assertEqual(result['permissions'][0]['zone'], self.zone_name)
+        #self.assertEqual(result['permissions'][0]['type'], 'rodsuser')
+        #self.assertEqual(result['permissions'][0]['perm'], 'own')
+
     @unittest.skip('Test needs to be implemented.')
     def test_return_error_on_missing_parameters(self):
         pass
@@ -552,6 +680,173 @@ class test_data_objects_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['error_code'], 0)
 
+    def test_modifying_metadata_atomically(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+
+        # Create a data object.
+        data_object = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'for_atomic_metadata.txt')
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'touch',
+            'lpath': data_object
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Add metadata to the home data object.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_metadata',
+            'lpath': data_object,
+            'operations': json.dumps([
+                {
+                    'operation': 'add',
+                    'attribute': 'a1',
+                    'value': 'v1',
+                    'units': 'u1'
+                }
+            ])
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the metadata exists on the data object.
+        r = requests.get(f'{self.url_base}/query', headers=headers, params={
+            'op': 'execute_genquery',
+            'query': "select COLL_NAME, DATA_NAME where META_DATA_ATTR_NAME = 'a1' and META_DATA_ATTR_VALUE = 'v1' and META_DATA_ATTR_UNITS = 'u1'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['rows'][0][0], os.path.dirname(data_object))
+        self.assertEqual(result['rows'][0][1], os.path.basename(data_object))
+
+        # Remove the metadata from the data object.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_metadata',
+            'lpath': data_object,
+            'operations': json.dumps([
+                {
+                    'operation': 'remove',
+                    'attribute': 'a1',
+                    'value': 'v1',
+                    'units': 'u1'
+                }
+            ])
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the metadata no longer exists on the data object.
+        r = requests.get(f'{self.url_base}/query', headers=headers, params={
+            'op': 'execute_genquery',
+            'query': "select COLL_NAME, DATA_NAME where META_DATA_ATTR_NAME = 'a1' and META_DATA_ATTR_VALUE = 'v1' and META_DATA_ATTR_UNITS = 'u1'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(len(result['rows']), 0)
+
+        # Remove the data object.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'remove',
+            'lpath': data_object,
+            'no-trash': 1
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+    def test_modifying_permissions_atomically(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+
+        # Create a data object.
+        data_object = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'for_atomic_acls.txt')
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'touch',
+            'lpath': data_object
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Give the rodsadmin read permission on the data object.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_permissions',
+            'lpath': data_object,
+            'operations': json.dumps([
+                {
+                    'entity_name': self.rodsadmin_username,
+                    'acl': 'read'
+                }
+            ])
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the rodsadmin now has permission to read the data object.
+        r = requests.get(self.url_endpoint, headers=headers, params={
+            'op': 'stat',
+            'lpath': data_object
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(len(result['permissions']), 2)
+        #self.assertEqual(result['permissions'][0]['name'], self.rodsuser_username)
+        #self.assertEqual(result['permissions'][0]['zone'], self.zone_name)
+        #self.assertEqual(result['permissions'][0]['type'], 'rodsuser')
+        #self.assertEqual(result['permissions'][0]['perm'], 'own')
+
+        # Remove rodsadmin's permission on the data object.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_permissions',
+            'lpath': data_object,
+            'operations': json.dumps([
+                {
+                    'entity_name': self.rodsadmin_username,
+                    'acl': 'null'
+                }
+            ])
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the permissions have been removed.
+        r = requests.get(self.url_endpoint, headers=headers, params={
+            'op': 'stat',
+            'lpath': data_object
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(len(result['permissions']), 1)
+        #self.assertEqual(result['permissions'][0]['name'], self.rodsuser_username)
+        #self.assertEqual(result['permissions'][0]['zone'], self.zone_name)
+        #self.assertEqual(result['permissions'][0]['type'], 'rodsuser')
+        #self.assertEqual(result['permissions'][0]['perm'], 'own')
+
+        # Remove the data object.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'remove',
+            'lpath': data_object,
+            'no-trash': 1
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
     @unittest.skip('Test needs to be implemented.')
     def test_return_error_on_missing_parameters(self):
         pass
@@ -578,95 +873,6 @@ class test_information_endpoint(unittest.TestCase):
         self.assertIn('max_http_request_size_in_bytes', info)
         self.assertIn('max_number_of_parallel_write_streams', info)
         self.assertIn('max_number_of_rows_per_catalog_query', info)
-
-class test_metadata_endpoint(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        setup_class(cls, {'endpoint_name': 'metadata'})
-
-    @classmethod
-    def tearDownClass(cls):
-        tear_down_class(cls)
-
-    def setUp(self):
-        self.assertFalse(self._class_init_error, 'Class initialization failed. Cannot continue.')
-
-    def test_http_api_passes_json_input_to_atomic_apply_metadata_operations_api_plugin(self):
-        # The HTTP API is simply a passthrough for the atomic metadata operations API plugin.
-        # For that reason, we only need to demonstrate that the API plugin is accessible.
-        # Testing all forms of input is not the responsibility of the HTTP API.
-
-        headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
-        collection = os.path.join('/', self.zone_name, 'home', self.rodsuser_username)
-
-        # Add metadata to the home collection.
-        r = requests.post(self.url_endpoint, headers=headers, data={
-            'op': 'execute',
-            'json': json.dumps({
-                'entity_name': collection,
-                'entity_type': 'collection',
-                'operations': [
-                    {
-                        'operation': 'add',
-                        'attribute': 'a1',
-                        'value': 'v1',
-                        'units': 'u1'
-                    }
-                ]
-            })
-        })
-        #print(r.content) # Debug
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
-
-        # Show the metadata exists on the collection.
-        r = requests.get(f'{self.url_base}/query', headers=headers, params={
-            'op': 'execute_genquery',
-            'query': "select COLL_NAME where META_COLL_ATTR_NAME = 'a1' and META_COLL_ATTR_VALUE = 'v1' and META_COLL_ATTR_UNITS = 'u1'"
-        })
-        #print(r.content) # Debug
-        self.assertEqual(r.status_code, 200)
-
-        result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
-        self.assertEqual(result['rows'][0][0], collection)
-
-        # Remove the metadata from the home collection.
-        r = requests.post(self.url_endpoint, headers=headers, data={
-            'op': 'execute',
-            'json': json.dumps({
-                'entity_name': collection,
-                'entity_type': 'collection',
-                'operations': [
-                    {
-                        'operation': 'remove',
-                        'attribute': 'a1',
-                        'value': 'v1',
-                        'units': 'u1'
-                    }
-                ]
-            })
-        })
-        #print(r.content) # Debug
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
-
-        # Show the metadata no longer exists on the collection.
-        r = requests.get(f'{self.url_base}/query', headers=headers, params={
-            'op': 'execute_genquery',
-            'query': "select COLL_NAME where META_COLL_ATTR_NAME = 'a1' and META_COLL_ATTR_VALUE = 'v1' and META_COLL_ATTR_UNITS = 'u1'"
-        })
-        #print(r.content) # Debug
-        self.assertEqual(r.status_code, 200)
-
-        result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
-        self.assertEqual(len(result['rows']), 0)
-
-    @unittest.skip('Test needs to be implemented.')
-    def test_return_error_on_missing_parameters(self):
-        pass
 
 class test_query_endpoint(unittest.TestCase):
 
@@ -987,6 +1193,68 @@ class test_resources_endpoint(unittest.TestCase):
         result = r.json()
         self.assertEqual(result['irods_response']['error_code'], 0)
         self.assertEqual(result['exists'], False)
+
+    def test_modifying_metadata_atomically(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+        resource = 'demoResc'
+
+        # Add metadata to the resource.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_metadata',
+            'name': resource,
+            'operations': json.dumps([
+                {
+                    'operation': 'add',
+                    'attribute': 'a1',
+                    'value': 'v1',
+                    'units': 'u1'
+                }
+            ])
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the metadata exists on the resource.
+        r = requests.get(f'{self.url_base}/query', headers=headers, params={
+            'op': 'execute_genquery',
+            'query': "select RESC_NAME where META_RESC_ATTR_NAME = 'a1' and META_RESC_ATTR_VALUE = 'v1' and META_RESC_ATTR_UNITS = 'u1'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['rows'][0][0], resource)
+
+        # Remove the metadata from the resource.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_metadata',
+            'name': resource,
+            'operations': json.dumps([
+                {
+                    'operation': 'remove',
+                    'attribute': 'a1',
+                    'value': 'v1',
+                    'units': 'u1'
+                }
+            ])
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the metadata no longer exists on the resource.
+        r = requests.get(f'{self.url_base}/query', headers=headers, params={
+            'op': 'execute_genquery',
+            'query': "select RESC_NAME where META_RESC_ATTR_NAME = 'a1' and META_RESC_ATTR_VALUE = 'v1' and META_RESC_ATTR_UNITS = 'u1'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(len(result['rows']), 0)
 
 class test_rules_endpoint(unittest.TestCase):
 
@@ -1519,6 +1787,68 @@ class test_users_groups_endpoint(unittest.TestCase):
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+    def test_modifying_metadata_atomically(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+        username = self.rodsuser_username
+
+        # Add metadata to the user.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_metadata',
+            'name': username,
+            'operations': json.dumps([
+                {
+                    'operation': 'add',
+                    'attribute': 'a1',
+                    'value': 'v1',
+                    'units': 'u1'
+                }
+            ])
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the metadata exists on the user.
+        r = requests.get(f'{self.url_base}/query', headers=headers, params={
+            'op': 'execute_genquery',
+            'query': "select USER_NAME where META_USER_ATTR_NAME = 'a1' and META_USER_ATTR_VALUE = 'v1' and META_USER_ATTR_UNITS = 'u1'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['rows'][0][0], username)
+
+        # Remove the metadata from the user.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_metadata',
+            'name': username,
+            'operations': json.dumps([
+                {
+                    'operation': 'remove',
+                    'attribute': 'a1',
+                    'value': 'v1',
+                    'units': 'u1'
+                }
+            ])
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the metadata no longer exists on the user.
+        r = requests.get(f'{self.url_base}/query', headers=headers, params={
+            'op': 'execute_genquery',
+            'query': "select USER_NAME where META_USER_ATTR_NAME = 'a1' and META_USER_ATTR_VALUE = 'v1' and META_USER_ATTR_UNITS = 'u1'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(len(result['rows']), 0)
 
     @unittest.skip('Test needs to be implemented.')
     def test_create_user_returns_error_when_missing_required_parameters(self):

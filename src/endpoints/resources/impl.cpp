@@ -4,6 +4,7 @@
 #include "globals.hpp"
 #include "log.hpp"
 #include "session.hpp"
+#include "shared_api_operations.hpp"
 #include "version.hpp"
 
 #include <irods/irods_exception.hpp>
@@ -50,6 +51,7 @@ namespace
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_child_op);
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_rebalance_op);
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_stat_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op);
 
     //
     // Operation to Handler mappings
@@ -65,7 +67,8 @@ namespace
         {"modify", handle_modify_op},
         {"add_child", handle_add_child_op},
         {"remove_child", handle_remove_child_op},
-        {"rebalance", handle_rebalance_op}
+        {"rebalance", handle_rebalance_op},
+        {"modify_metadata", handle_modify_metadata_op}
     };
 } // anonymous namespace
 
@@ -543,4 +546,10 @@ namespace
             return _sess_ptr->send(std::move(res));
         });
     } // handle_stat_op
+
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op)
+    {
+        using namespace irods::http::shared_api_operations;
+        return op_atomic_apply_metadata_operations(_sess_ptr, _req, _args, entity_type::resource);
+    } // handle_modify_metadata_op
 } // anonymous namespace

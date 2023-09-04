@@ -55,6 +55,7 @@ target_link_libraries(
   ${IRODS_EXTERNALS_FULLPATH_BOOST}/lib/libboost_program_options.so
   ${IRODS_EXTERNALS_FULLPATH_FMT}/lib/libfmt.so
   CURL::libcurl
+  $<TARGET_OBJECTS:shared_api_operations>
   $<TARGET_OBJECTS:authentication>
   $<TARGET_OBJECTS:collections>
   #$<TARGET_OBJECTS:config>
