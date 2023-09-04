@@ -311,7 +311,7 @@ namespace
                     return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                 }
 
-                static const auto& proxy_user_password = irods::http::globals::configuration().at(json::json_pointer{"/irods_client/rodsadmin/password"}).get_ref<const std::string&>();
+                static const auto& proxy_user_password = irods::http::globals::configuration().at(json::json_pointer{"/irods_client/proxy_admin_account/password"}).get_ref<const std::string&>();
                 const adm::user_password_property prop{new_password_iter->second, proxy_user_password};
 
                 auto conn = irods::get_connection(client_info->username);
