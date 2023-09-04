@@ -67,7 +67,8 @@ namespace
         // TODO May need to accept a zone for the client (i.e. federation).
         parallel_write_stream(const std::string& _client_username,
                               const std::string& _path,
-                              const std::optional<std::string> _ticket,
+                              const std::ios_base::openmode _openmode,
+                              const std::optional<std::string>& _ticket,
                               const irods::experimental::io::odstream* _base = nullptr)
         {
             const auto& client = irods::http::globals::configuration().at("irods_client");
@@ -96,12 +97,11 @@ namespace
 
             tp_ = std::make_unique<irods::experimental::io::client::native_transport>(conn_);
 
-            // TODO Handle truncate and append.
             if (_base) {
-                stream_.open(*tp_, _base->replica_token(), _path, _base->replica_number(), std::ios::out);
+                stream_.open(*tp_, _base->replica_token(), _path, _base->replica_number(), _openmode);
             }
             else {
-                stream_.open(*tp_, _path);
+                stream_.open(*tp_, _path, _openmode);
             }
 
             if (!stream_) {
@@ -505,6 +505,16 @@ namespace
                         return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
                     }
 
+                    auto openmode = std::ios_base::out;
+
+                    if (const auto iter = _args.find("truncate"); iter != std::end(_args) && iter->second == "0") {
+                        openmode |= std::ios_base::in;
+                    }
+
+                    if (const auto iter = _args.find("append"); iter != std::end(_args) && iter->second == "1") {
+                        openmode |= std::ios_base::app;
+                    }
+
                     log::trace("{}: Opening data object [{}] for write.", fn, lpath_iter->second);
                     log::trace("{}: (write) Initializing for single buffer write.", fn);
 
@@ -528,10 +538,10 @@ namespace
                     tp = std::make_unique<io::client::native_transport>(conn);
 
                     if (const auto iter = _args.find("resource"); iter != std::end(_args)) {
-                        out = std::make_unique<io::odstream>(*tp, lpath_iter->second, io::root_resource_name{iter->second});
+                        out = std::make_unique<io::odstream>(*tp, lpath_iter->second, io::root_resource_name{iter->second}, openmode);
                     }
                     else {
-                        out = std::make_unique<io::odstream>(*tp, lpath_iter->second);
+                        out = std::make_unique<io::odstream>(*tp, lpath_iter->second, openmode);
                     }
 
                     out_ptr = out.get();
@@ -676,13 +686,23 @@ namespace
                 pw_streams.reserve(stream_count);
 
                 try {
+                    auto openmode = std::ios_base::out;
+
+                    if (const auto iter = _args.find("truncate"); iter != std::end(_args) && iter->second == "0") {
+                        openmode |= std::ios_base::in;
+                    }
+
+                    if (const auto iter = _args.find("append"); iter != std::end(_args) && iter->second == "1") {
+                        openmode |= std::ios_base::app;
+                    }
+
                     std::optional<std::string> ticket;
                     if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
                         ticket = iter->second;
                     }
 
                     // Open the first stream.
-                    pw_streams.emplace_back(std::make_shared<parallel_write_stream>(client_info->username, lpath_iter->second, ticket));
+                    pw_streams.emplace_back(std::make_shared<parallel_write_stream>(client_info->username, lpath_iter->second, openmode, ticket));
 
                     auto& first_stream = pw_streams.front()->stream();
                     log::debug("{}: replica token=[{}], replica number=[{}], leaf resource name=[{}]",
@@ -695,6 +715,7 @@ namespace
                     for (int i = 0; i < stream_count; ++i) {
                         pw_streams.emplace_back(std::make_shared<parallel_write_stream>(client_info->username,
                                                                                         lpath_iter->second,
+                                                                                        openmode,
                                                                                         ticket,
                                                                                         &pw_streams.front()->stream()));
                     }
