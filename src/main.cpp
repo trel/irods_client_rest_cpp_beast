@@ -200,7 +200,7 @@ auto print_configuration_template() -> void
             "verify_server": "<string>"
         }},
 
-        "proxy_rodsadmin": {{
+        "proxy_admin_account": {{
             "username": "<string>",
             "password": "<string>"
         }},
@@ -294,7 +294,7 @@ auto init_irods_connection_pool(const json& _config) -> irods::connection_pool
     const auto& client = _config.at("irods_client");
     const auto& zone = client.at("zone").get_ref<const std::string&>();
     const auto& conn_pool = client.at("connection_pool");
-    const auto& rodsadmin = client.at("rodsadmin");
+    const auto& rodsadmin = client.at("proxy_admin_account");
     const auto& username = rodsadmin.at("username").get_ref<const std::string&>();
 
     irods::connection_pool_options opts;

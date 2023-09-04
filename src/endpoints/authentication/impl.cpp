@@ -81,8 +81,8 @@ namespace irods::http::handler
             bool login_successful = false;
 
             try {
-                static const auto& rodsadmin_username = irods::http::globals::configuration().at(nlohmann::json::json_pointer{"/irods_client/rodsadmin/username"}).get_ref<const std::string&>();
-                static const auto& rodsadmin_password = irods::http::globals::configuration().at(nlohmann::json::json_pointer{"/irods_client/rodsadmin/password"}).get_ref<const std::string&>();
+                static const auto& rodsadmin_username = irods::http::globals::configuration().at(nlohmann::json::json_pointer{"/irods_client/proxy_admin_account/username"}).get_ref<const std::string&>();
+                static const auto& rodsadmin_password = irods::http::globals::configuration().at(nlohmann::json::json_pointer{"/irods_client/proxy_admin_account/password"}).get_ref<const std::string&>();
                 static const auto& zone = irods::http::globals::configuration().at(nlohmann::json::json_pointer{"/irods_client/zone"}).get_ref<const std::string&>();
 
                 CheckAuthCredentialsInput input{};

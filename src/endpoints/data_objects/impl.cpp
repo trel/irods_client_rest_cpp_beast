@@ -69,7 +69,7 @@ namespace
         {
             const auto& client = irods::http::globals::configuration().at("irods_client");
             const auto& zone = client.at("zone").get_ref<const std::string&>();
-            const auto& rodsadmin = client.at("rodsadmin");
+            const auto& rodsadmin = client.at("proxy_admin_account");
 
             conn_.connect(irods::experimental::defer_authentication,
                           client.at("host").get_ref<const std::string&>(),

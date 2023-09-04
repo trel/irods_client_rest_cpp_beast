@@ -172,7 +172,7 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
 
         // The credentials for the rodsadmin user that will act as a proxy
         // for all authenticated users.
-        "proxy_rodsadmin": {
+        "proxy_admin_account": {
             "username": "<string>",
             "password": "<string>"
         },
