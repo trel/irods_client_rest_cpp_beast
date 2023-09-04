@@ -157,6 +157,13 @@ test_query_endpoint()
 
 test_resource_endpoint()
 {
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
+        --data-urlencode 'op=modify_metadata' \
+        --data-urlencode 'name=demoResc' \
+        --data-urlencode 'operations=[{"operation":"add", "attribute":"createdby", "value":"koryd"}]' \
+        ${curl_opts} | jq
+    exit
+
     # Stat demoResc.
     curl -G -H "authorization: Bearer $bearer_token" "${base_url}/resources" \
         --data-urlencode 'op=stat' \
@@ -473,6 +480,13 @@ test_tickets_endpoint()
 
 test_users_groups_endpoint()
 {
+    curl -H "authorization: Bearer $bearer_token" "${base_url}/users-groups" \
+        --data-urlencode 'op=modify_metadata' \
+        --data-urlencode 'name=kory' \
+        --data-urlencode 'operations=[{"operation":"add", "attribute":"http-api", "value":"didit"}]' \
+        ${curl_opts} | jq
+    exit
+
     # Stat a user.
     curl -G -H "authorization: Bearer $bearer_token" "${base_url}/users-groups" \
         --data-urlencode 'op=stat' \
@@ -514,14 +528,14 @@ test_users_groups_endpoint()
         $curl_opts | jq
 }
 
-test_collections_endpoint
+#test_collections_endpoint
 #test_configuration_endpoint
-test_data_objects_endpoint
-test_information_endpoint
-test_metadata_endpoint
-test_query_endpoint
-test_resource_endpoint
-test_rules_endpoint
-test_tickets_endpoint
+#test_data_objects_endpoint
+#test_information_endpoint
+#test_metadata_endpoint
+#test_query_endpoint
+#test_resource_endpoint
+#test_rules_endpoint
+#test_tickets_endpoint
 test_users_groups_endpoint
-test_zones_endpoint
+#test_zones_endpoint

@@ -4,6 +4,7 @@
 #include "globals.hpp"
 #include "log.hpp"
 #include "session.hpp"
+#include "shared_api_operations.hpp"
 #include "version.hpp"
 
 #include <irods/irods_exception.hpp>
@@ -51,6 +52,7 @@ namespace
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_user_type_op);
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_add_user_auth_op);
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_user_auth_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op);
 
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_create_group_op);
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_group_op);
@@ -85,7 +87,8 @@ namespace
         {"create_group", handle_create_group_op},
         {"remove_group", handle_remove_group_op},
         {"add_to_group", handle_add_to_group_op},
-        {"remove_from_group", handle_remove_from_group_op}
+        {"remove_from_group", handle_remove_from_group_op},
+        {"modify_metadata", handle_modify_metadata_op}
     };
 } // anonymous namespace
 
@@ -1048,4 +1051,10 @@ namespace
             return _sess_ptr->send(std::move(res));
         });
     } // handle_stat_op
+
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op)
+    {
+        using namespace irods::http::shared_api_operations;
+        return op_atomic_apply_metadata_operations(_sess_ptr, _req, _args, entity_type::user);
+    } // handle_modify_metadata_op
 } // anonymous namespace

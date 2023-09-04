@@ -4,6 +4,7 @@
 #include "globals.hpp"
 #include "log.hpp"
 #include "session.hpp"
+#include "shared_api_operations.hpp"
 #include "version.hpp"
 
 #include <irods/filesystem.hpp>
@@ -49,6 +50,8 @@ namespace
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_remove_op);
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_rename_op);
     IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_set_permission_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_permissions_op);
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op);
 
     //
     // Operation to Handler mappings
@@ -66,6 +69,8 @@ namespace
         //{"copy", handle_copy_op}, // TODO
         {"set_permission", handle_set_permission_op},
         //{"enable_inheritance", handle_enable_inheritance_op} // TODO set_permission handles inheritance?
+        {"modify_permissions", handle_modify_permissions_op},
+        {"modify_metadata", handle_modify_metadata_op},
     };
 } // anonymous namespace
 
@@ -619,4 +624,16 @@ namespace
             return _sess_ptr->send(std::move(res));
         });
     } // handle_set_permission_op
+
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_permissions_op)
+    {
+        using namespace irods::http::shared_api_operations;
+        return op_atomic_apply_acl_operations(_sess_ptr, _req, _args, entity_type::collection);
+    } // handle_modify_permissions_op
+
+    IRODS_HTTP_API_HANDLER_FUNCTION_SIGNATURE(handle_modify_metadata_op)
+    {
+        using namespace irods::http::shared_api_operations;
+        return op_atomic_apply_metadata_operations(_sess_ptr, _req, _args, entity_type::collection);
+    } // handle_modify_metadata_op
 } // anonymous namespace
