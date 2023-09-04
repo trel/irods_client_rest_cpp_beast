@@ -23,12 +23,6 @@ target_compile_definitions(
   PRIVATE
   ${IRODS_COMPILE_DEFINITIONS}
   ${IRODS_COMPILE_DEFINITIONS_PRIVATE}
-  # Needed so that beast::string_view can be passed to fmtlib.
-  # Likely defines the following:
-  #
-  #  using string_view = std::string_view;
-  #
-  BOOST_BEAST_USE_STD_STRING_VIEW
   # The following macro requires that the application never attempt to
   # change log levels concurrently across threads.
   SPDLOG_NO_ATOMIC_LEVELS

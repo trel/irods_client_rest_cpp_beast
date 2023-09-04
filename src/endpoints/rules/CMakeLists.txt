@@ -9,13 +9,7 @@ target_compile_definitions(
   ${IRODS_HTTP_ENDPOINT}
   PRIVATE
   ${IRODS_COMPILE_DEFINITIONS}
-  ${IRODS_COMPILE_DEFINITIONS_PRIVATE}
-  # Needed so that beast::string_view can be passed to fmtlib.
-  # Likely defines the following:
-  #
-  #  using string_view = std::string_view;
-  #
-  BOOST_BEAST_USE_STD_STRING_VIEW)
+  ${IRODS_COMPILE_DEFINITIONS_PRIVATE})
 
 target_include_directories(
   ${IRODS_HTTP_ENDPOINT}
