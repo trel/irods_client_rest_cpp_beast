@@ -55,7 +55,6 @@ target_link_libraries(
   #$<TARGET_OBJECTS:config>
   $<TARGET_OBJECTS:data_objects>
   $<TARGET_OBJECTS:information>
-  $<TARGET_OBJECTS:metadata>
   $<TARGET_OBJECTS:query>
   $<TARGET_OBJECTS:resources>
   $<TARGET_OBJECTS:rules>

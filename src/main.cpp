@@ -75,7 +75,6 @@ const irods::http::request_handler_map_type req_handlers{
 //  {IRODS_HTTP_API_BASE_URL "/config",       irods::http::handler::configuration},
     {IRODS_HTTP_API_BASE_URL "/data-objects", irods::http::handler::data_objects},
     {IRODS_HTTP_API_BASE_URL "/info",         irods::http::handler::information},
-    {IRODS_HTTP_API_BASE_URL "/metadata",     irods::http::handler::metadata},
     {IRODS_HTTP_API_BASE_URL "/query",        irods::http::handler::query},
     {IRODS_HTTP_API_BASE_URL "/resources",    irods::http::handler::resources},
     {IRODS_HTTP_API_BASE_URL "/rules",        irods::http::handler::rules},
