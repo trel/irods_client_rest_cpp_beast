@@ -8,6 +8,7 @@
 
 #include <irods/base64.hpp>
 #include <irods/check_auth_credentials.h>
+#include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/process_stash.hpp>
 #include <irods/rcConnect.h>
@@ -95,6 +96,9 @@ namespace irods::http::handler
                 obfuscated_password.copy(input.password, sizeof(CheckAuthCredentialsInput::password));
 
                 int* correct{};
+
+                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory, cppcoreguidelines-no-malloc)
+                irods::at_scope_exit free_memory{[&correct] { std::free(correct); }};
 
                 auto conn = irods::get_connection(rodsadmin_username);
 

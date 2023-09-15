@@ -14,6 +14,7 @@
 #include <irods/irods_query.hpp>
 #include <irods/msParam.h>
 #include <irods/rcMisc.h>
+#include <irods/rodsError.h>
 #include <irods/rodsErrorTable.h>
 #include <irods/rodsKeyWdDef.h>
 #include <irods/ruleExecDel.h>
@@ -144,10 +145,7 @@ namespace
 
                 ExecMyRuleInp input{};
 
-                irods::at_scope_exit clear_kvp{[&input] {
-                    clearKeyVal(&input.condInput);
-                    clearMsParamArray(input.inpParamArray, 0); // 0 -> do not free external structure.
-                }};
+                irods::at_scope_exit clear_kvp{[&input] { clearKeyVal(&input.condInput); }};
 
                 const auto rule_text = fmt::format("@external rule {{ {} }}", rule_text_iter->second);
                 std::strncpy(input.myRule, rule_text.c_str(), sizeof(ExecMyRuleInp::myRule));
@@ -158,10 +156,22 @@ namespace
                 }
 
                 MsParamArray param_array{};
+
+                irods::at_scope_exit clear_ms_param_array{[&param_array] {
+                    constexpr auto free_inOutStruct = 0;
+                    clearMsParamArray(&param_array, free_inOutStruct);
+                }};
+
                 input.inpParamArray = &param_array;
                 std::strncpy(input.outParamDesc, "ruleExecOut", sizeof(input.outParamDesc));
 
                 MsParamArray* out_param_array{};
+
+                irods::at_scope_exit clear_out_param_array{[&out_param_array] {
+                    constexpr auto free_inOutStruct = 1;
+                    clearMsParamArray(out_param_array, free_inOutStruct);
+                    std::free(out_param_array); // NOLINT(cppcoreguidelines-owning-memory, cppcoreguidelines-no-malloc)
+                }};
 
                 json stdout_output;
                 json stderr_output;
@@ -171,7 +181,7 @@ namespace
 
                 if (ec >= 0) {
                     if (auto* msp = getMsParamByType(out_param_array, ExecCmdOut_MS_T); msp) {
-                        if (const auto* exec_out = static_cast<ExecCmdOut*>(msp->inOutStruct); exec_out) {
+                        if (auto* exec_out = static_cast<ExecCmdOut*>(msp->inOutStruct); exec_out) {
                             if (exec_out->stdoutBuf.buf) {
                                 stdout_output = static_cast<const char*>(exec_out->stdoutBuf.buf);
                                 log::debug("{}: stdout_output = [{}]", fn, stdout_output.get_ref<const std::string&>());
@@ -194,11 +204,13 @@ namespace
                     for (auto&& err : std::span(rerr_info->errMsg, rerr_info->len)) {
                         log::info("{}: RcComm::rError info = [status=[{}], message=[{}]]", fn, err->status, err->msg);
                     }
+
+                    freeRError(rerr_info);
                 }
 
                 res.body() = json{
                     {"irods_response", {
-                        {"error_code", ec},
+                        {"error_code", ec}
                     }},
                     {"stdout", stdout_output},
                     {"stderr", stderr_output}
@@ -298,17 +310,26 @@ namespace
             try {
                 ExecMyRuleInp input{};
 
-                irods::at_scope_exit clear_kvp{[&input] {
-                    clearKeyVal(&input.condInput);
-                    clearMsParamArray(input.inpParamArray, 0); // 0 -> do not free external structure.
-                }};
+                irods::at_scope_exit clear_kvp{[&input] { clearKeyVal(&input.condInput); }};
 
                 addKeyVal(&input.condInput, AVAILABLE_KW, "");
 
                 MsParamArray param_array{};
+
+                irods::at_scope_exit clear_ms_param_array{[&param_array] {
+                    constexpr auto free_inOutStruct = 0;
+                    clearMsParamArray(&param_array, free_inOutStruct);
+                }};
+
                 input.inpParamArray = &param_array;
 
                 MsParamArray* out_param_array{};
+
+                irods::at_scope_exit clear_out_param_array{[&out_param_array] {
+                    constexpr auto free_inOutStruct = 1;
+                    clearMsParamArray(out_param_array, free_inOutStruct);
+                    std::free(out_param_array);
+                }};
 
                 auto conn = irods::get_connection(client_info->username);
                 const auto ec = rcExecMyRule(static_cast<RcComm*>(conn), &input, &out_param_array);
@@ -329,9 +350,9 @@ namespace
 
                 res.body() = json{
                     {"irods_response", {
-                        {"error_code", ec},
+                        {"error_code", ec}
                     }},
-                    {"rule_engine_plugin_instances", plugin_instances},
+                    {"rule_engine_plugin_instances", plugin_instances}
                 }.dump();
             }
             catch (const irods::exception& e) {
