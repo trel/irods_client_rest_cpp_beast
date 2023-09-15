@@ -4,6 +4,7 @@
 #include "log.hpp"
 #include "version.hpp"
 
+#include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/process_stash.hpp>
 #include <irods/rcMisc.h> // For addKeyVal().
@@ -320,6 +321,9 @@ namespace irods
         log::trace("{}: Changing identity associated with connection to [{}].", __func__, _username);
 
         SwitchUserInput input{};
+
+        irods::at_scope_exit clear_options{[&input] { clearKeyVal(&input.options); }};
+
         std::strncpy(input.username, _username.c_str(), sizeof(SwitchUserInput::username));
         std::strncpy(input.zone, zone.c_str(), sizeof(SwitchUserInput::zone));
         addKeyVal(&input.options, KW_CLOSE_OPEN_REPLICAS, "");
