@@ -214,13 +214,9 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
         },
 
         // The buffer size used for read operations.
-        // Clients are not allowed to read more bytes than this value in
-        // one API call.
         "max_rbuffer_size_in_bytes": 8192,
 
         // The buffer size used for write operations.
-        // Clients are not allowed to write more bytes than this value in
-        // one API call.
         "max_wbuffer_size_in_bytes": 8192,
 
         // The number of rows that can be returned by a General or Specific
