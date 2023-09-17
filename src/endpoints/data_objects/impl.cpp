@@ -440,7 +440,7 @@ namespace
                 // operation or by the parallel_write_shutdown HTTP API operation.
                 bool is_parallel_write = false;
 
-                irods::connection_pool::connection_proxy conn;
+                irods::http::connection_facade conn;
                 std::unique_ptr<io::client::native_transport> tp;
 
                 std::unique_ptr<io::odstream> out;

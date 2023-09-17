@@ -1,10 +1,12 @@
 #ifndef IRODS_HTTP_API_ENDPOINT_COMMON_HPP
 #define IRODS_HTTP_API_ENDPOINT_COMMON_HPP
 
+#include <irods/client_connection.hpp>
 #include <irods/connection_pool.hpp>
 #include <irods/filesystem/object_status.hpp>
 #include <irods/filesystem/permissions.hpp>
 #include <irods/irods_exception.hpp>
+#include <irods/rodsErrorTable.h>
 
 #include <boost/beast/http/status.hpp>
 #include <boost/beast/http/message.hpp>
@@ -19,6 +21,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 struct RcComm;
@@ -70,6 +73,53 @@ namespace irods::http
         const authenticated_client_info* client_info{};
     }; // struct client_identity_resolution_result
 
+    class connection_facade // NOLINT(cppcoreguidelines-special-member-functions)
+    {
+      public:
+        connection_facade() = default;
+
+        explicit connection_facade(irods::connection_pool::connection_proxy&& _conn)
+            : conn_{std::move(_conn)}
+        {
+        } // constructor
+
+        explicit connection_facade(irods::experimental::client_connection&& _conn)
+            : conn_{std::move(_conn)}
+        {
+        } // constructor
+
+        connection_facade(const connection_facade&) = delete;
+        auto operator=(const connection_facade&) -> connection_facade& = delete;
+
+        connection_facade(connection_facade&&) = default;
+        auto operator=(connection_facade&&) -> connection_facade& = default;
+
+        explicit operator RcComm*() noexcept
+        {
+            if (auto* p = std::get_if<irods::connection_pool::connection_proxy>(&conn_); p) {
+                return static_cast<RcComm*>(*p);
+            }
+
+            return static_cast<RcComm*>(*std::get_if<irods::experimental::client_connection>(&conn_));
+        } // operator RcComm*
+
+        operator RcComm&() // NOLINT(google-explicit-constructor)
+        {
+            if (auto* p = std::get_if<irods::connection_pool::connection_proxy>(&conn_); p) {
+                return *p;
+            }
+
+            if (auto* p = std::get_if<irods::experimental::client_connection>(&conn_); p) {
+                return *p;
+            }
+
+            THROW(SYS_INTERNAL_ERR, "Cannot return reference to connection object. connection_facade is empty.");
+        } // operator RcComm&
+
+      private:
+        std::variant<std::monostate, irods::experimental::client_connection, irods::connection_pool::connection_proxy> conn_;
+    }; // class connection_facade
+
     auto fail(response_type& _response, status_type _status, const std::string_view _error_msg) -> response_type;
 
     auto fail(response_type& _response, status_type _status) -> response_type;
@@ -118,8 +168,7 @@ namespace irods
 
     auto to_object_type_enum(const std::string_view _s) -> std::optional<irods::experimental::filesystem::object_type>;
 
-    // TODO May require the zone name be passed as well for federation?
-    auto get_connection(const std::string& _username) -> irods::connection_pool::connection_proxy;
+    auto get_connection(const std::string& _username) -> irods::http::connection_facade;
 
     auto fail(boost::beast::error_code ec, char const* what) -> void;
 

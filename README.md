@@ -188,6 +188,20 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
             "verify_server": "cert"
         },
 
+        // Controls how the HTTP API communicates with the iRODS server.
+        //
+        // When set to true, the following applies:
+        // - Only APIs supported by the iRODS 4.2 series will be used.
+        // - Connection pool settings are ignored.
+        // - All HTTP requests will be served using a new iRODS connection.
+        //
+        // When set to false, the HTTP API will take full advantage of the
+        // iRODS server's capabilities.
+        //
+        // This option should be used when the HTTP API is configured to
+        // communicate with an iRODS 4.2 server.
+        "enable_4_2_compatibility": false,
+
         // The credentials for the rodsadmin user that will act as a proxy
         // for all authenticated users.
         "proxy_admin_account": {

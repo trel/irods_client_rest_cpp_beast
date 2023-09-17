@@ -8,6 +8,7 @@
 #include "version.hpp"
 
 #include <irods/irods_exception.hpp>
+#include <irods/query_builder.hpp>
 #include <irods/resource_administration.hpp>
 #include <irods/rodsErrorTable.h>
 
@@ -498,10 +499,48 @@ namespace
                 json::object_t info;
                 bool exists = false;
 
-                if (const auto resc = adm::client::resource_info(conn, name_iter->second); resc) {
+                const auto& config = irods::http::globals::configuration();
+
+                if (config.at(json::json_pointer{"/irods_client/enable_4_2_compatibility"}).get<bool>()) {
+                    const auto gql = fmt::format("select RESC_ID, RESC_TYPE_NAME, RESC_ZONE_NAME, "
+                                                 "RESC_LOC, RESC_VAULT_PATH, RESC_STATUS, "
+                                                 "RESC_CONTEXT, RESC_COMMENT, RESC_INFO, "
+                                                 "RESC_FREE_SPACE, RESC_FREE_SPACE_TIME, "
+                                                 "RESC_PARENT, RESC_CREATE_TIME, RESC_MODIFY_TIME "
+                                                 "where RESC_NAME = '{}'",
+                                                 name_iter->second);
+
+                    for (auto&& row : irods::experimental::query_builder{}.build<RcComm>(conn, gql)) {
+                        exists = true;
+
+                        info = {
+                            {"id", row[0]},
+                            {"name", name_iter->second},
+                            {"type", row[1]},
+                            {"zone", row[2]},
+                            {"host", row[3]},
+                            {"vault_path", row[4]},
+                            {"status", adm::to_resource_status(row[5])},
+                            {"context", row[6]},
+                            {"comments", row[7]},
+                            {"information", row[8]},
+                            {"free_space", row[9]},
+                            {"free_space_last_modified", 0},
+                            {"parent_id", row[11]},
+                            {"created", std::stoull(row[12])},
+                            {"last_modified", std::stoull(row[13])},
+                            {"last_modified_millis", 0}
+                        };
+
+                        if (!row[10].empty()) {
+                            info["free_space_last_modified"] = std::stoull(row[10]);
+                        }
+                    }
+                }
+                else if (const auto resc = adm::client::resource_info(conn, name_iter->second); resc) {
                     exists = true;
 
-                    info = { // TODO Can't use += yet
+                    info = {
                         {"id", resc->id()},
                         {"name", resc->name()},
                         {"type", resc->type()},
@@ -516,13 +555,14 @@ namespace
                         {"free_space_last_modified", resc->free_space_last_modified().time_since_epoch().count()},
                         {"parent_id", resc->parent_id()},
                         {"created", resc->created().time_since_epoch().count()},
-                        {"last_modified", resc->last_modified().time_since_epoch().count()}
+                        {"last_modified", resc->last_modified().time_since_epoch().count()},
+                        {"last_modified_millis", resc->last_modified_millis().count()}
                     };
                 }
 
                 res.body() = json{
                     {"irods_response", {
-                        {"error_code", 0},
+                        {"error_code", 0}
                     }},
                     {"exists", exists},
                     {"info", info}

@@ -4,9 +4,11 @@
 #include "log.hpp"
 #include "version.hpp"
 
+#include <irods/client_connection.hpp>
 #include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/process_stash.hpp>
+#include <irods/rcConnect.h>
 #include <irods/rcMisc.h> // For addKeyVal().
 #include <irods/rodsErrorTable.h>
 #include <irods/rodsKeyWdDef.h> // For KW_CLOSE_OPEN_REPLICAS.
@@ -254,20 +256,23 @@ namespace irods
         using irods::experimental::filesystem::perms;
 
         switch (_p) {
+            // clang-format off
             case perms::null:            return "null";
             case perms::read_metadata:   return "read_metadata";
-            case perms::read_object:     return "read_object";
+            case perms::read_object:
             case perms::read:            return "read_object";
             case perms::create_metadata: return "create_metadata";
             case perms::modify_metadata: return "modify_metadata";
             case perms::delete_metadata: return "delete_metadata";
             case perms::create_object:   return "create_object";
-            case perms::modify_object:   return "modify_object";
+            case perms::modify_object:
             case perms::write:           return "modify_object";
             case perms::delete_object:   return "delete_object";
             case perms::own:             return "own";
-            default:                     return "?"; // TODO std::unreachable() or __builtin_unreachable()
+            // clang-format on
         }
+
+        THROW(SYS_INVALID_INPUT_PARAM, fmt::format("Cannot convert permission enumeration to string."));
     } // to_permission_string
 
     auto to_permission_enum(const std::string_view _s) -> std::optional<irods::experimental::filesystem::perms>
@@ -277,13 +282,13 @@ namespace irods
         // clang-format off
         if (_s == "null")            { return perms::null; }
         if (_s == "read_metadata")   { return perms::read_metadata; }
-        if (_s == "read_object")     { return perms::read_object; }
-        if (_s == "red")             { return perms::read; }
+        if (_s == "read_object")     { return perms::read; }
+        if (_s == "read")            { return perms::read; }
         if (_s == "create_metadata") { return perms::create_metadata; }
         if (_s == "modify_metadata") { return perms::modify_metadata; }
         if (_s == "delete_metadata") { return perms::delete_metadata; }
         if (_s == "create_object")   { return perms::create_object; }
-        if (_s == "modify_object")   { return perms::modify_object; }
+        if (_s == "modify_object")   { return perms::write; }
         if (_s == "write")           { return perms::write; }
         if (_s == "delete_object")   { return perms::delete_object; }
         if (_s == "own")             { return perms::own; }
@@ -323,14 +328,38 @@ namespace irods
         return std::nullopt;
     } // to_object_type_enum
 
-    // TODO May require the zone name be passed as well for federation?
-    auto get_connection(const std::string& _username) -> irods::connection_pool::connection_proxy
+    auto get_connection(const std::string& _username) -> irods::http::connection_facade
     {
         namespace log = irods::http::log;
         using json_pointer = nlohmann::json::json_pointer;
 
+        static const auto& config = irods::http::globals::configuration();
+        static const auto& irods_client_config = config.at("irods_client");
+        static const auto& zone = irods_client_config.at("zone").get_ref<const std::string&>();
+
+        if (config.at(json_pointer{"/irods_client/enable_4_2_compatibility"}).get<bool>()) {
+            static const auto& rodsadmin_username = irods_client_config.at(json_pointer{"/proxy_admin_account/username"}).get_ref<const std::string&>();
+            static auto rodsadmin_password = irods_client_config.at(json_pointer{"/proxy_admin_account/password"}).get_ref<const std::string&>();
+
+            irods::experimental::client_connection conn{
+                irods::experimental::defer_authentication,
+                irods_client_config.at("host").get_ref<const std::string&>(),
+                irods_client_config.at("port").get<int>(),
+                {rodsadmin_username, zone},
+                {_username, zone}
+            };
+
+            auto* conn_ptr = static_cast<RcComm*>(conn);
+
+            if (const auto ec = clientLoginWithPassword(conn_ptr, rodsadmin_password.data()); ec < 0) {
+                log::error("{}: clientLoginWithPassword error: {}", __func__, ec);
+                THROW(SYS_INTERNAL_ERR, "clientLoginWithPassword error.");
+            }
+
+            return irods::http::connection_facade{std::move(conn)};
+        }
+
         auto conn = irods::http::globals::connection_pool().get_connection();
-        static const auto& zone = irods::http::globals::configuration().at(json_pointer{"/irods_client/zone"}).get_ref<const std::string&>();
 
         log::trace("{}: Changing identity associated with connection to [{}].", __func__, _username);
 
@@ -343,13 +372,13 @@ namespace irods
         addKeyVal(&input.options, KW_CLOSE_OPEN_REPLICAS, "");
 
         if (const auto ec = rc_switch_user(static_cast<RcComm*>(conn), &input); ec != 0) {
-            irods::http::log::error("{}: rc_switch_user error: {}", __func__, ec);
+            log::error("{}: rc_switch_user error: {}", __func__, ec);
             THROW(SYS_INTERNAL_ERR, "rc_switch_user error.");
         }
 
         log::trace("{}: Successfully changed identity associated with connection to [{}].", __func__, _username);
 
-        return conn;
+        return irods::http::connection_facade{std::move(conn)};
     } // get_connection
 
     auto fail(boost::beast::error_code ec, char const* what) -> void
