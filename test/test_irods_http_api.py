@@ -44,6 +44,7 @@ def setup_class(cls, opts):
     cls.url_endpoint = f'{cls.url_base}/{opts["endpoint_name"]}'
 
     cls.zone_name = config.test_config['irods_zone']
+    cls.server_hostname = config.test_config['irods_server_hostname']
 
     # create_rodsuser cannot be honored if init_rodsadmin is set to False.
     # Therefore, return immediately.
@@ -465,7 +466,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'create',
             'name': resc_name,
             'type': 'unixfilesystem',
-            'host': socket.gethostname(),
+            'host': self.server_hostname,
             'vault-path': os.path.join('/tmp', f'{resc_name}_vault')
         })
         #print(r.content) # Debug
@@ -967,7 +968,7 @@ class test_resources_endpoint(unittest.TestCase):
     def test_common_operations(self):
         headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
 
-        hostname = socket.gethostname()
+        hostname = self.server_hostname
         resc_repl = 'test_repl'
         resc_ufs0 = 'test_ufs0'
         resc_ufs1 = 'test_ufs1'
@@ -1007,6 +1008,7 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(result['info']['parent_id'], '')
         self.assertIn('created', result['info'])
         self.assertIn('last_modified', result['info'])
+        self.assertIn('last_modified_millis', result['info'])
 
         # Capture the replication resource's id.
         # This resource is going to be the parent of the unixfilesystem resources.
@@ -1440,7 +1442,7 @@ class test_tickets_endpoint(unittest.TestCase):
         ticket_path = os.path.join('/', self.zone_name, 'home', self.rodsuser_username) 
         ticket_use_count = 2000
         ticket_groups = 'public'
-        ticket_hosts = socket.gethostname()
+        ticket_hosts = self.server_hostname
         r = requests.post(self.url_endpoint, headers=headers, data={
             'op': 'create',
             'lpath': ticket_path,

@@ -6,6 +6,7 @@
 #include "version.hpp"
 
 #include <irods/connection_pool.hpp>
+#include <irods/fully_qualified_username.hpp>
 #include <irods/irods_configuration_keywords.hpp>
 #include <irods/process_stash.hpp>
 #include <irods/rcConnect.h>
@@ -213,6 +214,8 @@ auto print_configuration_template() -> void
             "verify_server": "<string>"
         }},
 
+        "enable_4_2_compatibility": false,
+
         "proxy_admin_account": {{
             "username": "<string>",
             "password": "<string>"
@@ -302,7 +305,7 @@ auto init_tls(const json& _config) -> void
     set_env_var("/irods_client/tls/verify_server", irods::KW_CFG_IRODS_SSL_VERIFY_SERVER, "cert");
 } // init_tls
 
-auto init_irods_connection_pool(const json& _config) -> irods::connection_pool
+auto init_irods_connection_pool(const json& _config) -> std::unique_ptr<irods::connection_pool>
 {
     const auto& client = _config.at("irods_client");
     const auto& zone = client.at("zone").get_ref<const std::string&>();
@@ -324,19 +327,19 @@ auto init_irods_connection_pool(const json& _config) -> irods::connection_pool
         opts.refresh_connections_when_resource_changes_detected = iter->get<bool>();
     }
 
-    return {
+    return std::make_unique<irods::connection_pool>(
         conn_pool.at("size").get<int>(),
         client.at("host").get_ref<const std::string&>(),
         client.at("port").get<int>(),
-        {{username, zone}},
-        {username, zone},
+        irods::experimental::fully_qualified_username{username, zone},
+        irods::experimental::fully_qualified_username{username, zone},
         [pw = rodsadmin.at("password").get<std::string>()](RcComm& _comm) mutable {
             if (const auto ec = clientLoginWithPassword(&_comm, pw.data()); ec != 0) {
                 throw std::invalid_argument{fmt::format("Could not authenticate rodsadmin user: [{}]", ec)};
             }
         },
         opts
-    };
+    );
 } // init_irods_connection_pool
 
 auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpoint_config) -> void
@@ -510,9 +513,13 @@ auto main(int _argc, char* _argv[]) -> int
         log::trace("Initializing TLS.");
         init_tls(config);
 
-        log::trace("Initializing iRODS connection pool.");
-        auto conn_pool = init_irods_connection_pool(config);
-        irods::http::globals::set_connection_pool(conn_pool);
+        std::unique_ptr<irods::connection_pool> conn_pool;
+
+        if (!config.at(json::json_pointer{"/irods_client/enable_4_2_compatibility"}).get<bool>()) {
+            log::trace("Initializing iRODS connection pool.");
+            conn_pool = init_irods_connection_pool(config);
+            irods::http::globals::set_connection_pool(*conn_pool);
+        }
 
         // The io_context is required for all I/O.
         log::trace("Initializing HTTP components.");
