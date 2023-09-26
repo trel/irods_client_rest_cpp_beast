@@ -187,6 +187,14 @@ auto print_configuration_template() -> void
 
             "basic": {{
                 "timeout_in_seconds": 3600
+            }},
+
+            "oidc": {{
+                "config_host": "<string>",
+                "port": 8080,
+                "well_known_uri": "<string>",
+                "client_id": "<string>",
+                "redirect_uri": "<string>"
             }}
         }},
 
@@ -197,7 +205,7 @@ auto print_configuration_template() -> void
         }},
 
         "background_io": {{
-            "threads": 3
+            "threads": 6
         }}
     }},
 
@@ -223,8 +231,12 @@ auto print_configuration_template() -> void
 
         "connection_pool": {{
             "size": 6,
-            "refresh_timeout_in_seconds": 600
+            "refresh_timeout_in_seconds": 600,
+            "max_retrievals_before_refresh": 16,
+            "refresh_when_resource_changes_detected": true
         }},
+
+        "max_number_of_parallel_write_streams": 3,
 
         "max_rbuffer_size_in_bytes": 8192,
         "max_wbuffer_size_in_bytes": 8192,

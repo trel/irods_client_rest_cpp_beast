@@ -133,7 +133,7 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
         // These options are primarily related to long-running tasks.
         "background_io": {
             // The number of threads dedicated to background I/O.
-            "threads": 3
+            "threads": 6
         }
     },
 
@@ -226,6 +226,10 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
             // If a change is detected, all connections will be refreshed.
             "refresh_when_resource_changes_detected": true
         },
+
+        // The maximum number of parallel streams that can be associated to a
+        // single parallel write handle.
+        "max_number_of_parallel_write_streams": 3,
 
         // The buffer size used for read operations.
         "max_rbuffer_size_in_bytes": 8192,
