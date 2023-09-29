@@ -130,8 +130,8 @@ namespace
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
-        log::info("{}: client_info->username = [{}]", __func__, client_info->username);
+        const auto client_info = result.client_info;
+        log::info("{}: client_info.username = [{}]", __func__, client_info.username);
 
         irods::http::globals::background_task([fn = __func__, _sess_ptr, req = std::move(_req), args = std::move(_args), client_info]() mutable {
             auto query_iter = args.find("query");
@@ -160,7 +160,7 @@ namespace
                 json::array_t row;
                 json::array_t rows;
 
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
 
                 if ("genquery2" == parser) {
 #ifdef IRODS_ENABLE_GENQUERY2
@@ -298,8 +298,8 @@ namespace
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
-        log::info("{}: client_info->username = [{}]", __func__, client_info->username);
+        const auto client_info = result.client_info;
+        log::info("{}: client_info.username = [{}]", __func__, client_info.username);
 
         const auto name_iter = _args.find("name");
         if (name_iter == std::end(_args)) {
@@ -367,7 +367,7 @@ namespace
                     int offset_counter = 0;
                     int count_counter = 0;
 
-                    auto conn = irods::get_connection(client_info->username);
+                    auto conn = irods::get_connection(client_info.username);
 
                     for (auto&& r : qb.build<RcComm>(conn, name)) {
                         if (offset_counter < offset) {

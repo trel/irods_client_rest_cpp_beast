@@ -126,10 +126,10 @@ namespace
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -176,7 +176,7 @@ namespace
                 json stdout_output;
                 json stderr_output;
 
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
                 const auto ec = rcExecMyRule(static_cast<RcComm*>(conn), &input, &out_param_array);
 
                 if (ec >= 0) {
@@ -242,10 +242,10 @@ namespace
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -262,7 +262,7 @@ namespace
                 RuleExecDeleteInput input{};
                 std::strncpy(input.ruleExecId, rule_id_iter->second.c_str(), sizeof(RuleExecDeleteInput::ruleExecId));
 
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
                 const auto ec = rcRuleExecDel(static_cast<RcComm*>(conn), &input);
 
                 res.body() = json{
@@ -297,10 +297,10 @@ namespace
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -331,7 +331,7 @@ namespace
                     std::free(out_param_array);
                 }};
 
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
                 const auto ec = rcExecMyRule(static_cast<RcComm*>(conn), &input, &out_param_array);
 
                 std::vector<std::string> plugin_instances;
