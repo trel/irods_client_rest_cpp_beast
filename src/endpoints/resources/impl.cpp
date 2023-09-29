@@ -128,10 +128,10 @@ namespace
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -170,7 +170,7 @@ namespace
                     resc_info.context_string = ctx_iter->second;
                 }
 
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
                 adm::client::add_resource(conn, resc_info);
 
                 res.body() = json{
@@ -205,10 +205,10 @@ namespace
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -222,7 +222,7 @@ namespace
                     return _sess_ptr->send(irods::http::fail(http::status::bad_request));
                 }
 
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
                 adm::client::remove_resource(conn, name_iter->second);
 
                 res.body() = json{
@@ -258,10 +258,10 @@ namespace
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -302,10 +302,10 @@ namespace
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -325,7 +325,7 @@ namespace
                     return _sess_ptr->send(irods::http::fail(http::status::bad_request));
                 }
 
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
 
                 const auto ctx_iter = _args.find("context");
                 if (ctx_iter != std::end(_args)) {
@@ -367,10 +367,10 @@ namespace
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -390,7 +390,7 @@ namespace
                     return _sess_ptr->send(irods::http::fail(http::status::bad_request));
                 }
 
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
                 adm::client::remove_child_resource(conn, parent_name_iter->second, child_name_iter->second);
 
                 res.body() = json{
@@ -425,10 +425,10 @@ namespace
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -442,7 +442,7 @@ namespace
                     return _sess_ptr->send(irods::http::fail(http::status::bad_request));
                 }
 
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
                 adm::client::rebalance_resource(conn, name_iter->second);
 
                 res.body() = json{
@@ -477,10 +477,10 @@ namespace
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -494,7 +494,7 @@ namespace
                     return _sess_ptr->send(irods::http::fail(http::status::bad_request));
                 }
 
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
 
                 json::object_t info;
                 bool exists = false;

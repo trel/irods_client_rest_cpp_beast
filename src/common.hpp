@@ -70,7 +70,7 @@ namespace irods::http
     struct client_identity_resolution_result
     {
         std::optional<response_type> response;
-        const authenticated_client_info* client_info{};
+        authenticated_client_info client_info{};
     }; // struct client_identity_resolution_result
 
     class connection_facade // NOLINT(cppcoreguidelines-special-member-functions)

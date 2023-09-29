@@ -3,12 +3,12 @@
 #include "handlers.hpp"
 #include "log.hpp"
 #include "session.hpp"
+#include "process_stash.hpp"
 #include "version.hpp"
 
 #include <irods/connection_pool.hpp>
 #include <irods/fully_qualified_username.hpp>
 #include <irods/irods_configuration_keywords.hpp>
-#include <irods/process_stash.hpp>
 #include <irods/rcConnect.h>
 #include <irods/rcMisc.h>
 #include <irods/rodsClient.h>
@@ -431,7 +431,7 @@ class bearer_token_eviction_manager
             }
 
             log::trace("Evicting expired bearer tokens ...");
-            irods::process_stash::erase_if([](const auto& _k, const auto& _v) {
+            irods::http::process_stash::erase_if([](const auto& _k, const auto& _v) {
                 try {
                     const auto* p = boost::any_cast<const irods::http::authenticated_client_info>(&_v);
                     const auto erase_token = (p && std::chrono::steady_clock::now() >= p->expires_at);

@@ -40,10 +40,10 @@ namespace irods::http::shared_api_operations
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _entity_type, _args = std::move(_args)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             ::http::response<::http::string_body> res{::http::status::ok, _req.version()};
             res.set(::http::field::server, irods::http::version::server_name);
@@ -63,7 +63,7 @@ namespace irods::http::shared_api_operations
                     return _sess_ptr->send(irods::http::fail(res, ::http::status::bad_request));
                 }
 
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
 
                 // Verify the logical path points to the entity type we expect.
                 switch (_entity_type) {
@@ -147,10 +147,10 @@ namespace irods::http::shared_api_operations
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _entity_type, _args = std::move(_args)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             ::http::response<::http::string_body> res{::http::status::ok, _req.version()};
             res.set(::http::field::server, irods::http::version::server_name);
@@ -213,7 +213,7 @@ namespace irods::http::shared_api_operations
                 // NOLINTNEXTLINE(cppcoreguidelines-owning-memory, cppcoreguidelines-no-malloc)
                 irods::at_scope_exit_unsafe free_output{[&output] { std::free(output); }};
 
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
                 const auto ec = rc_atomic_apply_metadata_operations(static_cast<RcComm*>(conn), json_input.c_str(), &output);
 
                 if (ec != 0) {

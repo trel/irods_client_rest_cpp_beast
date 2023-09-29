@@ -3,6 +3,7 @@
 #include "common.hpp"
 #include "globals.hpp"
 #include "log.hpp"
+#include "process_stash.hpp"
 #include "session.hpp"
 #include "version.hpp"
 
@@ -11,7 +12,6 @@
 #include <irods/client_connection.hpp>
 #include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
-#include <irods/process_stash.hpp>
 #include <irods/rcConnect.h>
 #include <irods/user_administration.hpp>
 
@@ -350,7 +350,7 @@ namespace irods::http::handler
 							.at(nlohmann::json::json_pointer{"/http_server/authentication/basic/timeout_in_seconds"})
 							.get<int>();
 
-					auto bearer_token = irods::process_stash::insert(authenticated_client_info{
+					auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
 						.auth_scheme = authorization_scheme::openid_connect,
 						.username = std::move(irods_name),
 						.expires_at = std::chrono::steady_clock::now() + std::chrono::seconds{seconds}});
@@ -464,7 +464,7 @@ namespace irods::http::handler
 						irods::http::globals::configuration()
 							.at(nlohmann::json::json_pointer{"/http_server/authentication/basic/timeout_in_seconds"})
 							.get<int>();
-					auto bearer_token = irods::process_stash::insert(authenticated_client_info{
+					auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
 						.auth_scheme = authorization_scheme::basic,
 						.username = std::move(username),
 						.password = std::move(password),
@@ -532,7 +532,7 @@ namespace irods::http::handler
 						irods::http::globals::configuration()
 							.at(nlohmann::json::json_pointer{"/http_server/authentication/basic/timeout_in_seconds"})
 							.get<int>();
-					auto bearer_token = irods::process_stash::insert(authenticated_client_info{
+					auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
 						.auth_scheme = authorization_scheme::openid_connect,
 						.username = std::move(irods_name),
 						.expires_at = std::chrono::steady_clock::now() + std::chrono::seconds{seconds}});

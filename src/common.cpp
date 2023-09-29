@@ -2,12 +2,12 @@
 
 #include "globals.hpp"
 #include "log.hpp"
+#include "process_stash.hpp"
 #include "version.hpp"
 
 #include <irods/client_connection.hpp>
 #include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
-#include <irods/process_stash.hpp>
 #include <irods/rcConnect.h>
 #include <irods/rcMisc.h> // For addKeyVal().
 #include <irods/rodsErrorTable.h>
@@ -232,20 +232,25 @@ namespace irods::http
         log::debug("{}: Bearer token: [{}]", __func__, bearer_token);
 
         // Verify the bearer token is known to the server. If not, return an error.
-        const auto* object = irods::process_stash::find(bearer_token);
-        if (!object) {
-            log::error("{}: Could not find bearer token matching [{}].", __func__, bearer_token);
-            return {.response = fail(status_type::unauthorized)};
+        auto mapped_value{irods::http::process_stash::find(bearer_token)};
+		if (!mapped_value.has_value()) {
+		  log::error("{}: Could not find bearer token matching [{}].", __func__, bearer_token);
+		  return {.response = fail(status_type::unauthorized)};
         }
 
-        const auto* p = boost::any_cast<authenticated_client_info>(&*object);
-        if (std::chrono::steady_clock::now() >= p->expires_at) {
-            log::error("{}: Session for bearer token [{}] has expired.", __func__, bearer_token);
-            return {.response = fail(status_type::unauthorized)};
+		auto* client_info{boost::any_cast<authenticated_client_info>(&*mapped_value)};
+		if (client_info == nullptr) {
+		  log::error("{}: Could not find bearer token matching [{}].", __func__, bearer_token);
+		  return {.response = fail(status_type::unauthorized)};
         }
 
-        log::trace("{}: Client is authenticated.", __func__);
-        return {.client_info = p};
+		if (std::chrono::steady_clock::now() >= client_info->expires_at) {
+		  log::error("{}: Session for bearer token [{}] has expired.", __func__, bearer_token);
+		  return {.response = fail(status_type::unauthorized)};
+		}
+
+		log::trace("{}: Client is authenticated.", __func__);
+		return {.client_info = std::move(*client_info)};
     } // resolve_client_identity
 } // namespace irods::http
 

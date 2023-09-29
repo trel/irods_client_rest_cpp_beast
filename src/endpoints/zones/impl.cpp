@@ -33,10 +33,10 @@ namespace irods::http::handler
             return _sess_ptr->send(std::move(*result.response));
         }
 
-        const auto* client_info = result.client_info;
+        const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req)] {
-            log::info("{}: client_info->username = [{}]", fn, client_info->username);
+            log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             const auto url = irods::http::parse_url(_req);
 
@@ -55,7 +55,7 @@ namespace irods::http::handler
             irods::at_scope_exit free_bbuf{[&bbuf] { freeBBuf(bbuf); }};
 
             {
-                auto conn = irods::get_connection(client_info->username);
+                auto conn = irods::get_connection(client_info.username);
 
                 if (const auto ec = rcZoneReport(static_cast<RcComm*>(conn), &bbuf); ec != 0) {
                     log::error("{}: rcZoneReport error: [{}]", fn, ec);

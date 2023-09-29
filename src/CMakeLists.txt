@@ -16,6 +16,7 @@ add_executable(
   ${CMAKE_CURRENT_SOURCE_DIR}/crlf_parser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/globals.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/process_stash.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/session.cpp)
 
 target_compile_definitions(
