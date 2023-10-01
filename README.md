@@ -255,6 +255,47 @@ irods_http_api /path/to/config.json
 
 To stop the server, you can use **CTRL-C** or send **SIGINT** or **SIGTERM** to the process.
 
+### OpenID Connect
+Some additional configuration is required to run the OpenID Connect portion of the HTTP API.
+Following are a few points of interest.
+
+#### OpenID Provider Requirements and HTTP API Configuration
+The OpenID Provider, at this moment, must support discovery via a well-known endpoint.
+This endpoint must be specified in the `well_known_uri` OIDC configuration parameter.
+
+One should take care to ensure that `/.well-known/openid-configuration` is not included
+in the configuration parameter, as this is included automatically.
+
+One must also set the OIDC `config_host` and `port` parameter, so that the OpenID configuration
+may be gathered from the well-known endpoint on the HTTP API server's startup.
+The OpenID Provider must be running prior to starting the HTTP API server, otherwise, the HTTP API server
+will not be able to query the required information from the desired OpenID Provider.
+
+Additionally, the OIDC `redirect_uri` parameter must be set to the HTTP API's authentication endpoint.
+This is required, as the Authorization Code Grant needs to be redirected back to the HTTP API, to complete
+HTTP API token generation.
+
+#### Add `irods_username` to the claims
+Currently, the server looks for the custom claim `irods_username` in the ID Token.
+This serves as the mapping mechanism for an OIDC User to an iRODS User.
+
+A user who authenticates but does not have a `irods_username` mapped in their account
+will not have access to the API.
+A HTTP 400 Bad Request status code will be returned if no `irods_username` is found.
+
+#### Supported Grants
+Currently, the HTTP API server supports the following two grants:
+
+- Resource Owner Password Credentials Grant
+- Authorization Code Grant
+
+While we currently support the _Resource Owner Password Credentials Grant_, there are plans to remove
+support for this in the future.
+
+Reason being, the [OAuth 2.0 Security Best Current Practice](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics) draft,
+as well as the [The OAuth 2.1 Authorizaiton Framework](https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/) draft both deprecate that grant.
+More information can be found on the reasoning for the deprecation in the links provided above.
+
 ## Documentation
 
 API documentation can be found in [API.md](./API.md).
