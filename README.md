@@ -48,6 +48,66 @@ make package # Use -j to use more parallelism.
 
 Keep in mind that even though you've compiled the HTTP API with support for GenQuery2, that is half the story. You must also install the GenQuery2 package on the iRODS server which the HTTP API will connect to and the iRODS Catalog Service Provider.
 
+## Docker
+
+This project provides two Dockerfiles, one for building and one for running the application. GenQuery2 is enabled by default. As mentioned in the previous section, the iRODS server must have GenQuery2 installed before attempting to use the parser.
+
+**IMPORTANT: All commands in the sections that follow assume you are located in the root of the repository.**
+
+### The Builder Image
+
+The builder image is responsible for building the iRODS HTTP API package. Before you can use it, you must build the image. To do that, run the following:
+```bash
+docker build -t irods-http-api-builder -f irods_builder.Dockerfile .
+```
+
+With the builder image in hand, all that's left is to get the source code for the GenQuery2 project and HTTP API project. The builder image is designed to compile code sitting on your machine. This is important because it gives you the ability to build any fork or branch of the projects.
+
+Building the packages requires mounting the projects into the container at the appropriate locations. The command you run should look similar to the one below. Don't forget to create the directory which will hold your packages!
+```bash
+docker run -it --rm \
+    -v /path/to/irods_api_plugin_genquery2:/genquery2_source:ro \
+    -v /path/to/irods_client_http_api:/http_api_source:ro \
+    -v /path/to/packages_directory:/packages_output \
+    irods-http-api-builder
+```
+
+If everything succeeds, you will have two DEB packages in the local directory you mapped to **/packages_output**.
+
+### The Runner Image
+
+The runner image is responsible for running the iRODS HTTP API. Building the runner image requires the DEB packages for GenQuery2 and the iRODS HTTP API to exist on the local machine. See the previous section for details on generating the packages.
+
+To build the image, run the following command:
+```bash
+docker build -t irods-http-api-runner -f irods_runner.Dockerfile /path/to/packages/directory
+```
+
+If all goes well, you will have a containerized iRODS HTTP API server! You can verify this by checking the version information. Below is an example.
+```bash
+$ docker run -it --rm irods-http-api-runner -v
+irods_http_api v0.1.0-f6f6411
+```
+
+### Launching the Container
+
+To run the containerized server, you need to provide a configuration file at the correct location. If you do not have a configuration file already, see [Configuration](#configuration) for details.
+
+Assuming you have a valid configuration file, you can launch the server by running the following command:
+```bash
+docker run -d --rm --name irods_http_api -v /path/to/config/file:/config.json:ro -p 9000:9000 irods-http-api-runner
+```
+
+You can view the log output using `docker logs -f` or by passing `-it` to `docker run` instead of `-d`.
+
+Congratulations, you now have a working iRODS HTTP API server!
+
+### Stopping the Container
+
+If the container was launched with `-it`, use **CTRL-C** or `docker container stop <container_name>` to shut it down.
+
+If the container was launched with `-d`, use `docker container stop <container_name>`.
+
 ## Configuration
 
 Before you can run the server, you'll need to create a configuration file.
