@@ -16,6 +16,8 @@
 #include <irods/filesystem.hpp>
 #include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
+#include <irods/key_value_proxy.hpp>
+#include <irods/modDataObjMeta.h>
 #include <irods/phyPathReg.h>
 #include <irods/rcMisc.h>
 #include <irods/rodsErrorTable.h>
@@ -33,6 +35,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <array>
 #include <atomic>
 #include <mutex>
 #include <span>
@@ -193,6 +196,8 @@ namespace
 
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_metadata);
 
+	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_replica);
+
 	//
 	// Operation to Handler mappings
 	//
@@ -225,7 +230,9 @@ namespace
 
 		{"calculate_checksum", op_calculate_checksum},
 
-		{"modify_metadata", op_modify_metadata}
+		{"modify_metadata", op_modify_metadata},
+
+		{"modify_replica", op_modify_replica}
 	};
 	// clang-format on
 } // anonymous namespace
@@ -1808,4 +1815,120 @@ namespace
 		using namespace irods::http::shared_api_operations;
 		return op_atomic_apply_metadata_operations(_sess_ptr, _req, _args, entity_type::data_object);
 	} // op_modify_metadata
+
+	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_replica)
+	{
+		auto result = irods::http::resolve_client_identity(_req);
+		if (result.response) {
+			return _sess_ptr->send(std::move(*result.response));
+		}
+
+		irods::http::globals::background_task([fn = __func__,
+		                                       client_info = std::move(result.client_info),
+		                                       _sess_ptr,
+		                                       _req = std::move(_req),
+		                                       _args = std::move(_args)] {
+			log::info("{}: client_info->username = [{}]", fn, client_info.username);
+
+			http::response<http::string_body> res{http::status::ok, _req.version()};
+			res.set(http::field::server, irods::http::version::server_name);
+			res.set(http::field::content_type, "application/json");
+			res.keep_alive(_req.keep_alive());
+
+			try {
+				DataObjInfo info{};
+				irods::at_scope_exit free_memory{[&info] { clearKeyVal(&info.condInput); }};
+
+				if (const auto iter = _args.find("lpath"); iter != std::end(_args)) {
+					std::strncpy(info.objPath, iter->second.c_str(), sizeof(DataObjInfo::objPath));
+				}
+				else {
+					log::error("{}: Missing [lpath] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+				}
+
+				if (auto iter = _args.find("resource-hierarchy"); iter != std::end(_args)) {
+					std::strncpy(info.rescHier, iter->second.c_str(), sizeof(DataObjInfo::rescHier));
+				}
+				else if (iter = _args.find("replica-number"); iter != std::end(_args)) {
+					info.replNum = std::stoi(iter->second);
+				}
+				else {
+					log::error("{}: Missing [resource-hierarchy] or [replica-number] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+				}
+
+				KeyValPair reg_params{};
+				irods::experimental::key_value_proxy kvp{reg_params};
+				irods::at_scope_exit clear_kvp{[&kvp] { kvp.clear(); }};
+
+				// clang-format off
+				static constexpr auto properties = std::to_array<std::pair<const char*, const char*>>({
+					{"new-data-checksum", CHKSUM_KW},
+					{"new-data-comments", DATA_COMMENTS_KW},
+					{"new-data-create-time", DATA_CREATE_KW},
+					{"new-data-expiry", DATA_EXPIRY_KW},
+					{"new-data-mode", DATA_MODE_KW},
+					{"new-data-modify-time", DATA_MODIFY_KW},
+					//{"new-data-owner-name", DATA_OWNER_KW},
+					//{"new-data-owner-zone", DATA_OWNER_ZONE_KW},
+					{"new-data-path", FILE_PATH_KW},
+					{"new-data-replica-number", REPL_NUM_KW},
+					{"new-data-replica-status", REPL_STATUS_KW},
+					{"new-data-resource-id", RESC_ID_KW},
+					{"new-data-size", DATA_SIZE_KW},
+					{"new-data-status", STATUS_STRING_KW},
+					{"new-data-type-name", DATA_TYPE_KW},
+					{"new-data-version", VERSION_KW}
+				});
+				// clang-format on
+
+				for (auto&& [external_pname, internal_pname] : properties) {
+					if (const auto iter = _args.find(external_pname); iter != std::end(_args)) {
+						kvp[internal_pname] = iter->second;
+					}
+				}
+
+				if (kvp.empty()) {
+					log::error("{}: No properties provided.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+				}
+
+				// Setting this flag helps to enforce only rodsadmins are allowed to invoke
+				// this endpoint operation.
+				kvp[ADMIN_KW] = "";
+
+				ModDataObjMetaInp input{};
+				input.dataObjInfo = &info;
+				input.regParam = &reg_params;
+
+				auto conn = irods::get_connection(client_info.username);
+				const auto ec = rcModDataObjMeta(static_cast<RcComm*>(conn), &input);
+
+				json response{{"irods_response", {{"error_code", ec}}}};
+
+				res.body() = response.dump();
+			}
+			catch (const irods::exception& e) {
+				log::error("{}: Caught exception: {}", fn, e.client_display_what());
+				res.result(http::status::bad_request);
+				// clang-format off
+				res.body() = json{
+					{"irods_response", {
+						{"error_code", e.code()},
+						{"error_message", e.client_display_what()}
+					}}
+				}.dump();
+				// clang-format on
+			}
+			catch (const std::exception& e) {
+				log::error("{}: Caught exception: {}", fn, e.what());
+				res.result(http::status::internal_server_error);
+			}
+
+			res.prepare_payload();
+
+			_sess_ptr->send(std::move(res));
+		});
+	} // op_modify_replica
 } // anonymous namespace

@@ -995,6 +995,67 @@ class test_data_objects_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['error_code'], 0)
 
+    def test_modifying_replica_properties(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+
+        # Create a data object.
+        data_object = os.path.join('/', self.zone_name, 'home', self.rodsadmin_username, 'modrepl.txt')
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'touch',
+            'lpath': data_object
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the replica is currently marked as good and has a size of 0.
+        r = requests.get(f'{self.url_base}/query', headers=headers, params={
+            'op': 'execute_genquery',
+            'query': f"select DATA_REPL_STATUS, DATA_SIZE where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{os.path.basename(data_object)}'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['rows'][0][0], '1')
+        self.assertEqual(result['rows'][0][1], '0')
+
+        # Change the replica's status and data size using the modify_replica operation.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify_replica',
+            'lpath': data_object,
+            'replica-number': 0,
+            'new-data-replica-status': 0,
+            'new-data-size': 15
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+        # Show the replica's status and size has changed in the catalog.
+        r = requests.get(f'{self.url_base}/query', headers=headers, params={
+            'op': 'execute_genquery',
+            'query': f"select DATA_REPL_STATUS, DATA_SIZE where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{os.path.basename(data_object)}'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['rows'][0][0], '0')
+        self.assertEqual(result['rows'][0][1], '15')
+
+        # Remove the data object.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'remove',
+            'lpath': data_object,
+            'no-trash': 1
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
     @unittest.skip('Test needs to be implemented.')
     def test_return_error_on_missing_parameters(self):
         pass
