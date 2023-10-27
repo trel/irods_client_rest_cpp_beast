@@ -970,6 +970,56 @@ If there was an error, expect either an HTTP status code in the 4XX or 5XX range
 }
 ```
 
+### modify_replica
+
+Modifies properties of a single replica.
+
+**WARNING:** This operation requires rodsadmin level privileges and should only be used when there isn't a safer option. Misuse can lead to catalog inconsistencies and unexpected behavior.
+
+#### Request
+
+```bash
+curl http://localhost:<port>/irods-http-api/<version>/data-objects \
+    -H 'Authorization: Bearer <token>' \
+    --data-urlencode 'op=modify_replica' \
+    --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
+    --data-urlencode 'resource-hierarchy=<string>' \
+    --data-urlencode 'replica-number=<integer>' \
+    --data-urlencode 'new-data-checksum=<string>' \
+    --data-urlencode 'new-data-comments=<string>' \
+    --data-urlencode 'new-data-create-time=<integer>' \
+    --data-urlencode 'new-data-expiry=<integer>' \
+    --data-urlencode 'new-data-mode=<string>' \
+    --data-urlencode 'new-data-modify-time=<string>' \
+    --data-urlencode 'new-data-path=<string>' \
+    --data-urlencode 'new-data-replica-number=<integer>' \
+    --data-urlencode 'new-data-replica-status=<integer>' \
+    --data-urlencode 'new-data-resource-id=<integer>' \
+    --data-urlencode 'new-data-size=<integer>' \
+    --data-urlencode 'new-data-status=<string>' \
+    --data-urlencode 'new-data-type-name=<string>' \
+    --data-urlencode 'new-data-version=<string>'
+```
+
+`resource-hierarchy` and `replica-number` are mutually exclusive parameters.
+
+All parameters having a prefix of `new-` represent modifiable properties of the target replica. At least one modifiable property is required for the operation to succeed.
+
+#### Response
+
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+
+```js
+{
+    "irods_response": {
+        "error_code": 0
+        "error_message": "string" // Optional
+    }
+}
+```
+
+If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+
 ## Information Operations
 
 Returns general information about the iRODS HTTP API server.
