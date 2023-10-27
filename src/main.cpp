@@ -180,7 +180,7 @@ auto print_configuration_template() -> void
         "host": "0.0.0.0",
         "port": 9000,
 
-        "log_level": "warn",
+        "log_level": "info",
 
         "authentication": {{
             "eviction_check_interval_in_seconds": 60,
