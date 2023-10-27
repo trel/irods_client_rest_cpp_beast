@@ -140,7 +140,15 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
         "port": 9000,
 
         // The minimum log level needed before logging activity.
-        "log_level": "warn",
+        //
+        // The following values are supported:
+        // - trace
+        // - debug
+        // - info
+        // - warn
+        // - error
+        // - critical
+        "log_level": "info",
 
         // Defines options that affect various authentication schemes.
         "authentication": {
