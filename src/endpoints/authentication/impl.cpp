@@ -214,8 +214,10 @@ namespace irods::http::handler
 
 			if (did_except) {
 				irods::http::globals::background_task([fn = __func__, _sess_ptr, _req = std::move(_req)] {
-					const auto timeout{irods::http::globals::oidc_configuration().at("state_timeout_in_seconds").get<int>()};
-					const auto state{irods::http::process_stash::insert(std::chrono::steady_clock::now() + std::chrono::seconds(timeout))};
+					const auto timeout{
+						irods::http::globals::oidc_configuration().at("state_timeout_in_seconds").get<int>()};
+					const auto state{irods::http::process_stash::insert(
+						std::chrono::steady_clock::now() + std::chrono::seconds(timeout))};
 
 					body_arguments args{
 						{"client_id",
@@ -258,27 +260,28 @@ namespace irods::http::handler
 					}
 
 					const auto is_state_valid{[](const std::string& _in_state) {
-					  const auto mapped_value{irods::http::process_stash::find(_in_state)};
-					  if (!mapped_value) {
-						return false;
-					  }
-					  
-					  const auto* expire_time{boost::any_cast<const std::chrono::steady_clock::time_point>(&*mapped_value)};
-					  if (expire_time == nullptr) {
-						return false;
-					  }
+						const auto mapped_value{irods::http::process_stash::find(_in_state)};
+						if (!mapped_value) {
+							return false;
+						}
 
-					  // Ensure state is not expired...
-					  const auto is_expired{std::chrono::steady_clock::now() >= *expire_time};
+						const auto* expire_time{
+							boost::any_cast<const std::chrono::steady_clock::time_point>(&*mapped_value)};
+						if (expire_time == nullptr) {
+							return false;
+						}
 
-					  // Remove item from valid states
-					  if (!irods::http::process_stash::erase(_in_state)) {
-						// Someone else got validated first!
-						return false;
-					  }
+						// Ensure state is not expired...
+						const auto is_expired{std::chrono::steady_clock::now() >= *expire_time};
 
-					  // Return state validity
-					  return !is_expired;
+						// Remove item from valid states
+						if (!irods::http::process_stash::erase(_in_state)) {
+							// Someone else got validated first!
+							return false;
+						}
+
+						// Return state validity
+						return !is_expired;
 					}};
 
 					// The state is invalid (i.e. doesn't exist, or have been used)
@@ -406,7 +409,8 @@ namespace irods::http::handler
 				// Basic Auth case
 				if (const auto pos{iter->value().find("Basic ")}; pos != std::string_view::npos) {
 					constexpr auto basic_auth_scheme_prefix_size = 6;
-					auto [username, password]{decode_username_and_password(iter->value().substr(pos + basic_auth_scheme_prefix_size))};
+					auto [username, password]{
+						decode_username_and_password(iter->value().substr(pos + basic_auth_scheme_prefix_size))};
 
 					if (username.empty() || password.empty()) {
 						return _sess_ptr->send(fail(status_type::unauthorized));
@@ -415,56 +419,70 @@ namespace irods::http::handler
 					bool login_successful = false;
 
 					try {
-                                            using json_pointer = nlohmann::json::json_pointer;
+						using json_pointer = nlohmann::json::json_pointer;
 
-                                            static const auto& config = irods::http::globals::configuration();
-                                            static const auto& rodsadmin_username = config.at(json_pointer{"/irods_client/proxy_admin_account/username"}).get_ref<const std::string&>();
-                                            static const auto& rodsadmin_password = config.at(json_pointer{"/irods_client/proxy_admin_account/password"}).get_ref<const std::string&>();
-                                            static const auto& zone = config.at(json_pointer{"/irods_client/zone"}).get_ref<const std::string&>();
+						static const auto& config = irods::http::globals::configuration();
+						static const auto& rodsadmin_username =
+							config.at(json_pointer{"/irods_client/proxy_admin_account/username"})
+								.get_ref<const std::string&>();
+						static const auto& rodsadmin_password =
+							config.at(json_pointer{"/irods_client/proxy_admin_account/password"})
+								.get_ref<const std::string&>();
+						static const auto& zone =
+							config.at(json_pointer{"/irods_client/zone"}).get_ref<const std::string&>();
 
-                                            if (config.at(json_pointer{"/irods_client/enable_4_2_compatibility"}).get<bool>()) {
-                                                // When operating in 4.2 compatibility mode, all we can do is create a new iRODS connection
-                                                // and authenticate using the client's username and password. iRODS 4.2 does not provide an
-                                                // API for checking native authentication credentials.
+						if (config.at(json_pointer{"/irods_client/enable_4_2_compatibility"}).get<bool>()) {
+							// When operating in 4.2 compatibility mode, all we can do is create a new iRODS connection
+							// and authenticate using the client's username and password. iRODS 4.2 does not provide an
+							// API for checking native authentication credentials.
 
-                                                const auto& host = config.at(json_pointer{"/irods_client/host"}).get_ref<const std::string&>();
-                                                const auto port = config.at(json_pointer{"/irods_client/port"}).get<int>();
+							const auto& host =
+								config.at(json_pointer{"/irods_client/host"}).get_ref<const std::string&>();
+							const auto port = config.at(json_pointer{"/irods_client/port"}).get<int>();
 
-                                                irods::experimental::client_connection conn{
-                                                    irods::experimental::defer_authentication, host, port, {username, zone}};
+							irods::experimental::client_connection conn{
+								irods::experimental::defer_authentication, host, port, {username, zone}};
 
-                                                login_successful = (clientLoginWithPassword(static_cast<RcComm*>(conn), password.data()) == 0);
-                                            }
-                                            else {
-                                                // If we're in this branch, assume we're talking to an iRODS 4.3.1+ server. Therefore, we
-                                                // can use existing iRODS connections to verify the correctness of client provided credentials
-                                                // for native authentication.
+							login_successful =
+								(clientLoginWithPassword(static_cast<RcComm*>(conn), password.data()) == 0);
+						}
+						else {
+							// If we're in this branch, assume we're talking to an iRODS 4.3.1+ server. Therefore, we
+							// can use existing iRODS connections to verify the correctness of client provided
+							// credentials for native authentication.
 
-                                                CheckAuthCredentialsInput input{};
-                                                username.copy(input.username, sizeof(CheckAuthCredentialsInput::username));
-                                                zone.copy(input.zone, sizeof(CheckAuthCredentialsInput::zone));
+							CheckAuthCredentialsInput input{};
+							username.copy(input.username, sizeof(CheckAuthCredentialsInput::username));
+							zone.copy(input.zone, sizeof(CheckAuthCredentialsInput::zone));
 
-                                                namespace adm = irods::experimental::administration;
-                                                const adm::user_password_property prop{password, rodsadmin_password};
-                                                const auto obfuscated_password = irods::experimental::administration::obfuscate_password(prop);
-                                                obfuscated_password.copy(input.password, sizeof(CheckAuthCredentialsInput::password));
+							namespace adm = irods::experimental::administration;
+							const adm::user_password_property prop{password, rodsadmin_password};
+							const auto obfuscated_password =
+								irods::experimental::administration::obfuscate_password(prop);
+							obfuscated_password.copy(input.password, sizeof(CheckAuthCredentialsInput::password));
 
-                                                int* correct{};
+							int* correct{};
 
-                                                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory, cppcoreguidelines-no-malloc)
-                                                irods::at_scope_exit free_memory{[&correct] { std::free(correct); }};
+							// NOLINTNEXTLINE(cppcoreguidelines-owning-memory, cppcoreguidelines-no-malloc)
+							irods::at_scope_exit free_memory{[&correct] { std::free(correct); }};
 
-                                                auto conn = irods::get_connection(rodsadmin_username);
+							auto conn = irods::get_connection(rodsadmin_username);
 
-                                                if (const auto ec = rc_check_auth_credentials(static_cast<RcComm*>(conn), &input, &correct); ec < 0) {
-                                                    log::error("{}: Error verifying native authentication credentials for user [{}]: error code [{}].", fn, username, ec);
-                                                }
-                                                else {
-                                                    log::debug("{}: correct = [{}]", fn, fmt::ptr(correct));
-                                                    log::debug("{}: *correct = [{}]", fn, (correct ? *correct : -1));
-                                                    login_successful = (correct && 1 == *correct);
-                                                }
-                                            }
+							if (const auto ec = rc_check_auth_credentials(static_cast<RcComm*>(conn), &input, &correct);
+							    ec < 0) {
+								log::error(
+									"{}: Error verifying native authentication credentials for user [{}]: error code "
+									"[{}].",
+									fn,
+									username,
+									ec);
+							}
+							else {
+								log::debug("{}: correct = [{}]", fn, fmt::ptr(correct));
+								log::debug("{}: *correct = [{}]", fn, (correct ? *correct : -1));
+								login_successful = (correct && 1 == *correct);
+							}
+						}
 					}
 					catch (const irods::exception& e) {
 						log::error(

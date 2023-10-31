@@ -21,69 +21,69 @@
 /// \since 4.2.12
 namespace irods::http::process_stash
 {
-    /// Inserts an object into the process stash.
-    ///
-    /// This function is thread-safe.
-    ///
-    /// \param[in] _value The object to insert.
-    ///
-    /// \returns A string representing the handle to the inserted object.
-    ///
-    /// \since 4.2.12
-    auto insert(boost::any _value) -> std::string;
+	/// Inserts an object into the process stash.
+	///
+	/// This function is thread-safe.
+	///
+	/// \param[in] _value The object to insert.
+	///
+	/// \returns A string representing the handle to the inserted object.
+	///
+	/// \since 4.2.12
+	auto insert(boost::any _value) -> std::string;
 
-    /// Searches the process stash for the value associated with a specific key.
-    ///
-    /// This function is thread-safe.
-    ///
-    /// \param[in] _key The string which maps to the value of interest.
-    ///
-    /// \returns A std::optional<boost::any> containing the value of interest.
-    /// \retval A non-empty std::optional<boost::any> object if the key exists.
-    /// \retval An empty std::optional<boost::any> object otherwise.
-    ///
-    /// \since 4.2.12
-    auto find(const std::string& _key) -> std::optional<boost::any>;
+	/// Searches the process stash for the value associated with a specific key.
+	///
+	/// This function is thread-safe.
+	///
+	/// \param[in] _key The string which maps to the value of interest.
+	///
+	/// \returns A std::optional<boost::any> containing the value of interest.
+	/// \retval A non-empty std::optional<boost::any> object if the key exists.
+	/// \retval An empty std::optional<boost::any> object otherwise.
+	///
+	/// \since 4.2.12
+	auto find(const std::string& _key) -> std::optional<boost::any>;
 
-    /// Removes a value from the process stash.
-    ///
-    /// This function is thread-safe.
-    ///
-    /// \param[in] _key The string which maps to the value of interest.
-    ///
-    /// \returns A boolean indicating if an element is removed.
-    ///
-    /// \since 4.2.12
-    auto erase(const std::string& _key) -> bool;
+	/// Removes a value from the process stash.
+	///
+	/// This function is thread-safe.
+	///
+	/// \param[in] _key The string which maps to the value of interest.
+	///
+	/// \returns A boolean indicating if an element is removed.
+	///
+	/// \since 4.2.12
+	auto erase(const std::string& _key) -> bool;
 
-    /// Removes all entries satisfying the predicate.
-    ///
-    /// This function is thread-safe.
-    ///
-    /// \param[in] _pred \parblock The predicate to test each entry against.
-    ///
-    /// \p _pred must take a std::string and boost::any by reference and return a boolean
-    /// indicating whether the entry should be removed. The arguments passed must be
-    /// treated as read-only.
-    ///
-    /// The std::string parameter is the handle mapped to the object stored in the boost::any.
-    ///
-    /// The boost::any parameter is the wrapped object identified by the handle.
-    ///
-    /// If \p _pred returns \p true, the entry is removed.
-    /// \endparblock
-    ///
-    /// \returns The number of elements removed.
-    ///
-    /// \since 4.3.1
-    auto erase_if(const std::function<bool(const std::string&, const boost::any&)>& _pred) -> std::size_t;
+	/// Removes all entries satisfying the predicate.
+	///
+	/// This function is thread-safe.
+	///
+	/// \param[in] _pred \parblock The predicate to test each entry against.
+	///
+	/// \p _pred must take a std::string and boost::any by reference and return a boolean
+	/// indicating whether the entry should be removed. The arguments passed must be
+	/// treated as read-only.
+	///
+	/// The std::string parameter is the handle mapped to the object stored in the boost::any.
+	///
+	/// The boost::any parameter is the wrapped object identified by the handle.
+	///
+	/// If \p _pred returns \p true, the entry is removed.
+	/// \endparblock
+	///
+	/// \returns The number of elements removed.
+	///
+	/// \since 4.3.1
+	auto erase_if(const std::function<bool(const std::string&, const boost::any&)>& _pred) -> std::size_t;
 
-    /// Returns all handles in the process stash.
-    ///
-    /// This function is thread-safe.
-    ///
-    /// \since 4.2.12
-    auto handles() -> std::vector<std::string>;
+	/// Returns all handles in the process stash.
+	///
+	/// This function is thread-safe.
+	///
+	/// \since 4.2.12
+	auto handles() -> std::vector<std::string>;
 } // namespace irods::http::process_stash
 
 #endif // IRODS_HTTP_PROCESS_STASH_HPP
