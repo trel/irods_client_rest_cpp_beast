@@ -1607,6 +1607,16 @@ namespace
 					const json input{{"logical_path", lpath_iter->second}, {"options", options}};
 
 					auto conn = irods::get_connection(client_info.username);
+
+					const auto status = fs::client::status(conn, lpath_iter->second);
+
+					if (fs::client::exists(status) && !fs::client::is_data_object(status)) {
+						return _sess_ptr->send(irods::http::fail(
+							res,
+							http::status::bad_request,
+							json{{"irods_response", {{"error_code", NOT_A_DATA_OBJECT}}}}.dump()));
+					}
+
 					const auto ec = rc_touch(static_cast<RcComm*>(conn), input.dump().c_str());
 
 					res.body() = json{{"irods_response", {{"error_code", ec}}}}.dump();

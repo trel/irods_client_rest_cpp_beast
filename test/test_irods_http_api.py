@@ -719,6 +719,16 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             #print(r.content) # Debug
 
+    def test_touch_operation_reports_error_when_given_a_path_to_a_collection(self):
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+            'op': 'touch',
+            'lpath': f'/{self.zone_name}/home/{self.rodsuser_username}'
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json()['irods_response']['error_code'], -171000)
+
     def multipart_form_data_upload(self, **args):
         boundary = '------testing_http_api------'
 
