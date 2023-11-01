@@ -1283,7 +1283,7 @@ namespace
 						addKeyVal(&input.condInput, REG_CHKSUM_KW, "");
 					}
 
-					if (const auto iter = _args.find("force"); iter != std::end(_args)) {
+					if (const auto iter = _args.find("force"); iter != std::end(_args) && iter->second == "1") {
 						addKeyVal(&input.condInput, FORCE_FLAG_KW, "");
 					}
 
