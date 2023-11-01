@@ -1271,8 +1271,10 @@ namespace
 						addKeyVal(&input.condInput, DEST_RESC_NAME_KW, iter->second.c_str());
 					}
 
-					if (const auto iter = _args.find("as-replica"); iter != std::end(_args) && iter->second == "1") {
-						addKeyVal(&input.condInput, REG_REPL_KW, "");
+					if (const auto iter = _args.find("as-additional-replica"); iter != std::end(_args)) {
+						if (iter->second == "1") {
+							addKeyVal(&input.condInput, REG_REPL_KW, "");
+						}
 					}
 
 					if (const auto iter = _args.find("data-size"); iter != std::end(_args)) {

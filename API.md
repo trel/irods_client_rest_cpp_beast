@@ -677,7 +677,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'ppath=<string>' \ # Absolute physical path to file on the iRODS server.
     --data-urlencode 'resource=<string>' \ # The resource which will own the replica.
-    --data-urlencode 'as-replica=<integer>' \ # 0 or 1. Defaults to 0. Register as an additional replica for an existing data object.
+    --data-urlencode 'as-additional-replica=<integer>' \ # 0 or 1. Defaults to 0. Register as an additional replica for an existing data object.
     --data-urlencode 'data-size=<integer>' \ # The size of the replica in bytes. Optional.
     --data-urlencode 'checksum=<string>' \ # The checksum to associate with the replica. Optional.
     --data-urlencode 'force=<integer>' \ # 0 or 1. Defaults to 0. TODO
