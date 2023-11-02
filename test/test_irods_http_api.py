@@ -565,9 +565,6 @@ class test_data_objects_endpoint(unittest.TestCase):
             'perm': 'read_object'
         }, result['permissions'])
 
-        # TODO Register a data object.
-        # TODO Register a replica.
-
         # Remove the data objects.
         for data_object in [data_object_renamed, data_object_copied]:
             with self.subTest(f'Removing [{data_object}]'):
@@ -581,6 +578,146 @@ class test_data_objects_endpoint(unittest.TestCase):
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+    def test_registering_a_new_data_object(self):
+        rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+
+        # Create a local file.
+        filename = 'newly_registered_file.txt'
+        physical_path = f'/tmp/{filename}'
+        with open(physical_path, 'w') as f:
+            f.write('data')
+
+        try:
+            # Show the data object we want to create via registration does not exist.
+            data_object = f'/{self.zone_name}/home/{self.rodsadmin_username}/{filename}'
+            r = requests.get(self.url_endpoint, headers=rodsadmin_headers, params={
+                'op': 'stat',
+                'lpath': data_object
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 400)
+            self.assertEqual(r.json()['irods_response']['error_code'], -171000)
+
+            # Register the local file into the catalog as a new data object.
+            # We know we're registering a new data object because the "as-additional-replica"
+            # parameter isn't set to 1.
+            resource = 'demoResc'
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'register',
+                'lpath': data_object,
+                'ppath': physical_path,
+                'resource': resource
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+            # Show a new data object exists with the expected replica information.
+            r = requests.get(f'{self.url_base}/query', headers=rodsadmin_headers, params={
+                'op': 'execute_genquery',
+                'query': f"select COLL_NAME, DATA_NAME, DATA_PATH, RESC_NAME where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{filename}'"
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['error_code'], 0)
+            self.assertEqual(len(result['rows']), 1)
+            self.assertEqual(result['rows'][0][0], os.path.dirname(data_object))
+            self.assertEqual(result['rows'][0][1], filename)
+            self.assertEqual(result['rows'][0][2], physical_path)
+            self.assertEqual(result['rows'][0][3], resource)
+
+        finally:
+            # Remove the data object by unregistering it.
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'unregister': 1
+            })
+            #print(r.content) # Debug
+
+    def test_registering_an_additional_replica_for_an_existing_data_object(self):
+        rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+
+        # The name of the resource we'll use to register an additional replica under.
+        other_resource = 'test_registration_resc'
+
+        try:
+            # Create a non-empty data object.
+            filename = 'newly_registered_replica.txt'
+            data_object = f'/{self.zone_name}/home/{self.rodsadmin_username}/{filename}'
+            content = 'hello, this message was written via the iRODS HTTP API!'
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'write',
+                'lpath': data_object,
+                'bytes': content,
+                'count': len(content)
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+            # Create a new unixfilesystem resource.
+            r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
+                'op': 'create',
+                'name': other_resource,
+                'type': 'unixfilesystem',
+                'host': self.server_hostname,
+                'vault-path': os.path.join('/tmp', f'{other_resource}_vault')
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+            # Create a local file.
+            physical_path = f'/tmp/{filename}'
+            with open(physical_path, 'w') as f:
+                f.write('some data')
+
+            # Register the local file into the catalog as a new replica of the data object.
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'register',
+                'lpath': data_object,
+                'ppath': physical_path,
+                'resource': other_resource,
+                'as-additional-replica': 1
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['error_code'], 0)
+
+            # Show a new replica exists with the expected replica information.
+            r = requests.get(f'{self.url_base}/query', headers=rodsadmin_headers, params={
+                'op': 'execute_genquery',
+                'query': 'select COLL_NAME, DATA_NAME, DATA_PATH, RESC_NAME ' +
+                         f"where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{filename}' and DATA_REPL_NUM = '1'"
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['error_code'], 0)
+            self.assertEqual(len(result['rows']), 1)
+            self.assertEqual(result['rows'][0][0], os.path.dirname(data_object))
+            self.assertEqual(result['rows'][0][1], filename)
+            self.assertEqual(result['rows'][0][2], physical_path)
+            self.assertEqual(result['rows'][0][3], other_resource)
+
+        finally:
+            # Remove the data object by unregistering it.
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'no-trash': 1
+            })
+            #print(r.content) # Debug
+
+            # Remove the unixfilesystem resource.
+            r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
+                'op': 'remove',
+                'name': other_resource
+            })
+            #print(r.content) # Debug
 
     def multipart_form_data_upload(self, **args):
         boundary = '------testing_http_api------'
