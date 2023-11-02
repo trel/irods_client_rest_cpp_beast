@@ -67,7 +67,16 @@ namespace irods::http::handler
 			res.set(field_type::server, irods::http::version::server_name);
 			res.set(field_type::content_type, "application/json");
 			res.keep_alive(_req.keep_alive());
-			res.body() = std::string_view(static_cast<char*>(bbuf->buf), bbuf->len);
+
+			try {
+				res.body() = fmt::format(
+					R"_irods_({{"irods_response":{{"error_code":0}},"zone_report":{}}})_irods_",
+					std::string_view(static_cast<char*>(bbuf->buf), bbuf->len));
+			}
+			catch (const std::exception& e) {
+				log::error("{}: Caught exception while writing zone report to HTTP body: {}", fn, e.what());
+			}
+
 			res.prepare_payload();
 
 			return _sess_ptr->send(std::move(res));

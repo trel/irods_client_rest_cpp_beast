@@ -2115,12 +2115,14 @@ class test_zones_endpoint(unittest.TestCase):
 
     def test_report_operation(self):
         headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
-        params = {'op': 'report'}
-        r = requests.get(self.url_endpoint, headers=headers, params=params)
+        r = requests.get(self.url_endpoint, headers=headers, params={'op': 'report'})
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
 
-        zone_report = r.json()
+        result = r.json()
+        self.assertEqual(result['irods_response']['error_code'], 0)
+
+        zone_report = result['zone_report']
         self.assertIn('schema_version', zone_report)
         self.assertIn('zones', zone_report)
         self.assertGreaterEqual(len(zone_report['zones']), 1)
