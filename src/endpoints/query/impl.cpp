@@ -202,16 +202,16 @@ namespace
 						}
 
 						if (0 == input.sql_only) {
-							// The string below contains a format placeholder for the "results" property
-						    // because this avoids the need to parse the GenQuery2 results into an nlohmann
-						    // JSON object just to serialize it for the response.
+							// The string below contains a format placeholder for the "rows" property
+							// because this avoids the need to parse the GenQuery2 results into an nlohmann
+							// JSON object just to serialize it for the response.
 							constexpr const auto* json_fmt_string =
-								R"_({{"irods_response":{{"error_code":0}},"results":{}}})_";
+								R"_({{"irods_response":{{"error_code":0}},"rows":{}}})_";
 							res.body() = fmt::format(json_fmt_string, output);
 						}
 						else {
 							constexpr const auto* json_fmt_string =
-								R"_({{"irods_response":{{"error_code":0}},"results":"{}"}})_";
+								R"_({{"irods_response":{{"error_code":0}},"sql":"{}"}})_";
 							res.body() = fmt::format(json_fmt_string, output);
 						}
 #else

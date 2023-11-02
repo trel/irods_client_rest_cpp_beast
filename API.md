@@ -1031,7 +1031,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
         ["string", "string", "string"],
 
         // Additional rows ...
-    ]
+    ],
+	"sql": "string" // If "sql-only" option is set to 1.
 }
 ```
 
