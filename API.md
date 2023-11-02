@@ -38,7 +38,7 @@ curl http://localhost:<port>/irods-http-api/<version>/collections \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -70,7 +70,7 @@ If `recurse` is set to 1, the contents of the collection will be removed. If `no
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -102,7 +102,7 @@ If `ticket` is passed a valid ticket string, it will be enabled before carrying 
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -145,7 +145,7 @@ curl http://localhost:<port>/irods-http-api/<version>/collections \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -181,7 +181,7 @@ curl http://localhost:<port>/irods-http-api/<version>/collections \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -224,7 +224,7 @@ The JSON object passed to the `operations` parameter must have the following str
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -286,7 +286,7 @@ The JSON object passed to the `operations` parameter must have the following str
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -334,7 +334,7 @@ curl http://localhost:<port>/irods-http-api/<version>/collections \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -369,7 +369,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -401,7 +401,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -436,7 +436,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -469,7 +469,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -511,7 +511,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -553,7 +553,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -585,7 +585,7 @@ The `options` parameter may not be implemented.
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -617,7 +617,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -651,7 +651,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -684,7 +684,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -847,7 +847,7 @@ The JSON object passed to the `operations` parameter must have the following str
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -897,7 +897,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -940,7 +940,7 @@ The JSON object passed to the `operations` parameter must have the following str
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1007,7 +1007,7 @@ All parameters having a prefix of `new-` represent modifiable properties of the 
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1032,7 +1032,7 @@ curl http://localhost:<port>/irods-http-api/<version>/info
 
 ### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1069,7 +1069,7 @@ curl http://localhost:<port>/irods-http-api/<version>/query \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1108,7 +1108,7 @@ curl http://localhost:<port>/irods-http-api/<version>/query \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1145,7 +1145,7 @@ curl http://localhost:<port>/irods-http-api/<version>/resources \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1173,7 +1173,7 @@ curl http://localhost:<port>/irods-http-api/<version>/resources \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1203,7 +1203,7 @@ curl http://localhost:<port>/irods-http-api/<version>/resources \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1232,7 +1232,7 @@ curl http://localhost:<port>/irods-http-api/<version>/resources \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1260,7 +1260,7 @@ curl http://localhost:<port>/irods-http-api/<version>/resources \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1289,7 +1289,7 @@ curl http://localhost:<port>/irods-http-api/<version>/resources \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1352,7 +1352,7 @@ The JSON object passed to the `operations` parameter must have the following str
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1401,7 +1401,7 @@ curl http://localhost:<port>/irods-http-api/<version>/rules \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1437,7 +1437,7 @@ If `rep-instance` is not passed, the rule text will be tried on ALL rule engine 
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1467,7 +1467,7 @@ curl http://localhost:<port>/irods-http-api/<version>/rules \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1505,7 +1505,7 @@ curl http://localhost:<port>/irods-http-api/<version>/tickets \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1534,7 +1534,7 @@ curl http://localhost:<port>/irods-http-api/<version>/tickets \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1566,7 +1566,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1595,7 +1595,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1625,7 +1625,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1655,7 +1655,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1683,7 +1683,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1711,7 +1711,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1741,7 +1741,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1771,7 +1771,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1799,7 +1799,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1835,7 +1835,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1871,7 +1871,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1902,7 +1902,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1950,7 +1950,7 @@ The JSON object passed to the `operations` parameter must have the following str
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
@@ -1999,7 +1999,7 @@ curl http://localhost:<port>/irods-http-api/<version>/zones \
 
 #### Response
 
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. It's structure is shown below.
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
 
 ```js
 {
