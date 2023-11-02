@@ -1061,9 +1061,9 @@ class test_query_endpoint(unittest.TestCase):
 
         result = r.json()
         self.assertEqual(result['irods_response']['error_code'], 0)
-        self.assertGreater(len(result['results']), 0)
-        self.assertIn(['/tempZone/home/http_api'], result['results'])
-        self.assertIn(['/tempZone/trash/home/http_api'], result['results'])
+        self.assertGreater(len(result['rows']), 0)
+        self.assertIn(['/tempZone/home/http_api'], result['rows'])
+        self.assertIn(['/tempZone/trash/home/http_api'], result['rows'])
 
     def test_genquery2_sql_only_option(self):
         if not config.test_config.get('run_genquery2_tests', False):
@@ -1081,7 +1081,7 @@ class test_query_endpoint(unittest.TestCase):
 
         result = r.json()
         self.assertEqual(result['irods_response']['error_code'], 0)
-        self.assertGreater(len(result['results']), 0)
+        self.assertGreater(len(result['sql']), 0)
 
     def test_support_for_specific_queries(self):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
