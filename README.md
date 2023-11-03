@@ -178,7 +178,11 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
                 "client_id": "irods_http_api",
 
                 // URI pointing to the irods HTTP API auth endpoint.
-                "redirect_uri": "https://<domain>/irods-http/0.1.0/authenticate"
+                "redirect_uri": "https://<domain>/irods-http/0.1.0/authenticate",
+
+                // The amount of time before the OIDC Authorization Code grant
+                // times out, requiring another attempt at authentication.
+                "state_timeout_in_seconds": 600
             }
         },
 
