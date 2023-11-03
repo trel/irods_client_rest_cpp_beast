@@ -220,13 +220,13 @@ namespace
 				}
 
 				res.body() =
-					json{{"irods_response", {{"error_code", ec}}}, {"stdout", stdout_output}, {"stderr", stderr_output}}
+					json{{"irods_response", {{"status_code", ec}}}, {"stdout", stdout_output}, {"stderr", stderr_output}}
 						.dump();
 			}
 			catch (const irods::exception& e) {
 				res.result(http::status::bad_request);
 				res.body() =
-					json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
@@ -274,13 +274,13 @@ namespace
 					res.body() = json{
 						{"irods_response",
 				         {
-							 {"error_code", ec},
+							 {"status_code", ec},
 						 }}}.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
@@ -357,13 +357,13 @@ namespace
 				}
 
 				res.body() =
-					json{{"irods_response", {{"error_code", ec}}}, {"rule_engine_plugin_instances", plugin_instances}}
+					json{{"irods_response", {{"status_code", ec}}}, {"rule_engine_plugin_instances", plugin_instances}}
 						.dump();
 			}
 			catch (const irods::exception& e) {
 				res.result(http::status::bad_request);
 				res.body() =
-					json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {

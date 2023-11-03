@@ -43,8 +43,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -75,8 +75,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -107,8 +107,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "type": "string",
     "inheritance_enabled": false,
@@ -150,8 +150,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "entries": [
         "string",
@@ -186,8 +186,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -229,8 +229,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -240,15 +240,15 @@ If there was an error, expect either an HTTP status code in the 4XX or 5XX range
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string", // Optional
+        "status_code": 0
+        "status_message": "string", // Optional
         "failed_operation": {
             "operation": {
                 "entity_name": "string", // The name of a user or group.
                 "acl": "string" // null, read, write, or own.
             },
             "operation_index": 0,
-            "error_message": "string"
+            "status_message": "string"
         }
     }
 }
@@ -291,8 +291,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -302,8 +302,8 @@ If there was an error, expect either an HTTP status code in the 4XX or 5XX range
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string", // Optional
+        "status_code": 0
+        "status_message": "string", // Optional
         "failed_operation": {
             "operation": {
                 "operation": "string", // add or remove.
@@ -312,7 +312,7 @@ If there was an error, expect either an HTTP status code in the 4XX or 5XX range
                 "units": "string" // Optional.
             },
             "operation_index": 0,
-            "error_message": "string"
+            "status_message": "string"
         }
     }
 }
@@ -339,8 +339,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -374,8 +374,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -406,8 +406,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -441,8 +441,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "checksum": "string"
 }
@@ -474,8 +474,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "results": {
         // Verification results. This object only exists if the operation found inconsistencies
@@ -516,8 +516,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "type": "string",
     "permissions": [
@@ -558,8 +558,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -590,8 +590,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "copied": false
 }
@@ -622,8 +622,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -656,8 +656,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -689,8 +689,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -750,8 +750,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```
 {
     "irods_response": {
-        "error_code": 0,
-        "error_message": "string" // Optional
+        "status_code": 0,
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -782,8 +782,8 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 ```
 {
     "irods_response": {
-        "error_code": 0,
-        "error_message": "string" // Optional
+        "status_code": 0,
+        "status_message": "string" // Optional
     },
     "parallel_write_handle": "string"
 }
@@ -809,8 +809,8 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 ```
 {
     "irods_response": {
-        "error_code": 0,
-        "error_message": "string" // Optional
+        "status_code": 0,
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -852,8 +852,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -863,8 +863,8 @@ If there was an error, expect either an HTTP status code in the 4XX or 5XX range
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string", // Optional
+        "status_code": 0
+        "status_message": "string", // Optional
         "failed_operation": {
             "operation": {
                 "operation": "string", // add or remove.
@@ -873,7 +873,7 @@ If there was an error, expect either an HTTP status code in the 4XX or 5XX range
                 "units": "string" // Optional.
             },
             "operation_index": 0,
-            "error_message": "string"
+            "status_message": "string"
         }
     }
 }
@@ -902,8 +902,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -945,8 +945,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -956,15 +956,15 @@ If there was an error, expect either an HTTP status code in the 4XX or 5XX range
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string", // Optional
+        "status_code": 0
+        "status_message": "string", // Optional
         "failed_operation": {
             "operation": {
                 "entity_name": "string", // The name of a user or group.
                 "acl": "string" // null, read, write, or own.
             },
             "operation_index": 0,
-            "error_message": "string"
+            "status_message": "string"
         }
     }
 }
@@ -1012,8 +1012,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1074,8 +1074,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "rows": [
         ["string", "string", "string"],
@@ -1113,8 +1113,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "rows": [
         ["string", "string", "string"],
@@ -1150,8 +1150,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1178,8 +1178,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1208,8 +1208,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1237,8 +1237,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1265,8 +1265,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1294,8 +1294,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "exists": false,
     "info": {
@@ -1357,8 +1357,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1368,8 +1368,8 @@ If there was an error, expect either an HTTP status code in the 4XX or 5XX range
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string", // Optional
+        "status_code": 0
+        "status_message": "string", // Optional
         "failed_operation": {
             "operation": {
                 "operation": "string", // add or remove.
@@ -1378,7 +1378,7 @@ If there was an error, expect either an HTTP status code in the 4XX or 5XX range
                 "units": "string" // Optional.
             },
             "operation_index": 0,
-            "error_message": "string"
+            "status_message": "string"
         }
     }
 }
@@ -1406,8 +1406,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "rule_engine_plugin_instances": [
         "string",
@@ -1442,8 +1442,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "stdout": "string",
     "stderr": "string"
@@ -1472,8 +1472,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1510,8 +1510,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "ticket": "string" // The generated ticket string.
 }
@@ -1539,8 +1539,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1571,8 +1571,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1600,8 +1600,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1630,8 +1630,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1660,8 +1660,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1688,8 +1688,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1716,8 +1716,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1746,8 +1746,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1776,8 +1776,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1804,8 +1804,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "users": [
         {
@@ -1840,8 +1840,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "groups": [
         "string",
@@ -1876,8 +1876,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "is_member": false
 }
@@ -1907,8 +1907,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "exists": false,
     "id": "string",
@@ -1955,8 +1955,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     }
 }
 ```
@@ -1966,8 +1966,8 @@ If there was an error, expect either an HTTP status code in the 4XX or 5XX range
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string", // Optional
+        "status_code": 0
+        "status_message": "string", // Optional
         "failed_operation": {
             "operation": {
                 "operation": "string", // add or remove.
@@ -1976,7 +1976,7 @@ If there was an error, expect either an HTTP status code in the 4XX or 5XX range
                 "units": "string" // Optional.
             },
             "operation_index": 0,
-            "error_message": "string"
+            "status_message": "string"
         }
     }
 }
@@ -2004,8 +2004,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 ```js
 {
     "irods_response": {
-        "error_code": 0
-        "error_message": "string" // Optional
+        "status_code": 0
+        "status_message": "string" // Optional
     },
     "zone_report": {
         // Equivalent output of executing izonereport.

@@ -162,7 +162,7 @@ namespace
 							res.result(http::status::internal_server_error);
 							res.body() =
 								json{{"irods_response",
-						              {{"error_code", ec}, {"error_message", "Error enabling ticket on connection."}}}}
+						              {{"status_code", ec}, {"status_message", "Error enabling ticket on connection."}}}}
 									.dump();
 							res.prepare_payload();
 							return _sess_ptr->send(std::move(res));
@@ -173,7 +173,7 @@ namespace
 						return _sess_ptr->send(irods::http::fail(
 							res,
 							http::status::bad_request,
-							json{{"irods_response", {{"error_code", NOT_A_COLLECTION}}}}.dump()));
+							json{{"irods_response", {{"status_code", NOT_A_COLLECTION}}}}.dump()));
 					}
 
 					json entries;
@@ -193,7 +193,7 @@ namespace
 					res.body() = json{
 						{"irods_response",
 				         {
-							 {"error_code", 0},
+							 {"status_code", 0},
 						 }},
 						{"entries",
 				         entries}}.dump();
@@ -201,13 +201,13 @@ namespace
 				catch (const fs::filesystem_error& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code().value()}, {"error_message", e.what()}}}}
+						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
 							.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
@@ -253,7 +253,7 @@ namespace
 							res.result(http::status::internal_server_error);
 							res.body() =
 								json{{"irods_response",
-						              {{"error_code", ec}, {"error_message", "Error enabling ticket on connection."}}}}
+						              {{"status_code", ec}, {"status_message", "Error enabling ticket on connection."}}}}
 									.dump();
 							res.prepare_payload();
 							return _sess_ptr->send(std::move(res));
@@ -266,7 +266,7 @@ namespace
 						return _sess_ptr->send(irods::http::fail(
 							res,
 							http::status::bad_request,
-							json{{"irods_response", {{"error_code", NOT_A_COLLECTION}}}}.dump()));
+							json{{"irods_response", {{"status_code", NOT_A_COLLECTION}}}}.dump()));
 					}
 
 					json perms;
@@ -283,7 +283,7 @@ namespace
 						json{
 							{"irods_response",
 				             {
-								 {"error_code", 0},
+								 {"status_code", 0},
 							 }},
 							{"type", irods::to_object_type_string(status.type())},
 							{"inheritance_enabled", status.is_inheritance_enabled()},
@@ -296,13 +296,13 @@ namespace
 				catch (const fs::filesystem_error& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code().value()}, {"error_message", e.what()}}}}
+						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
 							.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
@@ -343,18 +343,18 @@ namespace
 					auto conn = irods::get_connection(client_info.username);
 					fs::client::create_collections(conn, lpath_iter->second);
 
-					res.body() = json{{"irods_response", {{"error_code", 0}}}}.dump();
+					res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
 				}
 				catch (const fs::filesystem_error& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code().value()}, {"error_message", e.what()}}}}
+						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
 							.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
@@ -398,7 +398,7 @@ namespace
 						return _sess_ptr->send(irods::http::fail(
 							res,
 							http::status::bad_request,
-							json{{"irods_response", {{"error_code", NOT_A_COLLECTION}}}}.dump()));
+							json{{"irods_response", {{"status_code", NOT_A_COLLECTION}}}}.dump()));
 					}
 
 					fs::remove_options opts = fs::remove_options::none;
@@ -416,18 +416,18 @@ namespace
 						fs::client::remove(conn, lpath_iter->second, opts);
 					}
 
-					res.body() = json{{"irods_response", {{"error_code", 0}}}}.dump();
+					res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
 				}
 				catch (const fs::filesystem_error& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code().value()}, {"error_message", e.what()}}}}
+						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
 							.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
@@ -471,7 +471,7 @@ namespace
 						return _sess_ptr->send(irods::http::fail(
 							res,
 							http::status::bad_request,
-							json{{"irods_response", {{"error_code", NOT_A_COLLECTION}}}}.dump()));
+							json{{"irods_response", {{"status_code", NOT_A_COLLECTION}}}}.dump()));
 					}
 
 					const auto new_lpath_iter = _args.find("new-lpath");
@@ -486,26 +486,26 @@ namespace
 						res.body() = json{
 							{"irods_response",
 					         {
-								 {"error_code", 0},
+								 {"status_code", 0},
 							 }}}.dump();
 					}
 					catch (const fs::filesystem_error& e) {
 						res.result(http::status::bad_request);
 						res.body() =
-							json{{"irods_response", {{"error_code", e.code().value()}, {"error_message", e.what()}}}}
+							json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
 								.dump();
 					}
 				}
 				catch (const fs::filesystem_error& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code().value()}, {"error_message", e.what()}}}}
+						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
 							.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
@@ -549,7 +549,7 @@ namespace
 						return _sess_ptr->send(irods::http::fail(
 							res,
 							http::status::bad_request,
-							json{{"irods_response", {{"error_code", NOT_A_COLLECTION}}}}.dump()));
+							json{{"irods_response", {{"status_code", NOT_A_COLLECTION}}}}.dump()));
 					}
 
 					const auto entity_name_iter = _args.find("entity-name");
@@ -583,25 +583,25 @@ namespace
 						res.body() = json{
 							{"irods_response",
 					         {
-								 {"error_code", 0},
+								 {"status_code", 0},
 							 }}}.dump();
 					}
 					catch (const fs::filesystem_error& e) {
 						res.body() =
-							json{{"irods_response", {{"error_code", e.code().value()}, {"error_message", e.what()}}}}
+							json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
 								.dump();
 					}
 				}
 				catch (const fs::filesystem_error& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code().value()}, {"error_message", e.what()}}}}
+						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
 							.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
