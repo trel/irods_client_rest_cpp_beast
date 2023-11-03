@@ -206,7 +206,7 @@ namespace
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							 {"error_code", 0}
+							 {"status_code", 0}
 						}}
 					}.dump();
 					// clang-format on
@@ -216,8 +216,8 @@ namespace
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							{"error_code", e.code()},
-							{"error_message", e.client_display_what()}
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
 						}}
 					}.dump();
 					// clang-format on
@@ -269,7 +269,7 @@ namespace
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							{"error_code", 0}
+							{"status_code", 0}
 						}}
 					}.dump();
 					// clang-format on
@@ -279,8 +279,8 @@ namespace
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							{"error_code", e.code()},
-							{"error_message", e.client_display_what()}
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
 						}}
 					}.dump();
 					// clang-format on
@@ -341,15 +341,15 @@ namespace
 					auto conn = irods::get_connection(client_info.username);
 					adm::client::modify_user(conn, adm::user{name_iter->second, zone_iter->second}, prop);
 
-					res.body() = json{{"irods_response", {{"error_code", 0}}}}.dump();
+					res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							{"error_code", e.code()},
-							{"error_message", e.client_display_what()}
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
 						}}
 					}.dump();
 					// clang-format on
@@ -409,7 +409,7 @@ namespace
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							{"error_code", 0}
+							{"status_code", 0}
 						}}
 					}.dump();
 					// clang-format on
@@ -419,8 +419,8 @@ namespace
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							{"error_code", e.code()},
-							{"error_message", e.client_display_what()}
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
 						}}
 					}.dump();
 					// clang-format on
@@ -459,8 +459,8 @@ namespace
                 res.result(http::status::bad_request);
                 res.body() = json{
                     {"irods_response", {
-                        {"error_code", e.code()},
-                        {"error_message", e.client_display_what()}
+                        {"status_code", e.code()},
+                        {"status_message", e.client_display_what()}
                     }}
                 }.dump();
             }
@@ -504,8 +504,8 @@ namespace
                 res.result(http::status::bad_request);
                 res.body() = json{
                     {"irods_response", {
-                        {"error_code", e.code()},
-                        {"error_message", e.client_display_what()}
+                        {"status_code", e.code()},
+                        {"status_message", e.client_display_what()}
                     }}
                 }.dump();
             }
@@ -556,7 +556,7 @@ namespace
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							{"error_code", 0}
+							{"status_code", 0}
 						}}
 					}.dump();
 					// clang-format on
@@ -566,8 +566,8 @@ namespace
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							{"error_code", e.code()},
-							{"error_message", e.client_display_what()}
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
 						}}
 					}.dump();
 					// clang-format on
@@ -613,7 +613,7 @@ namespace
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							{"error_code", 0}
+							{"status_code", 0}
 						}}
 					}.dump();
 					// clang-format on
@@ -623,8 +623,8 @@ namespace
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							{"error_code", e.code()},
-							{"error_message", e.client_display_what()}
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
 						}}
 					}.dump();
 					// clang-format on
@@ -683,13 +683,13 @@ namespace
 					res.body() = json{
 						{"irods_response",
 				         {
-							 {"error_code", 0},
+							 {"status_code", 0},
 						 }}}.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
@@ -746,13 +746,13 @@ namespace
 					res.body() = json{
 						{"irods_response",
 				         {
-							 {"error_code", 0},
+							 {"status_code", 0},
 						 }}}.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
@@ -794,12 +794,12 @@ namespace
 						v.push_back({{"name", u.name}, {"zone", u.zone}});
 					}
 
-					res.body() = json{{"irods_response", {{"error_code", 0}}}, {"users", v}}.dump();
+					res.body() = json{{"irods_response", {{"status_code", 0}}}, {"users", v}}.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
@@ -841,12 +841,12 @@ namespace
 						v.push_back(std::move(g.name));
 					}
 
-					res.body() = json{{"irods_response", {{"error_code", 0}}}, {"groups", v}}.dump();
+					res.body() = json{{"irods_response", {{"status_code", 0}}}, {"groups", v}}.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
@@ -883,8 +883,8 @@ namespace
                 res.result(http::status::bad_request);
                 res.body() = json{
                     {"irods_response", {
-                        {"error_code", e.code()},
-                        {"error_message", e.client_display_what()}
+                        {"status_code", e.code()},
+                        {"status_message", e.client_display_what()}
                     }}
                 }.dump();
             }
@@ -948,14 +948,14 @@ namespace
 
 					res.body() =
 						json{
-							{"irods_response", {{"error_code", 0}}},
+							{"irods_response", {{"status_code", 0}}},
 							{"is_member", adm::client::user_is_member_of_group(conn, group, user)}}
 							.dump();
 				}
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
@@ -998,7 +998,7 @@ namespace
 					json info{
 						{"irods_response",
 				         {
-							 {"error_code", 0},
+							 {"status_code", 0},
 						 }},
 						{"exists", false}};
 
@@ -1043,7 +1043,7 @@ namespace
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {

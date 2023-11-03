@@ -70,7 +70,7 @@ namespace irods::http::handler
 
 			try {
 				res.body() = fmt::format(
-					R"_irods_({{"irods_response":{{"error_code":0}},"zone_report":{}}})_irods_",
+					R"_irods_({{"irods_response":{{"status_code":0}},"zone_report":{}}})_irods_",
 					std::string_view(static_cast<char*>(bbuf->buf), bbuf->len));
 			}
 			catch (const std::exception& e) {

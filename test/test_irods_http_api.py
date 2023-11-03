@@ -147,7 +147,7 @@ class test_collections_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
-        self.assertEqual(stat_info['irods_response']['error_code'], 0)
+        self.assertEqual(stat_info['irods_response']['status_code'], 0)
 
         # Stat the collection to show that it exists.
         params = {'op': 'stat', 'lpath': collection_path}
@@ -156,7 +156,7 @@ class test_collections_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
-        self.assertEqual(stat_info['irods_response']['error_code'], 0)
+        self.assertEqual(stat_info['irods_response']['status_code'], 0)
 
         # Rename the collection.
         new_collection_path = collection_path + '.renamed'
@@ -193,7 +193,7 @@ class test_collections_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
-        self.assertEqual(stat_info['irods_response']['error_code'], 0)
+        self.assertEqual(stat_info['irods_response']['status_code'], 0)
         self.assertEqual(len(stat_info['permissions']), 2)
 
         perms = stat_info['permissions']
@@ -216,7 +216,7 @@ class test_collections_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 400)
 
         stat_info = r.json()
-        self.assertEqual(stat_info['irods_response']['error_code'], -170000)
+        self.assertEqual(stat_info['irods_response']['status_code'], -170000)
 
     def test_stat_operation_returns_expected_json_structure(self):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -226,7 +226,7 @@ class test_collections_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
-        self.assertEqual(stat_info['irods_response']['error_code'], 0)
+        self.assertEqual(stat_info['irods_response']['status_code'], 0)
         self.assertEqual(stat_info['type'], 'collection')
         self.assertEqual(stat_info['inheritance_enabled'], False)
         self.assertEqual(stat_info['registered'], True)
@@ -247,7 +247,7 @@ class test_collections_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 400)
-        self.assertEqual(r.json()['irods_response']['error_code'], -170000)
+        self.assertEqual(r.json()['irods_response']['status_code'], -170000)
 
     def test_list_operation(self):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -258,7 +258,7 @@ class test_collections_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data={'op': 'create', 'lpath': collection})
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Create one data object in each collection.
         data_objects = [
@@ -272,14 +272,14 @@ class test_collections_endpoint(unittest.TestCase):
             r = requests.post(f'{self.url_base}/data-objects', headers=headers, data={'op': 'touch', 'lpath': data_object})
             #print(r.content) # Debug
             self.assertEqual(r.status_code, 200)
-            self.assertEqual(r.json()['irods_response']['error_code'], 0)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # List only the contents of the home collection.
         r = requests.get(self.url_endpoint, headers=headers, params={'op': 'list', 'lpath': home_collection})
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['entries'], [os.path.dirname(data_objects[0])])
 
         # List the home collection recursively.
@@ -287,7 +287,7 @@ class test_collections_endpoint(unittest.TestCase):
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         result['entries'].sort()
         expected_result = [
             os.path.dirname(data_objects[0]),
@@ -309,7 +309,7 @@ class test_collections_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
     def test_modifying_metadata_atomically(self):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -330,7 +330,7 @@ class test_collections_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the metadata exists on the collection.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -341,7 +341,7 @@ class test_collections_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['rows'][0][0], collection)
 
         # Remove the metadata from the collection.
@@ -359,7 +359,7 @@ class test_collections_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the metadata no longer exists on the collection.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -370,7 +370,7 @@ class test_collections_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 0)
 
     def test_modifying_permissions_atomically(self):
@@ -390,7 +390,7 @@ class test_collections_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the rodsadmin now has permission to read the collection.
         r = requests.get(self.url_endpoint, headers=headers, params={
@@ -401,7 +401,7 @@ class test_collections_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['permissions']), 2)
         #self.assertEqual(result['permissions'][0]['name'], self.rodsuser_username)
         #self.assertEqual(result['permissions'][0]['zone'], self.zone_name)
@@ -421,7 +421,7 @@ class test_collections_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the permissions have been removed.
         r = requests.get(self.url_endpoint, headers=headers, params={
@@ -432,7 +432,7 @@ class test_collections_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['permissions']), 1)
         #self.assertEqual(result['permissions'][0]['name'], self.rodsuser_username)
         #self.assertEqual(result['permissions'][0]['zone'], self.zone_name)
@@ -471,7 +471,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Create a non-empty data object.
         data_object = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'common_ops.txt')
@@ -484,7 +484,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Replicate the data object.
         r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
@@ -494,7 +494,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show there are two replicas.
         coll_name = os.path.dirname(data_object)
@@ -506,7 +506,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 2)
 
         # Trim the first replica.
@@ -517,7 +517,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Rename the data object.
         data_object_renamed = f'{data_object}.renamed'
@@ -528,7 +528,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Copy the data object.
         data_object_copied = f'{data_object}.copied'
@@ -539,7 +539,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Modify permissions on the data object.
         r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
@@ -550,14 +550,14 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the permissions were updated.
         r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={'op': 'stat', 'lpath': data_object_copied})
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertIn({
             'name': self.rodsadmin_username,
             'zone': self.zone_name,
@@ -571,13 +571,13 @@ class test_data_objects_endpoint(unittest.TestCase):
                 r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={'op': 'remove', 'lpath': data_object, 'no-trash': 1})
                 #print(r.content) # Debug
                 self.assertEqual(r.status_code, 200)
-                self.assertEqual(r.json()['irods_response']['error_code'], 0)
+                self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Remove the resource.
         r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={'op': 'remove', 'name': resc_name})
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
     def test_registering_a_new_data_object(self):
         rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
@@ -597,7 +597,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             #print(r.content) # Debug
             self.assertEqual(r.status_code, 400)
-            self.assertEqual(r.json()['irods_response']['error_code'], -171000)
+            self.assertEqual(r.json()['irods_response']['status_code'], -171000)
 
             # Register the local file into the catalog as a new data object.
             # We know we're registering a new data object because the "as-additional-replica"
@@ -611,7 +611,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             #print(r.content) # Debug
             self.assertEqual(r.status_code, 200)
-            self.assertEqual(r.json()['irods_response']['error_code'], 0)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
             # Show a new data object exists with the expected replica information.
             r = requests.get(f'{self.url_base}/query', headers=rodsadmin_headers, params={
@@ -621,7 +621,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             #print(r.content) # Debug
             self.assertEqual(r.status_code, 200)
             result = r.json()
-            self.assertEqual(result['irods_response']['error_code'], 0)
+            self.assertEqual(result['irods_response']['status_code'], 0)
             self.assertEqual(len(result['rows']), 1)
             self.assertEqual(result['rows'][0][0], os.path.dirname(data_object))
             self.assertEqual(result['rows'][0][1], filename)
@@ -656,7 +656,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             #print(r.content) # Debug
             self.assertEqual(r.status_code, 200)
-            self.assertEqual(r.json()['irods_response']['error_code'], 0)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
             # Create a new unixfilesystem resource.
             r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
@@ -668,7 +668,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             #print(r.content) # Debug
             self.assertEqual(r.status_code, 200)
-            self.assertEqual(r.json()['irods_response']['error_code'], 0)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
             # Create a local file.
             physical_path = f'/tmp/{filename}'
@@ -685,7 +685,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             #print(r.content) # Debug
             self.assertEqual(r.status_code, 200)
-            self.assertEqual(r.json()['irods_response']['error_code'], 0)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
             # Show a new replica exists with the expected replica information.
             r = requests.get(f'{self.url_base}/query', headers=rodsadmin_headers, params={
@@ -696,7 +696,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             #print(r.content) # Debug
             self.assertEqual(r.status_code, 200)
             result = r.json()
-            self.assertEqual(result['irods_response']['error_code'], 0)
+            self.assertEqual(result['irods_response']['status_code'], 0)
             self.assertEqual(len(result['rows']), 1)
             self.assertEqual(result['rows'][0][0], os.path.dirname(data_object))
             self.assertEqual(result['rows'][0][1], filename)
@@ -727,7 +727,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 400)
-        self.assertEqual(r.json()['irods_response']['error_code'], -171000)
+        self.assertEqual(r.json()['irods_response']['status_code'], -171000)
 
     def multipart_form_data_upload(self, **args):
         boundary = '------testing_http_api------'
@@ -778,7 +778,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         parallel_write_handle = result['parallel_write_handle']
 
         # Write to the data object using the parallel write handle.
@@ -801,7 +801,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             for f in concurrent.futures.as_completed(futures):
                 result = f.result()
                 #print(result) # Debug
-                self.assertEqual(result['irods_response']['error_code'], 0)
+                self.assertEqual(result['irods_response']['status_code'], 0)
 
         # End the parallel write.
         r = requests.post(self.url_endpoint, headers=headers, data={
@@ -810,7 +810,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Read the contents of the data object and show it contains exactly what we expect.
         r = requests.get(self.url_endpoint, headers=headers, params={
@@ -826,7 +826,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data={'op': 'remove', 'lpath': data_object, 'no-trash': 1})
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
     def test_modifying_metadata_atomically(self):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -839,7 +839,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Add metadata to the home data object.
         r = requests.post(self.url_endpoint, headers=headers, data={
@@ -856,7 +856,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the metadata exists on the data object.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -867,7 +867,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['rows'][0][0], os.path.dirname(data_object))
         self.assertEqual(result['rows'][0][1], os.path.basename(data_object))
 
@@ -886,7 +886,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the metadata no longer exists on the data object.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -897,7 +897,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 0)
 
         # Remove the data object.
@@ -908,7 +908,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
     def test_modifying_permissions_atomically(self):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -921,7 +921,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Give the rodsadmin read permission on the data object.
         r = requests.post(self.url_endpoint, headers=headers, data={
@@ -936,7 +936,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the rodsadmin now has permission to read the data object.
         r = requests.get(self.url_endpoint, headers=headers, params={
@@ -947,7 +947,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['permissions']), 2)
         #self.assertEqual(result['permissions'][0]['name'], self.rodsuser_username)
         #self.assertEqual(result['permissions'][0]['zone'], self.zone_name)
@@ -967,7 +967,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the permissions have been removed.
         r = requests.get(self.url_endpoint, headers=headers, params={
@@ -978,7 +978,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['permissions']), 1)
         #self.assertEqual(result['permissions'][0]['name'], self.rodsuser_username)
         #self.assertEqual(result['permissions'][0]['zone'], self.zone_name)
@@ -993,7 +993,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
     def test_modifying_replica_properties(self):
         headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
@@ -1006,7 +1006,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the replica is currently marked as good and has a size of 0.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -1017,7 +1017,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['rows'][0][0], '1')
         self.assertEqual(result['rows'][0][1], '0')
 
@@ -1031,7 +1031,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the replica's status and size has changed in the catalog.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -1042,7 +1042,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['rows'][0][0], '0')
         self.assertEqual(result['rows'][0][1], '15')
 
@@ -1054,7 +1054,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
     @unittest.skip('Test needs to be implemented.')
     def test_return_error_on_missing_parameters(self):
@@ -1104,7 +1104,7 @@ class test_query_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertGreater(len(result['rows']), 0)
 
     def test_genquery2_query(self):
@@ -1121,7 +1121,7 @@ class test_query_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertGreater(len(result['rows']), 0)
         self.assertIn(['/tempZone/home/http_api'], result['rows'])
         self.assertIn(['/tempZone/trash/home/http_api'], result['rows'])
@@ -1141,7 +1141,7 @@ class test_query_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertGreater(len(result['sql']), 0)
 
     def test_support_for_specific_queries(self):
@@ -1157,7 +1157,7 @@ class test_query_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertGreaterEqual(len(result['rows']), 0)
 
 class test_resources_endpoint(unittest.TestCase):
@@ -1191,7 +1191,7 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
 
         # Show the replication resource was created.
         r = requests.get(self.url_endpoint, headers=headers, params={'op': 'stat', 'name': resc_repl})
@@ -1199,7 +1199,7 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['exists'], True)
         self.assertIn('id', result['info'])
         self.assertEqual(result['info']['name'], resc_repl)
@@ -1237,7 +1237,7 @@ class test_resources_endpoint(unittest.TestCase):
                 })
                 #print(r.content) # Debug
                 self.assertEqual(r.status_code, 200)
-                self.assertEqual(r.json()['irods_response']['error_code'], 0)
+                self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
                 # Add the unixfilesystem resource as a child of the replication resource.
                 r = requests.post(self.url_endpoint, headers=headers, data={
@@ -1247,7 +1247,7 @@ class test_resources_endpoint(unittest.TestCase):
                 })
                 #print(r.content) # Debug
                 self.assertEqual(r.status_code, 200)
-                self.assertEqual(r.json()['irods_response']['error_code'], 0)
+                self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
                 # Show that the resource was created and configured successfully.
                 r = requests.get(self.url_endpoint, headers=headers, params={'op': 'stat', 'name': resc_name})
@@ -1255,7 +1255,7 @@ class test_resources_endpoint(unittest.TestCase):
                 self.assertEqual(r.status_code, 200)
 
                 result = r.json()
-                self.assertEqual(result['irods_response']['error_code'], 0)
+                self.assertEqual(result['irods_response']['status_code'], 0)
                 self.assertEqual(result['exists'], True)
                 self.assertIn('id', result['info'])
                 self.assertEqual(result['info']['name'], resc_name)
@@ -1286,7 +1286,7 @@ class test_resources_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show there are two replicas under the replication resource hierarchy.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -1297,7 +1297,7 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 2)
 
         resc_tuple = (result['rows'][0][1], result['rows'][1][1])
@@ -1314,7 +1314,7 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
 
         # Show there is only one replica under the replication resource hierarchy.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -1325,7 +1325,7 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 1)
 
         # Launch rebalance.
@@ -1334,7 +1334,7 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
 
         # Give the rebalance operation time to complete!
         time.sleep(3)
@@ -1353,7 +1353,7 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
 
         # Remove resources.
         for resc_name in [resc_ufs0, resc_ufs1]:
@@ -1368,7 +1368,7 @@ class test_resources_endpoint(unittest.TestCase):
                 self.assertEqual(r.status_code, 200)
 
                 result = r.json()
-                self.assertEqual(result['irods_response']['error_code'], 0)
+                self.assertEqual(result['irods_response']['status_code'], 0)
 
                 # Remove ufs resource.
                 r = requests.post(self.url_endpoint, headers=headers, data={'op': 'remove', 'name': resc_name})
@@ -1376,7 +1376,7 @@ class test_resources_endpoint(unittest.TestCase):
                 self.assertEqual(r.status_code, 200)
 
                 result = r.json()
-                self.assertEqual(result['irods_response']['error_code'], 0)
+                self.assertEqual(result['irods_response']['status_code'], 0)
 
                 # Show that the resource no longer exists.
                 r = requests.get(self.url_endpoint, headers=headers, params={'op': 'stat', 'name': resc_name})
@@ -1384,7 +1384,7 @@ class test_resources_endpoint(unittest.TestCase):
                 self.assertEqual(r.status_code, 200)
 
                 result = r.json()
-                self.assertEqual(result['irods_response']['error_code'], 0)
+                self.assertEqual(result['irods_response']['status_code'], 0)
                 self.assertEqual(result['exists'], False)
 
         # Remove replication resource.
@@ -1393,7 +1393,7 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
 
         # Show that the resource no longer exists.
         r = requests.get(self.url_endpoint, headers=headers, params={'op': 'stat', 'name': resc_repl})
@@ -1401,7 +1401,7 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['exists'], False)
 
     def test_modifying_metadata_atomically(self):
@@ -1423,7 +1423,7 @@ class test_resources_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the metadata exists on the resource.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -1434,7 +1434,7 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['rows'][0][0], resource)
 
         # Remove the metadata from the resource.
@@ -1452,7 +1452,7 @@ class test_resources_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the metadata no longer exists on the resource.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -1463,7 +1463,7 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 0)
 
 class test_rules_endpoint(unittest.TestCase):
@@ -1486,7 +1486,7 @@ class test_rules_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertGreater(len(result['rule_engine_plugin_instances']), 0)
 
     def test_execute_rule(self):
@@ -1503,7 +1503,7 @@ class test_rules_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
  
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['stderr'], None)
 
         # The REP always appends a newline character to the result. While we could trim the result,
@@ -1524,7 +1524,7 @@ class test_rules_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
  
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
 
         # Find the delay rule we just created.
         # This query assumes the test suite is running on a system where no other delay
@@ -1537,7 +1537,7 @@ class test_rules_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
  
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 1)
 
         # Remove the delay rule.
@@ -1549,7 +1549,7 @@ class test_rules_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
  
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
 
 class test_tickets_endpoint(unittest.TestCase):
 
@@ -1574,7 +1574,7 @@ class test_tickets_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
 
         # Create a ticket.
         ticket_type = 'read'
@@ -1589,7 +1589,7 @@ class test_tickets_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         ticket_string = result['ticket']
         self.assertGreater(len(ticket_string), 0)
 
@@ -1604,7 +1604,7 @@ class test_tickets_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['rows'][0][0], ticket_string)
         self.assertEqual(result['rows'][0][1], ticket_type)
         self.assertEqual(result['rows'][0][2], os.path.basename(data_object))
@@ -1616,7 +1616,7 @@ class test_tickets_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
 
         # Show the ticket no longer exists.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -1627,7 +1627,7 @@ class test_tickets_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 0)
 
         # Remove the data object.
@@ -1640,7 +1640,7 @@ class test_tickets_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
 
     def test_create_and_remove_ticket_for_collection(self):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -1665,7 +1665,7 @@ class test_tickets_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         ticket_string = result['ticket']
         self.assertGreater(len(ticket_string), 0)
 
@@ -1680,7 +1680,7 @@ class test_tickets_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['rows'][0][0], ticket_string)
         self.assertEqual(result['rows'][0][1], ticket_type)
         self.assertEqual(result['rows'][0][2], ticket_path)
@@ -1695,7 +1695,7 @@ class test_tickets_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
 
         # Show the ticket no longer exists.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -1706,7 +1706,7 @@ class test_tickets_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 0)
 
     @unittest.skip('Test and HTTP API operation need to be implemented.')
@@ -1744,7 +1744,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
-        self.assertEqual(stat_info['irods_response']['error_code'], 0)
+        self.assertEqual(stat_info['irods_response']['status_code'], 0)
         self.assertEqual(stat_info['exists'], True)
         self.assertIn('id', stat_info)
         self.assertEqual(stat_info['local_unique_name'], f'{new_username}#{self.zone_name}')
@@ -1774,7 +1774,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
-        self.assertEqual(stat_info['irods_response']['error_code'], 0)
+        self.assertEqual(stat_info['irods_response']['status_code'], 0)
         self.assertEqual(stat_info['exists'], True)
         self.assertIn('id', stat_info)
         self.assertEqual(stat_info['local_unique_name'], f'{new_username}#{self.zone_name}')
@@ -1804,7 +1804,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
-        self.assertEqual(stat_info['irods_response']['error_code'], 0)
+        self.assertEqual(stat_info['irods_response']['status_code'], 0)
         self.assertEqual(stat_info['exists'], True)
         self.assertIn('id', stat_info)
         self.assertEqual(stat_info['local_unique_name'], f'{new_username}#{self.zone_name}')
@@ -1825,7 +1825,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data=data)
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Stat the group.
         params = {'op': 'stat', 'name': new_group}
@@ -1834,7 +1834,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
-        self.assertEqual(stat_info['irods_response']['error_code'], 0)
+        self.assertEqual(stat_info['irods_response']['status_code'], 0)
         self.assertEqual(stat_info['exists'], True)
         self.assertIn('id', stat_info)
         self.assertEqual(stat_info['type'], 'rodsgroup')
@@ -1846,14 +1846,14 @@ class test_users_groups_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data=data)
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
  
         # Add user to group.
         data = {'op': 'add_to_group', 'group': new_group, 'user': new_username, 'zone': self.zone_name}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show that the user is a member of the group.
         params = {'op': 'is_member_of_group', 'group': new_group, 'user': new_username, 'zone': self.zone_name}
@@ -1861,7 +1861,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['is_member'], True)
 
         # Remove user from group.
@@ -1869,31 +1869,31 @@ class test_users_groups_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data=data)
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Remove the user.
         data = {'op': 'remove_user', 'name': new_username, 'zone': self.zone_name}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Remove group.
         data = {'op': 'remove_group', 'name': new_group}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show that the group no longer exists.
         params = {'op': 'stat', 'name': new_group}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         stat_info = r.json()
-        self.assertEqual(stat_info['irods_response']['error_code'], 0)
+        self.assertEqual(stat_info['irods_response']['status_code'], 0)
         self.assertEqual(stat_info['exists'], False)
 
     def test_only_a_rodsadmin_can_change_the_type_of_a_user(self):
@@ -1906,7 +1906,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data=data)
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show that a rodsadmin can change the type of the new user.
         new_user_type = 'groupadmin'
@@ -1914,7 +1914,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data=data)
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show that a non-admin cannot change the new user's password.
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -1922,7 +1922,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data=data)
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 400)
-        self.assertNotEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertNotEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show that the user type matches the type set by the rodsadmin.
         params = {'op': 'stat', 'name': new_username, 'zone': self.zone_name}
@@ -1931,7 +1931,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
-        self.assertEqual(stat_info['irods_response']['error_code'], 0)
+        self.assertEqual(stat_info['irods_response']['status_code'], 0)
         self.assertEqual(stat_info['exists'], True)
         self.assertEqual(stat_info['local_unique_name'], f'{new_username}#{self.zone_name}')
         self.assertEqual(stat_info['type'], new_user_type)
@@ -1942,7 +1942,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data=data)
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
     def test_rodsusers_cannot_change_passwords(self):
         headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
@@ -1957,7 +1957,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 400)
-        self.assertNotEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertNotEqual(r.json()['irods_response']['status_code'], 0)
 
         # Authenticate as the user to prove the first password modification was successful.
         r = requests.post(f'{self.url_base}/authenticate', auth=(self.rodsuser_username, config.test_config['rodsuser']['password']))
@@ -1969,7 +1969,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertIn({'name': self.rodsadmin_username, 'zone': self.zone_name}, result['users'])
         self.assertIn({'name': self.rodsuser_username, 'zone': self.zone_name}, result['users'])
 
@@ -1981,14 +1981,14 @@ class test_users_groups_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data={'op': 'create_group', 'name': new_group})
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Get all groups.
         r = requests.get(self.url_endpoint, headers={'Authorization': f'Bearer {self.rodsuser_bearer_token}'}, params={'op': 'groups'})
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertIn('public', result['groups'])
         self.assertIn(new_group, result['groups'])
 
@@ -1996,7 +1996,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data={'op': 'remove_group', 'name': new_group})
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
     def test_modifying_metadata_atomically(self):
         headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
@@ -2017,7 +2017,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the metadata exists on the user.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -2028,7 +2028,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['rows'][0][0], username)
 
         # Remove the metadata from the user.
@@ -2046,7 +2046,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['irods_response']['error_code'], 0)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the metadata no longer exists on the user.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
@@ -2057,7 +2057,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 0)
 
     @unittest.skip('Test needs to be implemented.')
@@ -2120,7 +2120,7 @@ class test_zones_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
-        self.assertEqual(result['irods_response']['error_code'], 0)
+        self.assertEqual(result['irods_response']['status_code'], 0)
 
         zone_report = result['zone_report']
         self.assertIn('schema_version', zone_report)

@@ -198,7 +198,7 @@ namespace
 
 						if (ec < 0) {
 							res.result(http::status::bad_request);
-							res.body() = json{{"irods_response", {{"error_code", ec}}}}.dump();
+							res.body() = json{{"irods_response", {{"status_code", ec}}}}.dump();
 						}
 
 						if (0 == input.sql_only) {
@@ -206,19 +206,19 @@ namespace
 							// because this avoids the need to parse the GenQuery2 results into an nlohmann
 							// JSON object just to serialize it for the response.
 							constexpr const auto* json_fmt_string =
-								R"_({{"irods_response":{{"error_code":0}},"rows":{}}})_";
+								R"_({{"irods_response":{{"status_code":0}},"rows":{}}})_";
 							res.body() = fmt::format(json_fmt_string, output);
 						}
 						else {
 							constexpr const auto* json_fmt_string =
-								R"_({{"irods_response":{{"error_code":0}},"sql":"{}"}})_";
+								R"_({{"irods_response":{{"status_code":0}},"sql":"{}"}})_";
 							res.body() = fmt::format(json_fmt_string, output);
 						}
 #else
 						res.result(http::status::bad_request);
 						res.body() = json{{"irods_response",
-					                       {{"error_code", 0},
-					                        {"error_message", "GenQuery2 not enabled. Use GenQuery1 parser."}}}}
+					                       {{"status_code", 0},
+					                        {"status_message", "GenQuery2 not enabled. Use GenQuery1 parser."}}}}
 					                     .dump();
 #endif // IRODS_ENABLE_GENQUERY2
 					}
@@ -275,7 +275,7 @@ namespace
 						res.body() = json{
 							{"irods_response",
 					         {
-								 {"error_code", 0},
+								 {"status_code", 0},
 							 }},
 							{"rows",
 					         rows}}.dump();
@@ -284,7 +284,7 @@ namespace
 				catch (const irods::exception& e) {
 					res.result(http::status::bad_request);
 					res.body() =
-						json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
@@ -408,7 +408,7 @@ namespace
 				res.body() = json{
 					{"irods_response",
 				     {
-						 {"error_code", 0},
+						 {"status_code", 0},
 					 }},
 					{"rows",
 				     rows}}.dump();
@@ -416,7 +416,7 @@ namespace
 			catch (const irods::exception& e) {
 				res.result(http::status::bad_request);
 				res.body() =
-					json{{"irods_response", {{"error_code", e.code()}, {"error_message", e.client_display_what()}}}}
+					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {

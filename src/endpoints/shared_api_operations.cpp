@@ -73,7 +73,7 @@ namespace irods::http::shared_api_operations
 								return _sess_ptr->send(irods::http::fail(
 									res,
 									::http::status::bad_request,
-									json{{"irods_response", {{"error_code", NOT_A_DATA_OBJECT}}}}.dump()));
+									json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump()));
 							}
 							break;
 
@@ -82,7 +82,7 @@ namespace irods::http::shared_api_operations
 								return _sess_ptr->send(irods::http::fail(
 									res,
 									::http::status::bad_request,
-									json{{"irods_response", {{"error_code", NOT_A_COLLECTION}}}}.dump()));
+									json{{"irods_response", {{"status_code", NOT_A_COLLECTION}}}}.dump()));
 							}
 							break;
 
@@ -111,7 +111,7 @@ namespace irods::http::shared_api_operations
 						res.result(::http::status::bad_request);
 					}
 
-					json response{{"irods_response", {{"error_code", ec}}}};
+					json response{{"irods_response", {{"status_code", ec}}}};
 
 					if (output) {
 						response.at("irods_response")["failed_operation"] = json::parse(output);
@@ -124,8 +124,8 @@ namespace irods::http::shared_api_operations
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							{"error_code", e.code()},
-							{"error_message", e.client_display_what()}
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
 						}}
 					}.dump();
 					// clang-format on
@@ -224,7 +224,7 @@ namespace irods::http::shared_api_operations
 						res.result(::http::status::bad_request);
 					}
 
-					json response{{"irods_response", {{"error_code", ec}}}};
+					json response{{"irods_response", {{"status_code", ec}}}};
 
 					if (output) {
 						response.at("irods_response")["failed_operation"] = json::parse(output);
@@ -237,8 +237,8 @@ namespace irods::http::shared_api_operations
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
-							{"error_code", e.code()},
-							{"error_message", e.client_display_what()}}
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}}
 						}
 					}.dump();
 					// clang-format on
