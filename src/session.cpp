@@ -35,6 +35,11 @@ namespace irods::http
 	{
 	} // session (constructor)
 
+	auto session::ip() const -> std::string
+	{
+		return stream_.socket().remote_endpoint().address().to_string();
+	} // ip
+
 	// Start the asynchronous operation
 	auto session::run() -> void
 	{
