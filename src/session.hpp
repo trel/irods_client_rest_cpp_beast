@@ -28,6 +28,8 @@ namespace irods::http
 			int _max_rbuffer_size,
 			int _timeout_in_seconds);
 
+		auto ip() const -> std::string;
+
 		auto run() -> void;
 
 		auto do_read() -> void;
