@@ -202,9 +202,7 @@ namespace
 						}
 
 						if (0 == input.sql_only) {
-							// The string below contains a format placeholder for the "rows" property
-							// because this avoids the need to parse the GenQuery2 results into an nlohmann
-							// JSON object just to serialize it for the response.
+							// This is a performance optimization.
 							constexpr const auto* json_fmt_string =
 								R"_({{"irods_response":{{"status_code":0}},"rows":{}}})_";
 							res.body() = fmt::format(json_fmt_string, output);
@@ -284,9 +282,9 @@ namespace
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
 					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
+					res.body() = json{{"irods_response",
+				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+				                     .dump();
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
