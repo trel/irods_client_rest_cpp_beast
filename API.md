@@ -724,24 +724,28 @@ If there was an error, expect either an HTTP status code in the 4XX or 5XX range
 
 Writes bytes to a data object.
 
-To write to a data object in parallel, see [parallel-write-init](#parallel-write-init).
-
 #### Request
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
-    --data-urlencode 'op=write' \
-    --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
-    --data-urlencode 'resource=<string>' \ # The root resource to write to. Optional.
-    --data-urlencode 'offset=<integer>' \ # Number of bytes to skip. Defaults to 0.
-    --data-urlencode 'count=<integer>' \ # Number of bytes to write.
-    --data-urlencode 'truncate=<integer>' \ # 0 or 1. Defaults to 1. Truncates the data object before writing.
-    --data-urlencode 'append=<integer>' \ # 0 or 1. Defaults to 0. Appends the bytes to the data object.
-    --data-urlencode 'bytes=<binary_data>' \ # The bytes to write.
-    --data-urlencode 'parallel-write-handle=<string>' \ # The handle to use when writing in parallel.
-    --data-urlencode 'stream-index=<integer>' # The stream to use when writing in parallel.
+    [-F,--data-urlencode] 'op=write' \
+    [-F,--data-urlencode] 'lpath=<string>' \ # Absolute logical path to a data object.
+    [-F,--data-urlencode] 'resource=<string>' \ # The root resource to write to. Optional.
+    [-F,--data-urlencode] 'offset=<integer>' \ # Number of bytes to skip. Defaults to 0.
+    [-F,--data-urlencode] 'count=<integer>' \ # Number of bytes to write.
+    [-F,--data-urlencode] 'truncate=<integer>' \ # 0 or 1. Defaults to 1. Truncates the data object before writing.
+    [-F,--data-urlencode] 'append=<integer>' \ # 0 or 1. Defaults to 0. Appends the bytes to the data object.
+    [-F,--data-urlencode] 'bytes=<binary_data>;type=application/octet-stream' \ # The bytes to write.
+    [-F,--data-urlencode] 'parallel-write-handle=<string>' \ # The handle to use when writing in parallel. Optional.
+    [-F,--data-urlencode] 'stream-index=<integer>' # The stream to use when writing in parallel. Optional.
 ```
+
+This is the full set of parameters supported by the operation.
+
+When sending large amounts of data or writing in parallel, prefer multipart/form-data over application/x-www-form-urlencoded as the Content-Type.
+
+`parallel-write-handle` and `stream-index` only apply when writing to a replica in parallel. To obtain a parallel-write-handle, see [parallel-write-init](#parallel-write-init).
 
 #### Response
 
