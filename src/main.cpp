@@ -594,10 +594,10 @@ auto main(int _argc, char* _argv[]) -> int
 	}
 	catch (const irods::exception& e) {
 		fmt::print(stderr, "Error: {}\n", e.client_display_what());
-		return 1;
 	}
 	catch (const std::exception& e) {
 		fmt::print(stderr, "Error: {}\n", e.what());
-		return 1;
 	}
+
+	return 1;
 } // main

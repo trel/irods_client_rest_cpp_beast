@@ -74,7 +74,7 @@ namespace irods::http::handler
 					std::string_view(static_cast<char*>(bbuf->buf), bbuf->len));
 			}
 			catch (const std::exception& e) {
-				log::error("{}: Caught exception while writing zone report to HTTP body: {}", fn, e.what());
+				log::error("{}: {}", fn, e.what());
 			}
 
 			res.prepare_payload();

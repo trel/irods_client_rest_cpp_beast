@@ -140,6 +140,7 @@ namespace
             try {
             }
             catch (const irods::exception& e) {
+				log::error("{}: {}", fn, e.client_display_what());
                 res.result(http::status::bad_request);
                 res.body() = json{
                     {"irods_response", {
@@ -149,6 +150,7 @@ namespace
                 }.dump();
             }
             catch (const std::exception& e) {
+				log::error("{}: {}", fn, e.what());
                 res.result(http::status::internal_server_error);
             }
 
@@ -185,6 +187,7 @@ namespace
             try {
             }
             catch (const irods::exception& e) {
+				log::error("{}: {}", fn, e.client_display_what());
                 res.result(http::status::bad_request);
                 res.body() = json{
                     {"irods_response", {
@@ -194,6 +197,7 @@ namespace
                 }.dump();
             }
             catch (const std::exception& e) {
+				log::error("{}: {}", fn, e.what());
                 res.result(http::status::internal_server_error);
             }
 
@@ -324,12 +328,14 @@ namespace
 				     ticket}}.dump();
 			}
 			catch (const irods::exception& e) {
+				log::error("{}: {}", fn, e.client_display_what());
 				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
+				log::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -374,12 +380,14 @@ namespace
 						 }}}.dump();
 				}
 				catch (const irods::exception& e) {
+					log::error("{}: {}", fn, e.client_display_what());
 					res.result(http::status::bad_request);
 					res.body() =
 						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 							.dump();
 				}
 				catch (const std::exception& e) {
+					log::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
