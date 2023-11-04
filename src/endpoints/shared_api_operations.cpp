@@ -120,6 +120,7 @@ namespace irods::http::shared_api_operations
 					res.body() = response.dump();
 				}
 				catch (const irods::exception& e) {
+					log::error("{}: {}", fn, e.client_display_what());
 					res.result(::http::status::bad_request);
 					// clang-format off
 					res.body() = json{
@@ -131,6 +132,7 @@ namespace irods::http::shared_api_operations
 					// clang-format on
 				}
 				catch (const std::exception& e) {
+					log::error("{}: {}", fn, e.what());
 					res.result(::http::status::internal_server_error);
 				}
 
@@ -233,6 +235,7 @@ namespace irods::http::shared_api_operations
 					res.body() = response.dump();
 				}
 				catch (const irods::exception& e) {
+					log::error("{}: {}", fn, e.client_display_what());
 					res.result(::http::status::bad_request);
 					// clang-format off
 					res.body() = json{
@@ -244,6 +247,7 @@ namespace irods::http::shared_api_operations
 					// clang-format on
 				}
 				catch (const std::exception& e) {
+					log::error("{}: {}", fn, e.what());
 					res.result(::http::status::internal_server_error);
 				}
 

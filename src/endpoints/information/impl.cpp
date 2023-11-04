@@ -58,7 +58,7 @@ namespace irods::http::handler
 			return _sess_ptr->send(std::move(res));
 		}
 		catch (const std::exception& e) {
-			log::error("{}: Caught exception while processing /info request: {}", __func__, e.what());
+			log::error("{}: {}", __func__, e.what());
 		}
 	} // information
 } //namespace irods::http::handler
