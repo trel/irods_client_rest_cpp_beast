@@ -319,90 +319,58 @@ namespace
 
 		const auto client_info = result.client_info;
 
-		irods::http::globals::background_task(
-			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+		irods::http::globals::background_task([fn = __func__,
+		                                       client_info,
+		                                       _sess_ptr,
+		                                       _req = std::move(_req),
+		                                       _args = std::move(_args)] {
+			log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
-				http::response<http::string_body> res{http::status::ok, _req.version()};
-				res.set(http::field::server, irods::http::version::server_name);
-				res.set(http::field::content_type, "application/json");
-				res.keep_alive(_req.keep_alive());
+			http::response<http::string_body> res{http::status::ok, _req.version()};
+			res.set(http::field::server, irods::http::version::server_name);
+			res.set(http::field::content_type, "application/json");
+			res.keep_alive(_req.keep_alive());
 
-				try {
-					const auto lpath_iter = _args.find("lpath");
-					if (lpath_iter == std::end(_args)) {
-						log::error("{}: Missing [lpath] parameter.", fn);
-						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-					}
+			try {
+				const auto lpath_iter = _args.find("lpath");
+				if (lpath_iter == std::end(_args)) {
+					log::error("{}: Missing [lpath] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+				}
 
-					auto conn = irods::get_connection(client_info.username);
+				auto conn = irods::get_connection(client_info.username);
 
-					// Enable ticket if the request includes one.
-					if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
-						if (const auto ec = irods::enable_ticket(conn, iter->second); ec < 0) {
-							res.result(http::status::internal_server_error);
-							res.body() =
-								json{{"irods_response",
-						              {{"status_code", ec}, {"status_message", "Error enabling ticket on connection."}}}}
-									.dump();
-							res.prepare_payload();
-							return _sess_ptr->send(std::move(res));
-						}
-					}
-
-					io::client::native_transport tp{conn};
-					io::idstream in{tp, lpath_iter->second};
-
-					if (!in) {
-						log::error("{}: Could not open data object [{}] for read.", fn, lpath_iter->second);
-						res.result(http::status::bad_request);
+				// Enable ticket if the request includes one.
+				if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
+					if (const auto ec = irods::enable_ticket(conn, iter->second); ec < 0) {
+						res.result(http::status::internal_server_error);
+						res.body() =
+							json{{"irods_response",
+						          {{"status_code", ec}, {"status_message", "Error enabling ticket on connection."}}}}
+								.dump();
 						res.prepare_payload();
 						return _sess_ptr->send(std::move(res));
 					}
+				}
 
-					auto iter = _args.find("offset");
-					if (iter != std::end(_args)) {
-						try {
-							in.seekg(std::stoll(iter->second));
-						}
-						catch (const std::exception& e) {
-							log::error(
-								"{}: Could not seek to position [{}] in data object [{}].",
-								fn,
-								iter->second,
-								lpath_iter->second);
-							res.result(http::status::bad_request);
-							res.prepare_payload();
-							return _sess_ptr->send(std::move(res));
-						}
-					}
+				io::client::native_transport tp{conn};
+				io::idstream in{tp, lpath_iter->second};
 
-					std::vector<char> buffer;
+				if (!in) {
+					log::error("{}: Could not open data object [{}] for read.", fn, lpath_iter->second);
+					res.result(http::status::bad_request);
+					res.prepare_payload();
+					return _sess_ptr->send(std::move(res));
+				}
 
-					iter = _args.find("count");
-					if (iter == std::end(_args)) {
-						res.result(http::status::bad_request);
-						res.prepare_payload();
-						return _sess_ptr->send(std::move(res));
-					}
-
+				auto iter = _args.find("offset");
+				if (iter != std::end(_args)) {
 					try {
-						const auto count = std::stoi(iter->second);
-
-						if (count > irods::http::globals::configuration()
-					                    .at(json::json_pointer{"/irods_client/max_rbuffer_size_in_bytes"})
-					                    .get<int>())
-						{
-							res.result(http::status::bad_request);
-							res.prepare_payload();
-							return _sess_ptr->send(std::move(res));
-						}
-
-						buffer.resize(count);
+						in.seekg(std::stoll(iter->second));
 					}
 					catch (const std::exception& e) {
 						log::error(
-							"{}: Could not initialize read buffer to size [{}] for data object [{}].",
+							"{}: Could not seek to position [{}] in data object [{}].",
 							fn,
 							iter->second,
 							lpath_iter->second);
@@ -410,35 +378,69 @@ namespace
 						res.prepare_payload();
 						return _sess_ptr->send(std::move(res));
 					}
-
-					in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-
-					res.set(http::field::content_type, "application/octet-stream");
-					res.body() = std::string_view(buffer.data(), in.gcount());
 				}
-				catch (const fs::filesystem_error& e) {
-					log::error("{}: {}", fn, e.what());
+
+				std::vector<char> buffer;
+
+				iter = _args.find("count");
+				if (iter == std::end(_args)) {
 					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
-							.dump();
+					res.prepare_payload();
+					return _sess_ptr->send(std::move(res));
 				}
-				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
+
+				try {
+					const auto count = std::stoi(iter->second);
+
+					if (count > irods::http::globals::configuration()
+					                .at(json::json_pointer{"/irods_client/max_rbuffer_size_in_bytes"})
+					                .get<int>())
+					{
+						res.result(http::status::bad_request);
+						res.prepare_payload();
+						return _sess_ptr->send(std::move(res));
+					}
+
+					buffer.resize(count);
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
-					res.result(http::status::internal_server_error);
+					log::error(
+						"{}: Could not initialize read buffer to size [{}] for data object [{}].",
+						fn,
+						iter->second,
+						lpath_iter->second);
+					res.result(http::status::bad_request);
+					res.prepare_payload();
+					return _sess_ptr->send(std::move(res));
 				}
 
-				res.prepare_payload();
+				in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
 
-				_sess_ptr->send(std::move(res));
-			});
+				res.set(http::field::content_type, "application/octet-stream");
+				res.body() = std::string_view(buffer.data(), in.gcount());
+			}
+			catch (const fs::filesystem_error& e) {
+				log::error("{}: {}", fn, e.what());
+				res.result(http::status::bad_request);
+				res.body() =
+					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
+			}
+			catch (const irods::exception& e) {
+				log::error("{}: {}", fn, e.client_display_what());
+				res.result(http::status::bad_request);
+				res.body() =
+					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+						.dump();
+			}
+			catch (const std::exception& e) {
+				log::error("{}: {}", fn, e.what());
+				res.result(http::status::internal_server_error);
+			}
+
+			res.prepare_payload();
+
+			_sess_ptr->send(std::move(res));
+		});
 	} // op_read
 
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_write)
@@ -556,10 +558,10 @@ namespace
 					if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
 						if (const auto ec = irods::enable_ticket(conn, iter->second); ec < 0) {
 							res.result(http::status::internal_server_error);
-							res.body() =
-								json{{"irods_response",
-							          {{"status_code", ec}, {"status_message", "Error enabling ticket on connection."}}}}
-									.dump();
+							res.body() = json{{"irods_response",
+							                   {{"status_code", ec},
+							                    {"status_message", "Error enabling ticket on connection."}}}}
+							                 .dump();
 							res.prepare_payload();
 							return _sess_ptr->send(std::move(res));
 						}
@@ -831,85 +833,83 @@ namespace
 
 		const auto client_info = result.client_info;
 
-		irods::http::globals::background_task(
-			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+		irods::http::globals::background_task([fn = __func__,
+		                                       client_info,
+		                                       _sess_ptr,
+		                                       _req = std::move(_req),
+		                                       _args = std::move(_args)] {
+			log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
-				http::response<http::string_body> res{http::status::ok, _req.version()};
-				res.set(http::field::server, irods::http::version::server_name);
-				res.set(http::field::content_type, "application/json");
-				res.keep_alive(_req.keep_alive());
+			http::response<http::string_body> res{http::status::ok, _req.version()};
+			res.set(http::field::server, irods::http::version::server_name);
+			res.set(http::field::content_type, "application/json");
+			res.keep_alive(_req.keep_alive());
 
-				try {
-					// 1. Verify transfer handle and lookup PTC.
-				    // 2. Close all streams in reverse order.
-				    // 3. Disassociate the transfer handle and PTC.
-				    // 4. Free resources.
+			try {
+				// 1. Verify transfer handle and lookup PTC.
+				// 2. Close all streams in reverse order.
+				// 3. Disassociate the transfer handle and PTC.
+				// 4. Free resources.
 
-					const auto parallel_write_handle_iter = _args.find("parallel-write-handle");
-					if (parallel_write_handle_iter == std::end(_args)) {
-						log::error("{}: Missing [parallel-write-handle] parameter.", fn);
-						return _sess_ptr->send(irods::http::fail(http::status::bad_request));
-					}
+				const auto parallel_write_handle_iter = _args.find("parallel-write-handle");
+				if (parallel_write_handle_iter == std::end(_args)) {
+					log::error("{}: Missing [parallel-write-handle] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+				}
 
-					log::debug("{}: (shutdown) Parallel Write Handle = [{}].", fn, parallel_write_handle_iter->second);
+				log::debug("{}: (shutdown) Parallel Write Handle = [{}].", fn, parallel_write_handle_iter->second);
 
-					{
-						std::scoped_lock lk{pwc_mtx};
+				{
+					std::scoped_lock lk{pwc_mtx};
 
-						const auto pw_iter = parallel_write_contexts.find(parallel_write_handle_iter->second);
-						if (pw_iter != std::end(parallel_write_contexts)) {
-							// Ignore the first stream. It must be closed last so that replication resources
-						    // are triggered correctly.
-							auto end = std::prev(std::rend(pw_iter->second.streams));
+					const auto pw_iter = parallel_write_contexts.find(parallel_write_handle_iter->second);
+					if (pw_iter != std::end(parallel_write_contexts)) {
+						// Ignore the first stream. It must be closed last so that replication resources
+						// are triggered correctly.
+						auto end = std::prev(std::rend(pw_iter->second.streams));
 
-							io::on_close_success close_input{};
-							close_input.update_size = false;
-							close_input.update_status = false;
-							close_input.compute_checksum = false;
-							close_input.send_notifications = false;
-							close_input.preserve_replica_state_table = false;
+						io::on_close_success close_input{};
+						close_input.update_size = false;
+						close_input.update_status = false;
+						close_input.compute_checksum = false;
+						close_input.send_notifications = false;
+						close_input.preserve_replica_state_table = false;
 
-							for (auto iter = std::rbegin(pw_iter->second.streams); iter != end; ++iter) {
-								(*iter)->stream().close(&close_input);
-							}
-
-							// Allow the first stream to update the catalog.
-							pw_iter->second.streams.front()->stream().close();
-
-							parallel_write_contexts.erase(pw_iter);
+						for (auto iter = std::rbegin(pw_iter->second.streams); iter != end; ++iter) {
+							(*iter)->stream().close(&close_input);
 						}
+
+						// Allow the first stream to update the catalog.
+						pw_iter->second.streams.front()->stream().close();
+
+						parallel_write_contexts.erase(pw_iter);
 					}
-
-					res.body() = json{
-						{"irods_response",
-				         {
-							 {"status_code", 0},
-						 }}}.dump();
-				}
-				catch (const fs::filesystem_error& e) {
-					log::error("{}: {}", fn, e.what());
-					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
-							.dump();
-				}
-				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
-				}
-				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
-					res.result(http::status::internal_server_error);
 				}
 
-				res.prepare_payload();
+				res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
+			}
+			catch (const fs::filesystem_error& e) {
+				log::error("{}: {}", fn, e.what());
+				res.result(http::status::bad_request);
+				res.body() =
+					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
+			}
+			catch (const irods::exception& e) {
+				log::error("{}: {}", fn, e.client_display_what());
+				res.result(http::status::bad_request);
+				res.body() =
+					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+						.dump();
+			}
+			catch (const std::exception& e) {
+				log::error("{}: {}", fn, e.what());
+				res.result(http::status::internal_server_error);
+			}
 
-				_sess_ptr->send(std::move(res));
-			});
+			res.prepare_payload();
+
+			_sess_ptr->send(std::move(res));
+		});
 	} // op_parallel_write_shutdown
 
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_replicate)
@@ -973,9 +973,9 @@ namespace
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
 					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
+					res.body() = json{{"irods_response",
+				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+				                     .dump();
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
@@ -1047,9 +1047,9 @@ namespace
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
 					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
+					res.body() = json{{"irods_response",
+				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+				                     .dump();
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
@@ -1170,94 +1170,93 @@ namespace
 
 		const auto client_info = result.client_info;
 
-		irods::http::globals::background_task(
-			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+		irods::http::globals::background_task([fn = __func__,
+		                                       client_info,
+		                                       _sess_ptr,
+		                                       _req = std::move(_req),
+		                                       _args = std::move(_args)] {
+			log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
-				http::response<http::string_body> res{http::status::ok, _req.version()};
-				res.set(http::field::server, irods::http::version::server_name);
-				res.set(http::field::content_type, "application/json");
-				res.keep_alive(_req.keep_alive());
+			http::response<http::string_body> res{http::status::ok, _req.version()};
+			res.set(http::field::server, irods::http::version::server_name);
+			res.set(http::field::content_type, "application/json");
+			res.keep_alive(_req.keep_alive());
 
-				try {
-					const auto lpath_iter = _args.find("lpath");
-					if (lpath_iter == std::end(_args)) {
-						log::error("{}: Missing [lpath] parameter.", fn);
-						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-					}
-
-					auto conn = irods::get_connection(client_info.username);
-
-					// Enable ticket if the request includes one.
-					if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
-						if (const auto ec = irods::enable_ticket(conn, iter->second); ec < 0) {
-							res.result(http::status::internal_server_error);
-							res.body() =
-								json{{"irods_response",
-						              {{"status_code", ec}, {"status_message", "Error enabling ticket on connection."}}}}
-									.dump();
-							res.prepare_payload();
-							return _sess_ptr->send(std::move(res));
-						}
-					}
-
-					const auto status = fs::client::status(conn, lpath_iter->second);
-
-					if (!fs::client::is_data_object(status)) {
-						return _sess_ptr->send(irods::http::fail(
-							res,
-							http::status::bad_request,
-							json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump()));
-					}
-
-					json perms;
-					for (auto&& ep : status.permissions()) {
-						perms.push_back(json{
-							{"name", ep.name},
-							{"zone", ep.zone},
-							{"type", ep.type},
-							{"perm", irods::to_permission_string(ep.prms)},
-						});
-					}
-
-					res.body() =
-						json{
-							{"irods_response",
-				             {
-								 {"status_code", 0},
-							 }},
-							{"type", irods::to_object_type_string(status.type())},
-							{"permissions", perms},
-							{"size", fs::client::data_object_size(conn, lpath_iter->second)},
-							{"checksum", fs::client::data_object_checksum(conn, lpath_iter->second)},
-							{"registered", fs::client::is_data_object_registered(conn, lpath_iter->second)},
-							{"modified_at",
-				             fs::client::last_write_time(conn, lpath_iter->second).time_since_epoch().count()}}
-							.dump();
-				}
-				catch (const fs::filesystem_error& e) {
-					log::error("{}: {}", fn, e.what());
-					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
-							.dump();
-				}
-				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
-				}
-				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
-					res.result(http::status::internal_server_error);
+			try {
+				const auto lpath_iter = _args.find("lpath");
+				if (lpath_iter == std::end(_args)) {
+					log::error("{}: Missing [lpath] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
-				res.prepare_payload();
+				auto conn = irods::get_connection(client_info.username);
 
-				_sess_ptr->send(std::move(res));
-			});
+				// Enable ticket if the request includes one.
+				if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
+					if (const auto ec = irods::enable_ticket(conn, iter->second); ec < 0) {
+						res.result(http::status::internal_server_error);
+						res.body() =
+							json{{"irods_response",
+						          {{"status_code", ec}, {"status_message", "Error enabling ticket on connection."}}}}
+								.dump();
+						res.prepare_payload();
+						return _sess_ptr->send(std::move(res));
+					}
+				}
+
+				const auto status = fs::client::status(conn, lpath_iter->second);
+
+				if (!fs::client::is_data_object(status)) {
+					return _sess_ptr->send(irods::http::fail(
+						res,
+						http::status::bad_request,
+						json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump()));
+				}
+
+				json perms;
+				for (auto&& ep : status.permissions()) {
+					perms.push_back(json{
+						{"name", ep.name},
+						{"zone", ep.zone},
+						{"type", ep.type},
+						{"perm", irods::to_permission_string(ep.prms)},
+					});
+				}
+
+				res.body() =
+					json{
+						{"irods_response", {{"status_code", 0}}},
+						{"type", irods::to_object_type_string(status.type())},
+						{"permissions", perms},
+						{"size", fs::client::data_object_size(conn, lpath_iter->second)},
+						{"checksum", fs::client::data_object_checksum(conn, lpath_iter->second)},
+						{"registered", fs::client::is_data_object_registered(conn, lpath_iter->second)},
+						{"modified_at",
+				         fs::client::last_write_time(conn, lpath_iter->second).time_since_epoch().count()}}
+						.dump();
+			}
+			catch (const fs::filesystem_error& e) {
+				log::error("{}: {}", fn, e.what());
+				res.result(http::status::bad_request);
+				res.body() =
+					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
+			}
+			catch (const irods::exception& e) {
+				log::error("{}: {}", fn, e.client_display_what());
+				res.result(http::status::bad_request);
+				res.body() =
+					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+						.dump();
+			}
+			catch (const std::exception& e) {
+				log::error("{}: {}", fn, e.what());
+				res.result(http::status::internal_server_error);
+			}
+
+			res.prepare_payload();
+
+			_sess_ptr->send(std::move(res));
+		});
 	} // op_stat
 
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_register)
@@ -1333,9 +1332,9 @@ namespace
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
 					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
+					res.body() = json{{"irods_response",
+				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+				                     .dump();
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
@@ -1357,69 +1356,71 @@ namespace
 
 		const auto client_info = result.client_info;
 
-		irods::http::globals::background_task(
-			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+		irods::http::globals::background_task([fn = __func__,
+		                                       client_info,
+		                                       _sess_ptr,
+		                                       _req = std::move(_req),
+		                                       _args = std::move(_args)] {
+			log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
-				http::response<http::string_body> res{http::status::ok, _req.version()};
-				res.set(http::field::server, irods::http::version::server_name);
-				res.set(http::field::content_type, "application/json");
-				res.keep_alive(_req.keep_alive());
+			http::response<http::string_body> res{http::status::ok, _req.version()};
+			res.set(http::field::server, irods::http::version::server_name);
+			res.set(http::field::content_type, "application/json");
+			res.keep_alive(_req.keep_alive());
 
-				try {
-					const auto lpath_iter = _args.find("lpath");
-					if (lpath_iter == std::end(_args)) {
-						log::error("{}: Missing [lpath] parameter.", fn);
-						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-					}
-
-					auto conn = irods::get_connection(client_info.username);
-
-					if (!fs::client::is_data_object(conn, lpath_iter->second)) {
-						return _sess_ptr->send(irods::http::fail(
-							res,
-							http::status::bad_request,
-							json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump()));
-					}
-
-					fs::extended_remove_options opts{};
-
-					if (const auto iter = _args.find("no-trash"); iter != std::end(_args) && iter->second == "1") {
-						opts.no_trash = true;
-					}
-
-					if (const auto iter = _args.find("unregister"); iter != std::end(_args) && iter->second == "1") {
-						opts.unregister = true;
-					}
-
-					// There's no admin flag for removal.
-					fs::client::remove(conn, lpath_iter->second, opts);
-
-					res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
-				}
-				catch (const fs::filesystem_error& e) {
-					log::error("{}: {}", fn, e.what());
-					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
-							.dump();
-				}
-				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
-				}
-				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
-					res.result(http::status::internal_server_error);
+			try {
+				const auto lpath_iter = _args.find("lpath");
+				if (lpath_iter == std::end(_args)) {
+					log::error("{}: Missing [lpath] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
-				res.prepare_payload();
+				auto conn = irods::get_connection(client_info.username);
 
-				_sess_ptr->send(std::move(res));
-			});
+				if (!fs::client::is_data_object(conn, lpath_iter->second)) {
+					return _sess_ptr->send(irods::http::fail(
+						res,
+						http::status::bad_request,
+						json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump()));
+				}
+
+				fs::extended_remove_options opts{};
+
+				if (const auto iter = _args.find("no-trash"); iter != std::end(_args) && iter->second == "1") {
+					opts.no_trash = true;
+				}
+
+				if (const auto iter = _args.find("unregister"); iter != std::end(_args) && iter->second == "1") {
+					opts.unregister = true;
+				}
+
+				// There's no admin flag for removal.
+				fs::client::remove(conn, lpath_iter->second, opts);
+
+				res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
+			}
+			catch (const fs::filesystem_error& e) {
+				log::error("{}: {}", fn, e.what());
+				res.result(http::status::bad_request);
+				res.body() =
+					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
+			}
+			catch (const irods::exception& e) {
+				log::error("{}: {}", fn, e.client_display_what());
+				res.result(http::status::bad_request);
+				res.body() =
+					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+						.dump();
+			}
+			catch (const std::exception& e) {
+				log::error("{}: {}", fn, e.what());
+				res.result(http::status::internal_server_error);
+			}
+
+			res.prepare_payload();
+
+			_sess_ptr->send(std::move(res));
+		});
 	} // op_remove
 
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_rename)
@@ -1431,68 +1432,66 @@ namespace
 
 		const auto client_info = result.client_info;
 
-		irods::http::globals::background_task(
-			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+		irods::http::globals::background_task([fn = __func__,
+		                                       client_info,
+		                                       _sess_ptr,
+		                                       _req = std::move(_req),
+		                                       _args = std::move(_args)] {
+			log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
-				http::response<http::string_body> res{http::status::ok, _req.version()};
-				res.set(http::field::server, irods::http::version::server_name);
-				res.set(http::field::content_type, "application/json");
-				res.keep_alive(_req.keep_alive());
+			http::response<http::string_body> res{http::status::ok, _req.version()};
+			res.set(http::field::server, irods::http::version::server_name);
+			res.set(http::field::content_type, "application/json");
+			res.keep_alive(_req.keep_alive());
 
-				try {
-					const auto old_lpath_iter = _args.find("old-lpath");
-					if (old_lpath_iter == std::end(_args)) {
-						log::error("{}: Missing [old-lpath] parameter.", fn);
-						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-					}
-
-					auto conn = irods::get_connection(client_info.username);
-
-					if (!fs::client::is_data_object(conn, old_lpath_iter->second)) {
-						return _sess_ptr->send(irods::http::fail(
-							res,
-							http::status::bad_request,
-							json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump()));
-					}
-
-					const auto new_lpath_iter = _args.find("new-lpath");
-					if (new_lpath_iter == std::end(_args)) {
-						log::error("{}: Missing [new-lpath] parameter.", fn);
-						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-					}
-
-					fs::client::rename(conn, old_lpath_iter->second, new_lpath_iter->second);
-
-					res.body() = json{
-						{"irods_response",
-				         {
-							 {"status_code", 0},
-						 }}}.dump();
-				}
-				catch (const fs::filesystem_error& e) {
-					log::error("{}: {}", fn, e.what());
-					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
-							.dump();
-				}
-				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
-				}
-				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
-					res.result(http::status::internal_server_error);
+			try {
+				const auto old_lpath_iter = _args.find("old-lpath");
+				if (old_lpath_iter == std::end(_args)) {
+					log::error("{}: Missing [old-lpath] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
-				res.prepare_payload();
+				auto conn = irods::get_connection(client_info.username);
 
-				_sess_ptr->send(std::move(res));
-			});
+				if (!fs::client::is_data_object(conn, old_lpath_iter->second)) {
+					return _sess_ptr->send(irods::http::fail(
+						res,
+						http::status::bad_request,
+						json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump()));
+				}
+
+				const auto new_lpath_iter = _args.find("new-lpath");
+				if (new_lpath_iter == std::end(_args)) {
+					log::error("{}: Missing [new-lpath] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+				}
+
+				fs::client::rename(conn, old_lpath_iter->second, new_lpath_iter->second);
+
+				res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
+			}
+			catch (const fs::filesystem_error& e) {
+				log::error("{}: {}", fn, e.what());
+				res.result(http::status::bad_request);
+				res.body() =
+					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
+			}
+			catch (const irods::exception& e) {
+				log::error("{}: {}", fn, e.client_display_what());
+				res.result(http::status::bad_request);
+				res.body() =
+					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+						.dump();
+			}
+			catch (const std::exception& e) {
+				log::error("{}: {}", fn, e.what());
+				res.result(http::status::internal_server_error);
+			}
+
+			res.prepare_payload();
+
+			_sess_ptr->send(std::move(res));
+		});
 	} // op_rename
 
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_copy)
@@ -1562,9 +1561,9 @@ namespace
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
 					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
+					res.body() = json{{"irods_response",
+				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+				                     .dump();
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
@@ -1586,98 +1585,98 @@ namespace
 
 		const auto client_info = result.client_info;
 
-		irods::http::globals::background_task(
-			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+		irods::http::globals::background_task([fn = __func__,
+		                                       client_info,
+		                                       _sess_ptr,
+		                                       _req = std::move(_req),
+		                                       _args = std::move(_args)] {
+			log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
-				http::response<http::string_body> res{http::status::ok, _req.version()};
-				res.set(http::field::server, irods::http::version::server_name);
-				res.set(http::field::content_type, "application/json");
-				res.keep_alive(_req.keep_alive());
+			http::response<http::string_body> res{http::status::ok, _req.version()};
+			res.set(http::field::server, irods::http::version::server_name);
+			res.set(http::field::content_type, "application/json");
+			res.keep_alive(_req.keep_alive());
 
-				try {
-					const auto lpath_iter = _args.find("lpath");
-					if (lpath_iter == std::end(_args)) {
-						log::error("{}: Missing [lpath] parameter.", fn);
+			try {
+				const auto lpath_iter = _args.find("lpath");
+				if (lpath_iter == std::end(_args)) {
+					log::error("{}: Missing [lpath] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+				}
+
+				json::object_t options;
+
+				auto opt_iter = _args.find("no-create");
+				if (opt_iter != std::end(_args)) {
+					options["no_create"] = (opt_iter->second == "1");
+				}
+
+				opt_iter = _args.find("replica-number");
+				if (opt_iter != std::end(_args)) {
+					try {
+						options["replica_number"] = std::stoi(opt_iter->second);
+					}
+					catch (const std::exception& e) {
+						log::error("{}: Could not convert replica number [{}] into an integer.", fn, opt_iter->second);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
-
-					json::object_t options;
-
-					auto opt_iter = _args.find("no-create");
-					if (opt_iter != std::end(_args)) {
-						options["no_create"] = (opt_iter->second == "1");
-					}
-
-					opt_iter = _args.find("replica-number");
-					if (opt_iter != std::end(_args)) {
-						try {
-							options["replica_number"] = std::stoi(opt_iter->second);
-						}
-						catch (const std::exception& e) {
-							log::error(
-								"{}: Could not convert replica number [{}] into an integer.", fn, opt_iter->second);
-							return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-						}
-					}
-
-					opt_iter = _args.find("leaf-resource");
-					if (opt_iter != std::end(_args)) {
-						options["leaf_resource_name"] = opt_iter->second;
-					}
-
-					opt_iter = _args.find("seconds-since-epoch");
-					if (opt_iter != std::end(_args)) {
-						try {
-							options["seconds_since_epoch"] = std::stoi(opt_iter->second);
-						}
-						catch (const std::exception& e) {
-							log::error(
-								"{}: Could not convert seconds-since-epoch [{}] into an integer.",
-								fn,
-								opt_iter->second);
-							return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-						}
-					}
-
-					opt_iter = _args.find("reference");
-					if (opt_iter != std::end(_args)) {
-						options["reference"] = opt_iter->second;
-					}
-
-					const json input{{"logical_path", lpath_iter->second}, {"options", options}};
-
-					auto conn = irods::get_connection(client_info.username);
-
-					const auto status = fs::client::status(conn, lpath_iter->second);
-
-					if (fs::client::exists(status) && !fs::client::is_data_object(status)) {
-						return _sess_ptr->send(irods::http::fail(
-							res,
-							http::status::bad_request,
-							json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump()));
-					}
-
-					const auto ec = rc_touch(static_cast<RcComm*>(conn), input.dump().c_str());
-
-					res.body() = json{{"irods_response", {{"status_code", ec}}}}.dump();
-				}
-				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
-				}
-				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
-					res.result(http::status::internal_server_error);
 				}
 
-				res.prepare_payload();
+				opt_iter = _args.find("leaf-resource");
+				if (opt_iter != std::end(_args)) {
+					options["leaf_resource_name"] = opt_iter->second;
+				}
 
-				_sess_ptr->send(std::move(res));
-			});
+				opt_iter = _args.find("seconds-since-epoch");
+				if (opt_iter != std::end(_args)) {
+					try {
+						options["seconds_since_epoch"] = std::stoi(opt_iter->second);
+					}
+					catch (const std::exception& e) {
+						log::error(
+							"{}: Could not convert seconds-since-epoch [{}] into an integer.", fn, opt_iter->second);
+						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+					}
+				}
+
+				opt_iter = _args.find("reference");
+				if (opt_iter != std::end(_args)) {
+					options["reference"] = opt_iter->second;
+				}
+
+				const json input{{"logical_path", lpath_iter->second}, {"options", options}};
+
+				auto conn = irods::get_connection(client_info.username);
+
+				const auto status = fs::client::status(conn, lpath_iter->second);
+
+				if (fs::client::exists(status) && !fs::client::is_data_object(status)) {
+					return _sess_ptr->send(irods::http::fail(
+						res,
+						http::status::bad_request,
+						json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump()));
+				}
+
+				const auto ec = rc_touch(static_cast<RcComm*>(conn), input.dump().c_str());
+
+				res.body() = json{{"irods_response", {{"status_code", ec}}}}.dump();
+			}
+			catch (const irods::exception& e) {
+				log::error("{}: {}", fn, e.client_display_what());
+				res.result(http::status::bad_request);
+				res.body() =
+					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+						.dump();
+			}
+			catch (const std::exception& e) {
+				log::error("{}: {}", fn, e.what());
+				res.result(http::status::internal_server_error);
+			}
+
+			res.prepare_payload();
+
+			_sess_ptr->send(std::move(res));
+		});
 	} // op_touch
 
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_calculate_checksum)
@@ -1741,9 +1740,9 @@ namespace
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
 					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
+					res.body() = json{{"irods_response",
+				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+				                     .dump();
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
@@ -1835,9 +1834,9 @@ namespace
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
 					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-							.dump();
+					res.body() = json{{"irods_response",
+				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
+				                     .dump();
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
