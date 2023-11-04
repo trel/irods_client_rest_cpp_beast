@@ -393,7 +393,7 @@ namespace
 					const auto count = std::stoi(iter->second);
 
 					if (count > irods::http::globals::configuration()
-					                .at(json::json_pointer{"/irods_client/max_rbuffer_size_in_bytes"})
+					                .at(json::json_pointer{"/irods_client/max_number_of_bytes_per_read_operation"})
 					                .get<int>())
 					{
 						res.result(http::status::bad_request);
@@ -616,9 +616,9 @@ namespace
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
-				static const auto max_wbuffer_size =
+				static const auto buffer_size =
 					irods::http::globals::configuration()
-						.at(json::json_pointer{"/irods_client/max_wbuffer_size_in_bytes"})
+						.at(json::json_pointer{"/irods_client/buffer_size_in_bytes_for_write_operations"})
 						.get<std::int64_t>();
 				const char* p = iter->second.data();
 
@@ -629,7 +629,7 @@ namespace
 						return _sess_ptr->send(irods::http::fail(res, http::status::internal_server_error));
 					}
 
-					const auto to_send = std::min<std::streamsize>(remaining_bytes, max_wbuffer_size);
+					const auto to_send = std::min<std::streamsize>(remaining_bytes, buffer_size);
 					log::debug("{}: Write buffer: remaining=[{}], sending=[{}].", fn, remaining_bytes, to_send);
 					out_ptr->write(p, to_send);
 					p += to_send;

@@ -299,11 +299,12 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
         // single parallel write handle.
         "max_number_of_parallel_write_streams": 3,
 
-        // The buffer size used for read operations.
-        "max_rbuffer_size_in_bytes": 8192,
+        // The maximum number of bytes that can be read from a data object
+		// during a single read operation.
+        "max_number_of_bytes_per_read_operation": 8192,
 
         // The buffer size used for write operations.
-        "max_wbuffer_size_in_bytes": 8192,
+        "buffer_size_in_bytes_for_write_operations": 8192,
 
         // The number of rows that can be returned by a General or Specific
         // query. If the client specifies a number greater than the value
