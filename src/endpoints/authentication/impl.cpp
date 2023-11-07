@@ -197,7 +197,7 @@ namespace irods::http::handler
 		std::string username{sv.substr(0, colon)};
 		std::string password{sv.substr(colon + 1)};
 
-		return {username, password};
+		return {std::move(username), std::move(password)};
 	}
 
 	IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(authentication)
@@ -412,6 +412,36 @@ namespace irods::http::handler
 					auto [username, password]{
 						decode_username_and_password(iter->value().substr(pos + basic_auth_scheme_prefix_size))};
 
+					static const auto seconds =
+						irods::http::globals::configuration()
+							.at(nlohmann::json::json_pointer{"/http_server/authentication/basic/timeout_in_seconds"})
+							.get<int>();
+
+					// The anonymous user account must be handled in a special way because rc_check_auth_credentials
+					// doesn't support it. To get around that, the HTTP API will return a bearer token whenever the
+					// anonymous user is seen. If the iRODS zone doesn't contain an anonymous user, any request sent
+					// by the client will result in an error.
+					//
+					// The error will occur when rc_switch_user is invoked on the non-existent user.
+					if ("anonymous" == username && password.empty()) {
+						log::trace(
+							"{}: Detected the anonymous user account. Skipping auth check and returning token.", fn);
+
+						auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
+							.auth_scheme = authorization_scheme::basic,
+							.username = std::move(username),
+							.expires_at = std::chrono::steady_clock::now() + std::chrono::seconds{seconds}});
+
+						response_type res{status_type::ok, _req.version()};
+						res.set(field_type::server, irods::http::version::server_name);
+						res.set(field_type::content_type, "text/plain");
+						res.keep_alive(_req.keep_alive());
+						res.body() = std::move(bearer_token);
+						res.prepare_payload();
+
+						return _sess_ptr->send(std::move(res));
+					}
+
 					if (username.empty() || password.empty()) {
 						return _sess_ptr->send(fail(status_type::unauthorized));
 					}
@@ -503,14 +533,9 @@ namespace irods::http::handler
 						return _sess_ptr->send(fail(status_type::unauthorized));
 					}
 
-					static const auto seconds =
-						irods::http::globals::configuration()
-							.at(nlohmann::json::json_pointer{"/http_server/authentication/basic/timeout_in_seconds"})
-							.get<int>();
 					auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
 						.auth_scheme = authorization_scheme::basic,
 						.username = std::move(username),
-						.password = std::move(password),
 						.expires_at = std::chrono::steady_clock::now() + std::chrono::seconds{seconds}});
 
 					response_type res{status_type::ok, _req.version()};

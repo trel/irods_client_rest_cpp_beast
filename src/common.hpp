@@ -55,7 +55,6 @@ namespace irods::http
 	{
 		authorization_scheme auth_scheme;
 		std::string username;
-		std::string password; // TODO Probably not needed.
 		std::chrono::steady_clock::time_point
 			expires_at; // TODO This may be controlled by OIDC. Think about how to handle that.
 		// TODO Store an expiration timestamp here. Post discush: let it expire and send reauth code to client.
