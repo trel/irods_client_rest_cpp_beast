@@ -8,13 +8,15 @@ If you discover that some topic related to the behavior of the endpoint operatio
 
 ### Scheme: Basic
 
-_Command:_
+#### Request
+
 ```bash
-curl http://localhost:<port>/irods-http-api/<version>/authenticate \
-    -X POST --user <username>:<password> 
+curl -X POST -u <username>:<password> http://localhost:<port>/irods-http-api/<version>/authenticate
 ```
 
-_Returns:_ A string representing a bearer token that can be used to carry out operations as the authenticated user.
+#### Response
+
+A string representing a bearer token that can be used to execute operations as the authenticated user.
 
 ### Scheme: OpenID Connect (OIDC)
 
