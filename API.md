@@ -20,7 +20,59 @@ A string representing a bearer token that can be used to execute operations as t
 
 ### Scheme: OpenID Connect (OIDC)
 
-Coming soon ...
+For authenticating with OpenID Connect, there are two methods:
+
+- Resource Owner Password Credentials Grant
+- Authorization Code Grant
+
+#### Resource Owner Password Credentials Grant
+
+The core advantage of this grant is the flexibility in how it may be applied.
+
+Following is a brief example of authenticating from the command line.
+
+##### Request
+```bash
+username_and_password=$(echo -n "<username>:<password>" | base64 -)
+curl -X POST -H "Authorization: iRODS $username_and_password" \
+    http://localhost:<port>/irods-http-api/<version>/authenticate
+```
+
+##### Response
+A string representing a bearer token that can be used to execute operations as the authenticated user.
+
+#### Authorization Code Grant
+
+Using this grant requires a bit more work to extract the token.
+Authentication is done in the browser.
+
+##### Request
+```bash
+curl http://localhost:<port>/irods-http-api/<version>/authenticate -v
+```
+
+After running the previous command, you should see output similar to the following:
+```
+*   Trying [::1]:9000...
+* Connected to localhost (::1) port 9000
+> GET /irods-http-api/0.1.0/authenticate HTTP/1.1
+> Host: localhost:9000
+> User-Agent: curl/8.4.0
+> Accept: */*
+> 
+< HTTP/1.1 302 Found
+< Server: irods_http_api/0.1.0 [d6164b7aa421265e0f9f9d5f7eb69bb67d8e4a3c]
+< Location: http://oidc.example.org/realms/example/protocol/openid-connect/auth?...
+< Content-Length: 0
+< 
+* Connection #0 to host localhost left intact
+```
+
+To authenticate, you need to head to the `Location` provided in the response.
+This will open a browser window that will allow you to authenticate in.
+
+##### Response
+The bearer token should be returned and viewable in the browser window after authenticating.
 
 ## Collection Operations
 
