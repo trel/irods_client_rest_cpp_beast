@@ -380,9 +380,9 @@ namespace irods
 		std::strncpy(input.zone, zone.c_str(), sizeof(SwitchUserInput::zone));
 		addKeyVal(&input.options, KW_CLOSE_OPEN_REPLICAS, "");
 
-		if (const auto ec = rc_switch_user(static_cast<RcComm*>(conn), &input); ec != 0) {
+		if (const auto ec = rc_switch_user(static_cast<RcComm*>(conn), &input); ec < 0) {
 			log::error("{}: rc_switch_user error: {}", __func__, ec);
-			THROW(SYS_INTERNAL_ERR, "rc_switch_user error.");
+			THROW(ec, "rc_switch_user error.");
 		}
 
 		log::trace("{}: Successfully changed identity associated with connection to [{}].", __func__, _username);
