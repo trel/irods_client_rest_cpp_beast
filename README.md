@@ -1,6 +1,6 @@
 # iRODS HTTP API
 
-A project that presents an iRODS 4.3.1+ server as HTTP v1.1.
+A project that presents an iRODS Zone as HTTP v1.1.
 
 ## Build Dependencies
 
