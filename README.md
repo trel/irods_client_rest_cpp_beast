@@ -304,7 +304,7 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
         "max_number_of_parallel_write_streams": 3,
 
         // The maximum number of bytes that can be read from a data object
-		// during a single read operation.
+        // during a single read operation.
         "max_number_of_bytes_per_read_operation": 8192,
 
         // The buffer size used for write operations.
