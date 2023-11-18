@@ -1119,9 +1119,11 @@ curl http://localhost:<port>/irods-http-api/<version>/query \
     --data-urlencode 'query=<string>' \
     --data-urlencode 'offset=<integer>' \ # Number of rows to skip. Defaults to 0.
     --data-urlencode 'count=<integer>' \ # Number of rows to return. Default set by administrator.
+    --data-urlencode 'case-sensitive=<integer>' \ # Execute a case sensitive/insensitive query. Defaults to 1. Only supported by GenQuery1.
+    --data-urlencode 'distinct=<integer>' \ # Collapse duplicate rows. Defaults to 1. Only supported by GenQuery1.
     --data-urlencode 'parser=<string>' \ # genquery1 or genquery2. Defaults to genquery1.
     --data-urlencode 'sql-only=<integer>' \ # 0 or 1. Defaults to 0. Only supported by GenQuery2.
-    --data-urlencode 'zone=<string>' \ # The zone name. Defaults to the local zone. Only supported by GenQuery2.
+    --data-urlencode 'zone=<string>' \ # The zone name. Defaults to the local zone.
     -G
 ```
 

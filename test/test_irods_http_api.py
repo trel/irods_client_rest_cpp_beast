@@ -1107,6 +1107,133 @@ class test_query_endpoint(unittest.TestCase):
         self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertGreater(len(result['rows']), 0)
 
+    def test_genquery1_no_distinct_option(self):
+        rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+
+        # Create a data object on the default resource.
+        data_object = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'test_genquery1_no_distinct.txt')
+        r = requests.post(f'{self.url_base}/data-objects', headers=rodsuser_headers, data={'op': 'touch', 'lpath': data_object})
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        result = r.json()
+        self.assertEqual(result['irods_response']['status_code'], 0)
+
+        resc_name = 'test_ufs_genquery1_no_distinct'
+
+        try:
+            # Create a unixfilesystem resource.
+            r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
+                'op': 'create',
+                'name': resc_name,
+                'type': 'unixfilesystem',
+                'host': self.server_hostname,
+                'vault-path': os.path.join('/tmp', f'{resc_name}_vault')
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Replicate the data object.
+            r = requests.post(f'{self.url_base}/data-objects', headers=rodsuser_headers, data={
+                'op': 'replicate',
+                'lpath': data_object,
+                'dst-resource': resc_name
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            coll_name = os.path.dirname(data_object)
+            data_name = os.path.basename(data_object)
+            r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={
+                'op': 'execute_genquery',
+                'parser': 'genquery1',
+                'distinct': 0,
+                'query': f"select DATA_NAME where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(len(result['rows']), 2)
+
+        finally:
+            # Remove data object.
+            r = requests.post(f'{self.url_base}/data-objects', headers=rodsuser_headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'no-trash': 1
+            })
+            #print(r.content) # Debug
+
+            # Remove resource.
+            r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
+                'op': 'remove',
+                'name': resc_name
+            })
+            #print(r.content) # Debug
+
+    def test_genquery1_case_sensitivity_option(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        data_object = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'test_GenQuery1_CaSE_SENsiTIvE.TxT')
+
+        try:
+            # Create a data object with mixed case letters in the name.
+            r = requests.post(f'{self.url_base}/data-objects', headers=headers, data={
+                'op': 'touch',
+                'lpath': data_object
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show case-insensitive search finds the data object.
+            # The use of .upper() and .lower() are just to demonstrate that the case-ness of the
+            # input arguments doesn't matter.
+            coll_name = os.path.dirname(data_object)
+            data_name = os.path.basename(data_object)
+            r = requests.get(self.url_endpoint, headers=headers, params={
+                'op': 'execute_genquery',
+                'parser': 'genquery1',
+                'case-sensitive': 0,
+                'query': f"select DATA_NAME where COLL_NAME = '{coll_name.upper()}' and DATA_NAME = '{data_name.lower()}'"
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(len(result['rows']), 1)
+            self.assertEqual(result['rows'][0][0], data_name)
+
+            # Show case-sensitive search does NOT find the data object.
+            coll_name = os.path.dirname(data_object)
+            data_name = os.path.basename(data_object)
+            r = requests.get(self.url_endpoint, headers=headers, params={
+                'op': 'execute_genquery',
+                'parser': 'genquery1',
+                'case-sensitive': 1,
+                'query': f"select DATA_NAME where COLL_NAME = '{coll_name.upper()}' and DATA_NAME = '{data_name.lower()}'"
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(len(result['rows']), 0)
+
+        finally:
+            # Remove data object.
+            r = requests.post(f'{self.url_base}/data-objects', headers=headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'no-trash': 1
+            })
+            #print(r.content) # Debug
+
+    @unittest.skip('Test needs to be implemented.')
+    def test_genquery1_zone_option(self):
+        pass
+
     def test_genquery2_query(self):
         if not config.test_config.get('run_genquery2_tests', False):
             self.skipTest('GenQuery2 tests not enabled. Check [run_genquery2_tests] in test configuration file.')
