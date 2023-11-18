@@ -12,6 +12,7 @@
 #include <irods/procApiRequest.h>
 #include <irods/query_builder.hpp>
 #include <irods/rodsErrorTable.h>
+#include <irods/rodsGenQuery.h>
 
 #ifdef IRODS_ENABLE_GENQUERY2
 #  include <irods/plugins/api/genquery2_common.h>
@@ -221,6 +222,8 @@ namespace
 #endif // IRODS_ENABLE_GENQUERY2
 					}
 					else {
+						irods::experimental::query_builder qb;
+
 						int offset = 0;
 						if (const auto iter = args.find("offset"); iter != std::end(args)) {
 							try {
@@ -232,6 +235,7 @@ namespace
 							}
 						}
 						offset = std::max(0, offset);
+						qb.row_offset(offset);
 
 						static const auto max_row_count =
 							irods::http::globals::configuration()
@@ -243,48 +247,65 @@ namespace
 								count = std::stoi(iter->second);
 							}
 							catch (const std::exception& e) {
-								log::error("{}: Could not convert [count] parameter value into an integer. ", fn);
+								log::error("{}: Could not convert [count] parameter value into an integer.", fn);
 								return _sess_ptr->send(irods::http::fail(http::status::bad_request));
 							}
 						}
 						count = std::clamp(count, 1, max_row_count);
+						qb.row_limit(count);
 
-						int offset_counter = 0;
-						int count_counter = 0;
+						int options = 0;
 
-						for (auto&& r : irods::query{static_cast<RcComm*>(conn), query_iter->second}) {
-							if (offset_counter < offset) {
-								++offset_counter;
-								continue;
+						if (const auto iter = args.find("case-sensitive"); iter != std::end(args)) {
+							if (iter->second == "0") {
+								options |= UPPER_CASE_WHERE;
+								boost::algorithm::to_upper(query_iter->second);
 							}
+							else if (iter->second != "1") {
+								log::error("{}: Invalid value for [case-sensitive] parameter. Expected a 1 or 0.", fn);
+								return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+							}
+						}
 
+						if (const auto iter = args.find("distinct"); iter != std::end(args)) {
+							if (iter->second == "0") {
+								options |= NO_DISTINCT;
+							}
+							else if (iter->second != "1") {
+								log::error("{}: Invalid value for [distinct] parameter. Expected a 1 or 0.", fn);
+								return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+							}
+						}
+
+						qb.options(options);
+
+						if (const auto iter = args.find("zone"); iter != std::end(args)) {
+							qb.zone_hint(iter->second);
+						}
+
+						for (auto&& r : qb.build<RcComm>(conn, query_iter->second)) {
 							for (auto&& c : r) {
 								row.push_back(c);
 							}
 
 							rows.push_back(row);
 							row.clear();
-
-							if (++count_counter == count) {
-								break;
-							}
 						}
 
-						res.body() = json{
-							{"irods_response",
-					         {
-								 {"status_code", 0},
-							 }},
-							{"rows",
-					         rows}}.dump();
+						res.body() = json{{"irods_response", {{"status_code", 0}}}, {"rows", rows}}.dump();
 					}
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
 					res.result(http::status::bad_request);
-					res.body() = json{{"irods_response",
-				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-				                     .dump();
+					// clang-format off
+					res.body() = json{
+						{"irods_response", {
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
+						}}
+					}.dump();
+					// clang-format on
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
