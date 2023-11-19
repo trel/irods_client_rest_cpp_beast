@@ -2,6 +2,65 @@
 
 A project that presents an iRODS Zone as HTTP v1.1.
 
+## Quickstart (Running from Docker Hub Image)
+
+Generate a local configuration JSON file.
+
+```
+docker run --rm irods/irods_http_api --dump-config-template > config.json
+```
+
+Edit/update the template `config.json` file (point to your iRODS Zone, remove OIDC and TLS sections, etc.).
+
+```
+vim config.json
+```
+
+Launch the HTTP API with your customized configuration file to check for success/errors.
+
+```
+docker run --rm --name irods_http_api \
+    -v ./config.json:/config.json:ro \
+    -p 9000:9000 \
+    irods/irods_http_api
+```
+
+Then, the HTTP API will be available.
+
+```
+$ curl -X POST -u rods:rods \
+ http://localhost:9000/irods-http-api/0.1.0/authenticate
+568bbfc2-7d19-4723-b659-bb9325f9b076
+
+$ curl -s http://localhost:9000/irods-http-api/0.1.0/collections \
+    -H 'Authorization: Bearer 568bbfc2-7d19-4723-b659-bb9325f9b076' \
+    --data-urlencode 'op=stat' \
+    --data-urlencode 'lpath=/tempZone/home/rods' -G | jq
+{
+  "inheritance_enabled": false,
+  "irods_response": {
+    "status_code": 0
+  },
+  "modified_at": 1699448576,
+  "permissions": [
+    {
+      "name": "rods",
+      "perm": "own",
+      "type": "rodsadmin",
+      "zone": "tempZone"
+    },
+    {
+      "name": "alice",
+      "perm": "read_object",
+      "type": "groupadmin",
+      "zone": "tempZone"
+    }
+  ],
+  "registered": true,
+  "type": "collection"
+}
+```
+
 ## Build Dependencies
 
 - iRODS development package
@@ -58,7 +117,8 @@ This project provides two Dockerfiles, one for building and one for running the 
 
 The builder image is responsible for building the iRODS HTTP API package. Before you can use it, you must build the image. To do that, run the following:
 ```bash
-docker build -t irods-http-api-builder -f irods_builder.Dockerfile .
+docker build -t irods-http-api-builder \
+    -f irods_builder.Dockerfile .
 ```
 
 With the builder image in hand, all that's left is to get the source code for the GenQuery2 project and HTTP API project. The builder image is designed to compile code sitting on your machine. This is important because it gives you the ability to build any fork or branch of the projects.
@@ -80,7 +140,9 @@ The runner image is responsible for running the iRODS HTTP API. Building the run
 
 To build the image, run the following command:
 ```bash
-docker build -t irods-http-api-runner -f irods_runner.Dockerfile /path/to/packages/directory
+docker build -t irods-http-api-runner \
+    -f irods_runner.Dockerfile \
+    /path/to/packages/directory
 ```
 
 If all goes well, you will have a containerized iRODS HTTP API server! You can verify this by checking the version information. Below is an example.
@@ -95,7 +157,10 @@ To run the containerized server, you need to provide a configuration file at the
 
 Assuming you have a valid configuration file, you can launch the server by running the following command:
 ```bash
-docker run -d --rm --name irods_http_api -v /path/to/config/file:/config.json:ro -p 9000:9000 irods-http-api-runner
+docker run -d --rm --name irods_http_api \
+    -v /path/to/config/file:/config.json:ro \
+    -p 9000:9000 \
+    irods-http-api-runner
 ```
 
 You can view the log output using `docker logs -f` or by passing `-it` to `docker run` instead of `-d`.
