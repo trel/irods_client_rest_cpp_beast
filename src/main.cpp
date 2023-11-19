@@ -506,7 +506,7 @@ auto main(int _argc, char* _argv[]) -> int
 		log::info("Initializing server.");
 
 		// Confirm OIDC endpoint is valid (Assume all provide endpoint)
-		log::trace("Verifing OIDC endpoint configuration");
+		log::trace("Verifying OIDC endpoint configuration");
 
 		// JSON configs needs to be in main scope to last the entire duration of the program
 		nlohmann::json oi_config;
