@@ -439,6 +439,104 @@ class test_collections_endpoint(unittest.TestCase):
         #self.assertEqual(result['permissions'][0]['type'], 'rodsuser')
         #self.assertEqual(result['permissions'][0]['perm'], 'own')
 
+    def test_touch_operation_updates_mtime(self):
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+
+        # Get the mtime of the home collection.
+        collection = os.path.join('/', self.zone_name, 'home', self.rodsuser_username)
+        r = requests.get(f'{self.url_base}/query', headers=rodsuser_headers, params={
+            'op': 'execute_genquery',
+            'query': f"select COLL_MODIFY_TIME where COLL_NAME = '{collection}'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        result = r.json()
+        self.assertEqual(result['irods_response']['status_code'], 0)
+        self.assertEqual(len(result['rows']), 1)
+        original_mtime = int(result['rows'][0][0])
+        self.assertGreater(original_mtime, 0)
+
+        # Sleep for a short period of time to guarantee a difference in the mtime.
+        time.sleep(2)
+
+        # Update the mtime by calling touch.
+        r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+            'op': 'touch',
+            'lpath': collection
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+        # Show the mtime has been updated.
+        collection = os.path.join('/', self.zone_name, 'home', self.rodsuser_username)
+        r = requests.get(f'{self.url_base}/query', headers=rodsuser_headers, params={
+            'op': 'execute_genquery',
+            'query': f"select COLL_MODIFY_TIME where COLL_NAME = '{collection}'"
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        result = r.json()
+        self.assertEqual(result['irods_response']['status_code'], 0)
+        self.assertEqual(len(result['rows']), 1)
+        new_mtime = int(result['rows'][0][0])
+        self.assertGreater(new_mtime, original_mtime)
+
+    def test_touch_operation_reports_error_when_given_a_path_to_a_data_object(self):
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        data_object = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'test_object')
+
+        try:
+            # Create a data object.
+            r = requests.post(f'{self.url_base}/data-objects', headers=rodsuser_headers, data={
+                'op': 'touch',
+                'lpath': data_object
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show an error is returned when the touch operation for a collection is given
+            # a path pointing to a data object.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'touch',
+                'lpath': data_object
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 400)
+            self.assertEqual(r.json()['irods_response']['status_code'], -170000) # NOT_A_COLLECTION
+
+        finally:
+            # Remove data object.
+            r = requests.post(f'{self.url_base}/data-objects', headers=rodsuser_headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'no-trash': 1
+            })
+            #print(r.content) # Debug
+
+    def test_touch_operation_does_not_create_collections_or_data_objects(self):
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+
+        # Show the touch operation will silently ignore the fact that the target object
+        # does not exist. This is intended.
+        r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+            'op': 'touch',
+            'lpath': f'/{self.zone_name}/home/{self.rodsuser_username}/does_not_exist'
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+        # Show the touch operation did not create a new collection or data object (would be very bad).
+        r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={
+            'op': 'stat',
+            'lpath': f'/{self.zone_name}/home/{self.rodsuser_username}/does_not_exist'
+        })
+        #print(r.content) # Debug
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json()['irods_response']['status_code'], -170000) # NOT_A_COLLECTION
+
     @unittest.skip('Test needs to be implemented.')
     def test_return_error_on_missing_parameters(self):
         pass

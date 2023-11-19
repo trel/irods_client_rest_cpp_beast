@@ -10,6 +10,7 @@
 #include <irods/filesystem.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/rodsErrorTable.h>
+#include <irods/touch.h>
 
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
@@ -57,6 +58,7 @@ namespace
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_set_permission);
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_permissions);
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_metadata);
+	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_touch);
 
 	//
 	// Operation to Handler mappings
@@ -77,6 +79,7 @@ namespace
 		//{"enable_inheritance", op_enable_inheritance} // TODO set_permission handles inheritance?
 		{"modify_permissions", op_modify_permissions},
 		{"modify_metadata", op_modify_metadata},
+		{"touch", op_touch}
 	};
 	// clang-format on
 } // anonymous namespace
@@ -640,4 +643,91 @@ namespace
 		using namespace irods::http::shared_api_operations;
 		return op_atomic_apply_metadata_operations(_sess_ptr, _req, _args, entity_type::collection);
 	} // op_modify_metadata
+
+	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_touch)
+	{
+		auto result = irods::http::resolve_client_identity(_req);
+		if (result.response) {
+			return _sess_ptr->send(std::move(*result.response));
+		}
+
+		const auto client_info = result.client_info;
+
+		irods::http::globals::background_task(
+			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
+				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+
+				http::response<http::string_body> res{http::status::ok, _req.version()};
+				res.set(http::field::server, irods::http::version::server_name);
+				res.set(http::field::content_type, "application/json");
+				res.keep_alive(_req.keep_alive());
+
+				try {
+					const auto lpath_iter = _args.find("lpath");
+					if (lpath_iter == std::end(_args)) {
+						log::error("{}: Missing [lpath] parameter.", fn);
+						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+					}
+
+					// DO NOT allow data objects to be created.
+					json::object_t options{{"no_create", true}};
+
+					auto opt_iter = _args.find("seconds-since-epoch");
+					if (opt_iter != std::end(_args)) {
+						try {
+							options["seconds_since_epoch"] = std::stoi(opt_iter->second);
+						}
+						catch (const std::exception& e) {
+							log::error(
+								"{}: Could not convert seconds-since-epoch [{}] into an integer.",
+								fn,
+								opt_iter->second);
+							return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+						}
+					}
+
+					opt_iter = _args.find("reference");
+					if (opt_iter != std::end(_args)) {
+						options["reference"] = opt_iter->second;
+					}
+
+					const json input{{"logical_path", lpath_iter->second}, {"options", options}};
+
+					auto conn = irods::get_connection(client_info.username);
+
+					const auto status = fs::client::status(conn, lpath_iter->second);
+
+					if (fs::client::exists(status) && !fs::client::is_collection(status)) {
+						return _sess_ptr->send(irods::http::fail(
+							res,
+							http::status::bad_request,
+							json{{"irods_response", {{"status_code", NOT_A_COLLECTION}}}}.dump()));
+					}
+
+					const auto ec = rc_touch(static_cast<RcComm*>(conn), input.dump().c_str());
+
+					res.body() = json{{"irods_response", {{"status_code", ec}}}}.dump();
+				}
+				catch (const irods::exception& e) {
+					log::error("{}: {}", fn, e.client_display_what());
+					res.result(http::status::bad_request);
+					// clang-format off
+					res.body() = json{
+						{"irods_response", {
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
+						}}
+					}.dump();
+					// clang-format on
+				}
+				catch (const std::exception& e) {
+					log::error("{}: {}", fn, e.what());
+					res.result(http::status::internal_server_error);
+				}
+
+				res.prepare_payload();
+
+				_sess_ptr->send(std::move(res));
+			});
+	} // op_touch
 } // anonymous namespace
