@@ -401,6 +401,36 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 
 If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
 
+### touch
+
+Updates the mtime of an existing collection.
+
+#### Request
+
+```bash
+curl http://localhost:<port>/irods-http-api/<version>/collections \
+    -H 'Authorization: Bearer <token>' \
+    --data-urlencode 'op=touch' \
+    --data-urlencode 'lpath=<string>' \ # Absolute logical path to a collection.
+    --data-urlencode 'seconds-since-epoch=<integer>' \ # The mtime to assign to the collection. Optional.
+    --data-urlencode 'reference=<string>' # The absolute logical path of an object whose mtime will be copied to the collection. Optional.
+```
+
+#### Response
+
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
+
+```js
+{
+    "irods_response": {
+        "status_code": 0
+        "status_message": "string" // Optional
+    }
+}
+```
+
+If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+
 ## Data Object Operations
 
 ### touch
