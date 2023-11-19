@@ -61,6 +61,10 @@ $ curl -s http://localhost:9000/irods-http-api/0.1.0/collections \
 }
 ```
 
+## Documentation
+
+API documentation can be found in [API.md](./API.md).
+
 ## Build Dependencies
 
 - iRODS development package
@@ -433,7 +437,3 @@ support for this in the future.
 Reason being, the [OAuth 2.0 Security Best Current Practice](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics) draft,
 as well as the [The OAuth 2.1 Authorizaiton Framework](https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/) draft both deprecate that grant.
 More information can be found on the reasoning for the deprecation in the links provided above.
-
-## Documentation
-
-API documentation can be found in [API.md](./API.md).
