@@ -817,6 +817,70 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             #print(r.content) # Debug
 
+    def test_touch_operation_updates_mtime(self):
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        data_object = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'test_object')
+
+        try:
+            # Create a new data object.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'touch',
+                'lpath': data_object
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Get the mtime of the data object.
+            coll_name = os.path.dirname(data_object)
+            data_name = os.path.basename(data_object)
+            r = requests.get(f'{self.url_base}/query', headers=rodsuser_headers, params={
+                'op': 'execute_genquery',
+                'query': f"select DATA_MODIFY_TIME where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(len(result['rows']), 1)
+            original_mtime = int(result['rows'][0][0])
+            self.assertGreater(original_mtime, 0)
+
+            # Sleep for a short period of time to guarantee a difference in the mtime.
+            time.sleep(2)
+
+            # Update the mtime by calling touch.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'touch',
+                'lpath': data_object
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show the mtime has been updated.
+            collection = os.path.join('/', self.zone_name, 'home', self.rodsuser_username)
+            r = requests.get(f'{self.url_base}/query', headers=rodsuser_headers, params={
+                'op': 'execute_genquery',
+                'query': f"select DATA_MODIFY_TIME where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
+            })
+            #print(r.content) # Debug
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(len(result['rows']), 1)
+            new_mtime = int(result['rows'][0][0])
+            self.assertGreater(new_mtime, original_mtime)
+
+        finally:
+            # Remove data object.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'no-trash': 1
+            })
+            #print(r.content) # Debug
+
     def test_touch_operation_reports_error_when_given_a_path_to_a_collection(self):
         rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
         r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
