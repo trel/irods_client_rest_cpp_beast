@@ -103,7 +103,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### remove
 
@@ -135,7 +135,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### stat
 
@@ -179,7 +179,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### list
 
@@ -215,7 +215,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### set_permission
 
@@ -246,7 +246,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### modify_permissions
 
@@ -289,7 +289,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range. If an operation failed, the `irods_response` object will include an additional property called `failed_operation`. The structure is shown below.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range. If an operation failed, the `irods_response` object will include an additional property called `failed_operation`. The structure is shown below.
 
 ```js
 {
@@ -351,7 +351,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range. If an operation failed, the `irods_response` object will include an additional property called `failed_operation`. The structure is shown below.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range. If an operation failed, the `irods_response` object will include an additional property called `failed_operation`. The structure is shown below.
 
 ```js
 {
@@ -399,7 +399,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### touch
 
@@ -429,7 +429,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ## Data Object Operations
 
@@ -445,10 +445,10 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'op=touch' \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'no-create=<integer>' \ # 0 or 1. Defaults to 0. If set to 1, no data objects will be created.
-    --data-urlencode 'replica-number=<integer>' \ # The replica to update. The replica must exist.
-    --data-urlencode 'leaf-resource=<string>' \ # The resource holding an existing replica. If it does not exist, it will be created on the specified resource.
-    --data-urlencode 'seconds-since-epoch=<integer>' \ # The mtime to assign to the replica.
-    --data-urlencode 'reference=<string>' \ # The absolute logical path of an object whose mtime will be copied to the data object.
+    --data-urlencode 'replica-number=<integer>' \ # The replica to update. The replica must exist. Optional.
+    --data-urlencode 'leaf-resource=<string>' \ # The resource holding an existing replica. If it does not exist, it will be created on the specified resource. Optional.
+    --data-urlencode 'seconds-since-epoch=<integer>' \ # The mtime to assign to the replica. Optional.
+    --data-urlencode 'reference=<string>' # The absolute logical path of an object whose mtime will be copied to the data object. Optional.
 ```
 
 #### Response
@@ -464,7 +464,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### remove
 
@@ -496,7 +496,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### calculate_checksum
 
@@ -532,7 +532,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### verify_checksum
 
@@ -576,7 +576,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### stat
 
@@ -619,7 +619,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### rename
 
@@ -648,7 +648,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### copy
 
@@ -681,7 +681,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### replicate
 
@@ -712,7 +712,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### trim
 
@@ -746,7 +746,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### register
 
@@ -779,7 +779,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### read
 
@@ -802,7 +802,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 
 If an HTTP status code of 200 is returned, the body of the response will contain the bytes read from the data object.
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### write
 
@@ -844,7 +844,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### parallel-write-init
 
@@ -946,7 +946,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range. If an operation failed, the `irods_response` object will include an additional property called `failed_operation`. The structure is shown below.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range. If an operation failed, the `irods_response` object will include an additional property called `failed_operation`. The structure is shown below.
 
 ```js
 {
@@ -996,7 +996,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### modify_permissions
 
@@ -1039,7 +1039,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range. If an operation failed, the `irods_response` object will include an additional property called `failed_operation`. The structure is shown below.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range. If an operation failed, the `irods_response` object will include an additional property called `failed_operation`. The structure is shown below.
 
 ```js
 {
@@ -1106,7 +1106,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ## Information Operations
 
@@ -1176,7 +1176,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### execute_specific_query
 
@@ -1246,7 +1246,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### remove
 
@@ -1274,7 +1274,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### add_child
 
@@ -1304,7 +1304,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### remove_child
 
@@ -1333,7 +1333,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### rebalance
 
@@ -1361,7 +1361,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### stat
 
@@ -1409,7 +1409,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### modify_metadata
 
@@ -1453,7 +1453,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range. If an operation failed, the `irods_response` object will include an additional property called `failed_operation`. The structure is shown below.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range. If an operation failed, the `irods_response` object will include an additional property called `failed_operation`. The structure is shown below.
 
 ```js
 {
@@ -1507,7 +1507,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### execute
 
@@ -1540,7 +1540,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### remove_delay_rule
 
@@ -1568,7 +1568,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ## Ticket Operations
 
@@ -1607,7 +1607,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### remove
 
@@ -1635,7 +1635,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ## User and Group Operations
 
@@ -1667,7 +1667,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### remove_user
 
@@ -1696,7 +1696,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### set_password
 
@@ -1726,7 +1726,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### set_user_type
 
@@ -1756,7 +1756,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### create_group
 
@@ -1784,7 +1784,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### remove_group
 
@@ -1812,7 +1812,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### add_to_group
 
@@ -1842,7 +1842,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### remove_from_group
 
@@ -1872,7 +1872,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### users
 
@@ -1908,7 +1908,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### groups
 
@@ -1941,7 +1941,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### is_member_of_group
 
@@ -1973,7 +1973,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### stat
 
@@ -2007,7 +2007,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
 ### modify_metadata
 
@@ -2051,7 +2051,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range. If an operation failed, the `irods_response` object will include an additional property called `failed_operation`. The structure is shown below.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range. If an operation failed, the `irods_response` object will include an additional property called `failed_operation`. The structure is shown below.
 
 ```js
 {
@@ -2103,4 +2103,4 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 }
 ```
 
-If there was an error, expect either an HTTP status code in the 4XX or 5XX range.
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.

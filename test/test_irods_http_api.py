@@ -216,7 +216,7 @@ class test_collections_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 400)
 
         stat_info = r.json()
-        self.assertEqual(stat_info['irods_response']['status_code'], -170000)
+        self.assertEqual(stat_info['irods_response']['status_code'], -170000) # NOT_A_COLLECTION
 
     def test_stat_operation_returns_expected_json_structure(self):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -247,7 +247,7 @@ class test_collections_endpoint(unittest.TestCase):
         })
         #print(r.content) # Debug
         self.assertEqual(r.status_code, 400)
-        self.assertEqual(r.json()['irods_response']['status_code'], -170000)
+        self.assertEqual(r.json()['irods_response']['status_code'], -170000) # NOT_A_COLLECTION
 
     def test_list_operation(self):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
