@@ -16,6 +16,7 @@ add_library(
   "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/process_stash.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/session.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/transport.cpp"
 )
 
 target_link_libraries(

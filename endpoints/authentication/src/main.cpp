@@ -5,6 +5,7 @@
 #include "irods/private/http_api/log.hpp"
 #include "irods/private/http_api/process_stash.hpp"
 #include "irods/private/http_api/session.hpp"
+#include "irods/private/http_api/transport.hpp"
 #include "irods/private/http_api/version.hpp"
 
 #include <irods/base64.hpp>
@@ -56,8 +57,6 @@ namespace irods::http::handler
 
 		// Setup net
 		net::io_context io_ctx;
-		net::ip::tcp::resolver tcp_res{io_ctx};
-		beast::tcp_stream tcp_stream{io_ctx};
 
 		const auto parsed_uri{boost::urls::parse_uri(token_endpoint)};
 
@@ -70,11 +69,9 @@ namespace irods::http::handler
 		const auto url{*parsed_uri};
 		const auto port{irods::http::get_port_from_url(url)};
 
-		// Addr
-		const auto resolve{tcp_res.resolve(url.host(), *port)};
-
 		// TCP thing
-		tcp_stream.connect(resolve);
+		auto tcp_stream{irods::http::transport_factory(url.scheme_id(), io_ctx)};
+		tcp_stream->connect(url.host(), *port);
 
 		// Build Request
 		constexpr auto version_number{11};
@@ -88,19 +85,9 @@ namespace irods::http::handler
 		req.body() = std::move(_encoded_body);
 		req.prepare_payload();
 
-		// Send request
-		beast::http::write(tcp_stream, req);
-
-		// Read back req
-		beast::flat_buffer buffer;
-		beast::http::response<beast::http::string_body> res;
-		beast::http::read(tcp_stream, buffer, res);
-
+		// Send request and Read back response
+		auto res{tcp_stream->communicate(req)};
 		log::debug("Got the following resp back: {}", res.body());
-
-		// Close socket
-		beast::error_code ec;
-		tcp_stream.socket().shutdown(net::ip::tcp::socket::shutdown_both, ec);
 
 		// JSONize response
 		return nlohmann::json::parse(res.body());

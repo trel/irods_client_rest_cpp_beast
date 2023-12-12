@@ -264,11 +264,15 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
 
                 // The amount of time before the OIDC Authorization Code grant
                 // times out, requiring another attempt at authentication.
-                "state_timeout_in_seconds": 600
+                "state_timeout_in_seconds": 600,
 
                 // The name of the OIDC claim which provides the mapping of an
                 // OIDC user to an iRODS user account
-                "irods_user_claim": "irods_username"
+                "irods_user_claim": "irods_username",
+
+                // The path to the TLS certificates directory.
+                // Used for HTTPS connections.
+                "tls_certificates_directory": "/path/to/certs"
             }
         },
 

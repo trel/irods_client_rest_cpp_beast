@@ -3,6 +3,7 @@
 #include "irods/private/http_api/handlers.hpp"
 #include "irods/private/http_api/log.hpp"
 #include "irods/private/http_api/session.hpp"
+#include "irods/private/http_api/transport.hpp"
 #include "irods/private/http_api/process_stash.hpp"
 #include "irods/private/http_api/version.hpp"
 
@@ -240,13 +241,17 @@ constexpr auto default_jsonschema() -> std::string_view
                                 }},
                                 "irods_user_claim": {{
                                     "type": "string"
+                                }},
+                                "tls_certificates_directory": {{
+                                    "type": "string"
                                 }}
                             }},
                             "required": [
                                 "provider_url",
                                 "client_id",
                                 "redirect_uri",
-                                "irods_user_claim"
+                                "irods_user_claim",
+                                "tls_certificates_directory"
                             ]
                         }}
                     }},
@@ -456,7 +461,8 @@ auto print_configuration_template() -> void
                 "provider_url": "<string>",
                 "client_id": "<string>",
                 "redirect_uri": "<string>",
-                "irods_user_claim": "<string>"
+                "irods_user_claim": "<string>",
+                "tls_certificates_directory": "<string>"
             }}
         }},
 
@@ -693,11 +699,6 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 		_oi_config = _config[json::json_pointer{"/authentication/openid_connect"}];
 		irods::http::globals::set_oidc_configuration(_oi_config);
 
-		// Consider reusing context further down main?
-		net::io_context io_ctx;
-		net::ip::tcp::resolver tcp_res{io_ctx};
-		beast::tcp_stream tcp_stream{io_ctx};
-
 		// Load config
 		const auto& provider{_oi_config.at("provider_url").get_ref<const std::string&>()};
 		const auto parsed_uri{boost::urls::parse_uri(provider)};
@@ -715,11 +716,11 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 			return false;
 		}
 
-		// Resolve addr
-		const auto resolve{tcp_res.resolve(url.host(), *port)};
+		// Consider reusing context further down main?
+		net::io_context io_ctx;
 
-		// Connect and get config
-		tcp_stream.connect(resolve);
+		auto tcp_stream{irods::http::transport_factory(url.scheme_id(), io_ctx)};
+		tcp_stream->connect(url.host(), *port);
 
 		// Build Request
 		constexpr auto version_number{11};
@@ -727,13 +728,8 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 		req.set(beast::http::field::host, url.host());
 		req.set(beast::http::field::user_agent, irods::http::version::server_name);
 
-		// Send request
-		beast::http::write(tcp_stream, req);
-
-		// Read back req
-		beast::flat_buffer buffer;
-		beast::http::response<beast::http::string_body> res;
-		beast::http::read(tcp_stream, buffer, res);
+		// Sends and recieves response
+		auto res{tcp_stream->communicate(req)};
 
 		// TODO: Check resposnse code...
 		log::debug("Got the following back: {}", res.body());
@@ -741,10 +737,6 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 		// Convert http json response to nlomman json response
 		_endpoint_config = json::parse(res.body());
 		irods::http::globals::set_oidc_endpoint_configuration(_endpoint_config);
-
-		// Close the socket
-		beast::error_code ec;
-		tcp_stream.socket().shutdown(net::ip::tcp::socket::shutdown_both, ec);
 	}
 	catch (const json::out_of_range& e) {
 		log::trace("Invalid OIDC configuration, ignoring. Reason: {}", e.what());
