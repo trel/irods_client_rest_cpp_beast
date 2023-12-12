@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.18.0 FATAL_ERROR)
 # Build Configuration
 #
 
-find_package(IRODS REQUIRED CONFIG)
+find_package(IRODS REQUIRED)
 
 include(RequireOutOfSourceBuild)
 
@@ -29,10 +29,7 @@ project(${IRODS_HTTP_API_BINARY_NAME} VERSION "${IRODS_HTTP_API_VERSION}" LANGUA
 
 find_package(Threads REQUIRED)
 
-# TODO Remove once project is ready for the public.
-set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
-
-include(${IRODS_TARGETS_PATH})
+include("${IRODS_TARGETS_PATH}")
 include(GNUInstallDirs)
 include(UseLibCXX)
 
@@ -40,10 +37,6 @@ if (NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build {Debug, Release}." FORCE)
   message(STATUS "Setting unspecified CMAKE_BUILD_TYPE to '${CMAKE_BUILD_TYPE}'. This is the correct setting for normal builds.")
 endif()
-
-find_package(CURL REQUIRED)
-find_package(nlohmann_json "3.6.1" REQUIRED)
-find_package(OpenSSL REQUIRED COMPONENTS Crypto SSL)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
   set(IRODS_BUILD_WITH_WERROR_DEFAULT ON)
@@ -55,10 +48,6 @@ set(IRODS_BUILD_WITH_WERROR ${IRODS_BUILD_WITH_WERROR_DEFAULT} CACHE BOOL "Choos
 if (IRODS_BUILD_WITH_WERROR)
   add_compile_options(-Werror)
 endif()
-
-# jwt library to handle OIDC JWT responses containing user information
-find_package(jwt-cpp REQUIRED
-  HINTS "${IRODS_EXTERNALS_FULLPATH_JWTCPP}")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fpermissive>)
@@ -94,7 +83,44 @@ else()
   set(CMAKE_EXE_LINKER_FLAGS_INIT "${CMAKE_EXE_LINKER_FLAGS_INIT} -Wl,-z,defs")
 endif()
 
-add_subdirectory(src)
+set(IRODS_ENABLE_GENQUERY2 OFF CACHE BOOL "Enable GenQuery2 support. GenQuery2 package must be installed.")
+
+set(IRODS_HTTP_PROJECT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+set(IRODS_HTTP_PROJECT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+
+find_package(CURL REQUIRED)
+find_package(nlohmann_json "3.6.1" REQUIRED)
+find_package(OpenSSL REQUIRED COMPONENTS Crypto SSL)
+
+# jwt library to handle OIDC JWT responses containing user information
+find_package(jwt-cpp REQUIRED
+  HINTS "${IRODS_EXTERNALS_FULLPATH_JWTCPP}")
+
+include(ObjectTargetHelpers)
+
+add_subdirectory(core)
+add_subdirectory(endpoints)
+
+add_executable(${IRODS_HTTP_API_BINARY_NAME})
+target_link_objects(
+  ${IRODS_HTTP_API_BINARY_NAME}
+  PRIVATE
+  irods_http_api_core
+  irods_http_api_shared_operations
+  irods_http_api_endpoint_authentication
+  irods_http_api_endpoint_collections
+  #irods_http_api_endpoint_config
+  irods_http_api_endpoint_data_objects
+  irods_http_api_endpoint_information
+  irods_http_api_endpoint_query
+  irods_http_api_endpoint_resources
+  irods_http_api_endpoint_rules
+  irods_http_api_endpoint_tickets
+  irods_http_api_endpoint_users_groups
+  irods_http_api_endpoint_zones
+)
+
+install(TARGETS ${IRODS_HTTP_API_BINARY_NAME} DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
 #
 # Packaging Configuration
@@ -134,10 +160,32 @@ set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 set(CPACK_ARCHIVE_COMPONENT_INSTALL OFF)
 
 set(CPACK_DEBIAN_PACKAGE_NAME ${IRODS_PACKAGE_NAME})
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "${IRODS_PACKAGE_DEPENDENCIES_STRING}, irods-runtime (= ${IRODS_VERSION})")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "irods-runtime (= ${IRODS_VERSION})")
+
+get_filename_component(CURL_LIBRARY_REALPATH ${CURL_LIBRARY} REALPATH)
+get_filename_component(CURL_LIBRARY_REALNAME ${CURL_LIBRARY_REALPATH} NAME_WE)
+if (CURL_LIBRARY_REALNAME STREQUAL "libcurl-gnutls")
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_DEBIAN_PACKAGE_DEPENDS}, libcurl3-gnutls")
+elseif (CURL_LIBRARY_REALNAME STREQUAL "libcurl-nss")
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_DEBIAN_PACKAGE_DEPENDS}, libcurl3-nss")
+elseif (CURL_LIBRARY_REALNAME STREQUAL "libcurl")
+  if (IRODS_LINUX_DISTRIBUTION_NAME STREQUAL "ubuntu")
+    if (IRODS_LINUX_DISTRIBUTION_VERSION_MAJOR GREATER_EQUAL "18")
+      set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_DEBIAN_PACKAGE_DEPENDS}, libcurl4")
+    else ()
+      set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_DEBIAN_PACKAGE_DEPENDS}, libcurl3")
+    endif ()
+  elseif (IRODS_LINUX_DISTRIBUTION_NAME STREQUAL "debian")
+    if (IRODS_LINUX_DISTRIBUTION_VERSION_MAJOR GREATER_EQUAL "10")
+      set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_DEBIAN_PACKAGE_DEPENDS}, libcurl4")
+    else ()
+      set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_DEBIAN_PACKAGE_DEPENDS}, libcurl3")
+    endif ()
+  endif ()
+endif ()
 
 set(CPACK_RPM_PACKAGE_NAME ${IRODS_PACKAGE_NAME})
-set(CPACK_RPM_PACKAGE_REQUIRES "${IRODS_PACKAGE_DEPENDENCIES_STRING}, irods-runtime = ${IRODS_VERSION}")
+set(CPACK_RPM_PACKAGE_REQUIRES "irods-runtime = ${IRODS_VERSION}, libcurl")
 
 if (NOT CPACK_GENERATOR)
   set(CPACK_GENERATOR ${IRODS_CPACK_GENERATOR} CACHE STRING "CPack generator to use, e.g. {DEB, RPM, TGZ}." FORCE)
