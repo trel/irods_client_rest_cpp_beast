@@ -328,6 +328,25 @@ namespace irods::http
 		log::error("{}: HTTP method not supported.", __func__);
 		return _sess_ptr->send(irods::http::fail(status_type::method_not_allowed));
 	} // operation_dispatch
+
+	auto get_port_from_url(boost::urls::url_view _url) -> std::optional<std::string>
+	{
+		if (_url.has_port()) {
+			return _url.port();
+		}
+
+		switch (_url.scheme_id()) {
+			case boost::urls::scheme::https:
+				log::debug("{}: Detected HTTPS scheme, using port 443.", __func__);
+				return "443";
+			case boost::urls::scheme::http:
+				log::debug("{}: Detected HTTP scheme, using port 80.", __func__);
+				return "80";
+			default:
+				log::error("{}: Cannot deduce port from url [{}].", __func__, _url.data());
+				return std::nullopt;
+		}
+	} // get_port_from_url
 } // namespace irods::http
 
 namespace irods

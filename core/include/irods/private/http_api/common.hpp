@@ -11,6 +11,7 @@
 #include <boost/beast/http/status.hpp>
 #include <boost/beast/http/message.hpp>
 #include <boost/beast/http/string_body.hpp>
+#include <boost/url/parse.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -161,6 +162,8 @@ namespace irods::http
 		request_type& _req,
 		const std::unordered_map<std::string, handler_type>& _op_table_get,
 		const std::unordered_map<std::string, handler_type>& _op_table_post) -> void;
+
+	auto get_port_from_url(boost::urls::url_view _url) -> std::optional<std::string>;
 } // namespace irods::http
 
 namespace irods
