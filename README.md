@@ -249,15 +249,12 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
             },
 
             // Defines required OIDC related configuration.
-            "oidc": {
-                // The hostname or ip address of the OIDC provider.
-                "config_host": "oidc.example.org",
-
-                // The port the OIDC provider is listening on.
-                "port": 8080,
-
-                // Well known endpoint to retrieve configuration of OIDC provider.
-                "well_known_uri": "/realms/example",
+            "openid_connect": {
+                // The url of the OIDC provider, with a path leading to
+                // where the .well-known configuration is.
+                // The protocol will determine the default port used if
+                // none is specified in the url.
+                "provider_url": "https://oidc.example.org/realms/irods",
 
                 // The client id given to the application by OIDC provider.
                 "client_id": "irods_http_api",

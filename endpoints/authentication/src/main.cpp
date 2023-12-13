@@ -19,6 +19,7 @@
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
+#include <boost/url/parse.hpp>
 
 #include <iterator>
 #include <nlohmann/json.hpp>
@@ -58,45 +59,27 @@ namespace irods::http::handler
 		net::ip::tcp::resolver tcp_res{io_ctx};
 		beast::tcp_stream tcp_stream{io_ctx};
 
-		// Setup curl
-		CURLU* endpoint{curl_url()};
-		if (endpoint == nullptr) {
-			std::abort();
+		const auto parsed_uri{boost::urls::parse_uri(token_endpoint)};
+
+		if (parsed_uri.has_error()) {
+			log::error(
+				"{}: Error trying to parse token_endpoint [{}]. Please check configuration.", __func__, token_endpoint);
+			return {{"error", "bad endpoint"}};
 		}
 
-		// Parse url
-		CURLUcode rc{curl_url_set(endpoint, CURLUPART_URL, token_endpoint.c_str(), 0)};
-		if (rc != 0) {
-			log::debug("Something happend....");
-		}
-
-		// Get host
-		char* host{};
-		rc = curl_url_get(endpoint, CURLUPART_HOST, &host, 0);
-		if (rc != 0) {
-			log::debug("Something happend....");
-		}
-
-		// Get service/port
-		const auto port{std::to_string(irods::http::globals::oidc_configuration().at("port").get<int>())};
-
-		// Get path
-		char* path{};
-		rc = curl_url_get(endpoint, CURLUPART_PATH, &path, 0);
-		if (rc != 0) {
-			log::debug("Something happend....");
-		}
+		const auto url{*parsed_uri};
+		const auto port{irods::http::get_port_from_url(url)};
 
 		// Addr
-		const auto resolve{tcp_res.resolve(host, port)};
+		const auto resolve{tcp_res.resolve(url.host(), *port)};
 
 		// TCP thing
 		tcp_stream.connect(resolve);
 
 		// Build Request
 		constexpr auto version_number{11};
-		beast::http::request<beast::http::string_body> req{beast::http::verb::post, path, version_number};
-		req.set(beast::http::field::host, host);
+		beast::http::request<beast::http::string_body> req{beast::http::verb::post, url.path(), version_number};
+		req.set(beast::http::field::host, url.host());
 		req.set(beast::http::field::user_agent, irods::http::version::server_name);
 		req.set(beast::http::field::content_type,
 		        "application/x-www-form-urlencoded"); // Possibly set a diff way?
@@ -118,13 +101,6 @@ namespace irods::http::handler
 		// Close socket
 		beast::error_code ec;
 		tcp_stream.socket().shutdown(net::ip::tcp::socket::shutdown_both, ec);
-
-		// Free up all items created in reverse order
-		curl_free(path);
-		curl_free(host);
-
-		// Done
-		curl_url_cleanup(endpoint);
 
 		// JSONize response
 		return nlohmann::json::parse(res.body());
@@ -204,7 +180,7 @@ namespace irods::http::handler
 	{
 		if (_req.method() == boost::beast::http::verb::get) {
 			static const auto oidc_stanza_exists = irods::http::globals::configuration().contains(
-				nlohmann::json::json_pointer{"/http_server/authentication/oidc"});
+				nlohmann::json::json_pointer{"/http_server/authentication/openid_connect"});
 
 			if (!oidc_stanza_exists) {
 				log::error("{}: HTTP GET method cannot be used for Basic authentication.", __func__);

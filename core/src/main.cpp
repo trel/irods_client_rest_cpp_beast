@@ -23,6 +23,7 @@
 #include <boost/config.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
+#include <boost/url/parse.hpp>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -225,17 +226,10 @@ constexpr auto default_jsonschema() -> std::string_view
                                 "timeout_in_seconds"
                             ]
                         }},
-                        "oidc": {{
+                        "openid_connect": {{
                             "type": "object",
                             "properties": {{
-                                "config_host": {{
-                                    "type": "string"
-                                }},
-                                "port": {{
-                                    "type": "integer",
-                                    "minimum": 1
-                                }},
-                                "well_known_uri": {{
+                                "provider_url": {{
                                     "type": "string"
                                 }},
                                 "client_id": {{
@@ -249,9 +243,7 @@ constexpr auto default_jsonschema() -> std::string_view
                                 }}
                             }},
                             "required": [
-                                "config_host",
-                                "port",
-                                "well_known_uri",
+                                "provider_url",
                                 "client_id",
                                 "redirect_uri",
                                 "irods_user_claim"
@@ -268,7 +260,7 @@ constexpr auto default_jsonschema() -> std::string_view
                         {{
                              "required": [
                                 "eviction_check_interval_in_seconds",
-                                "oidc"
+                                "openid_connect"
                              ]
                         }}
                     ]
@@ -460,10 +452,8 @@ auto print_configuration_template() -> void
                 "timeout_in_seconds": 3600
             }},
 
-            "oidc": {{
-                "config_host": "<string>",
-                "port": 8080,
-                "well_known_uri": "<string>",
+            "openid_connect": {{
+                "provider_url": "<string>",
                 "client_id": "<string>",
                 "redirect_uri": "<string>",
                 "irods_user_claim": "<string>"
@@ -696,11 +686,11 @@ auto init_irods_connection_pool(const json& _config) -> std::unique_ptr<irods::c
 		opts);
 } // init_irods_connection_pool
 
-auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpoint_config) -> void
+auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpoint_config) -> bool
 {
 	try {
 		// Setup config
-		_oi_config = _config.at(json::json_pointer{"/authentication/oidc"});
+		_oi_config = _config[json::json_pointer{"/authentication/openid_connect"}];
 		irods::http::globals::set_oidc_configuration(_oi_config);
 
 		// Consider reusing context further down main?
@@ -709,21 +699,32 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 		beast::tcp_stream tcp_stream{io_ctx};
 
 		// Load config
-		const auto host{_oi_config.at("config_host").get_ref<const std::string&>()};
-		const auto port{std::to_string(_oi_config.at("port").get<int>())};
-		const auto temp_uri{_oi_config.at("well_known_uri").get_ref<const std::string&>()};
-		const auto uri{fmt::format("{}/.well-known/openid-configuration", temp_uri)};
+		const auto& provider{_oi_config.at("provider_url").get_ref<const std::string&>()};
+		const auto parsed_uri{boost::urls::parse_uri(provider)};
+
+		if (parsed_uri.has_error()) {
+			log::error("Error trying to parse provider_url [{}]. Please check configuration.", provider);
+			return false;
+		}
+
+		const auto url{*parsed_uri};
+		const auto path{fmt::format("{}/.well-known/openid-configuration", url.path())};
+		const auto port{irods::http::get_port_from_url(url)};
+
+		if (!port) {
+			return false;
+		}
 
 		// Resolve addr
-		const auto resolve{tcp_res.resolve(host, port)};
+		const auto resolve{tcp_res.resolve(url.host(), *port)};
 
 		// Connect and get config
 		tcp_stream.connect(resolve);
 
 		// Build Request
 		constexpr auto version_number{11};
-		beast::http::request<beast::http::string_body> req{beast::http::verb::get, uri, version_number};
-		req.set(beast::http::field::host, host);
+		beast::http::request<beast::http::string_body> req{beast::http::verb::get, path, version_number};
+		req.set(beast::http::field::host, url.host());
 		req.set(beast::http::field::user_agent, irods::http::version::server_name);
 
 		// Send request
@@ -747,7 +748,10 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 	}
 	catch (const json::out_of_range& e) {
 		log::trace("Invalid OIDC configuration, ignoring. Reason: {}", e.what());
+		return false;
 	}
+
+	return true;
 } // load_oidc_configuration
 
 class process_stash_eviction_manager
@@ -871,8 +875,17 @@ auto main(int _argc, char* _argv[]) -> int
 		// JSON configs needs to be in main scope to last the entire duration of the program
 		nlohmann::json oi_config;
 		nlohmann::json endpoint_config;
-		load_oidc_configuration(http_server_config, oi_config, endpoint_config);
 
+		// Check if OIDC config exists, skip setup if missing.
+		if (http_server_config.contains(json::json_pointer{"/authentication/openid_connect"})) {
+			if (!load_oidc_configuration(http_server_config, oi_config, endpoint_config)) {
+				log::error("Invalid OIDC configuration, server not starting.");
+				return 1;
+			}
+		}
+		else {
+			log::info("No OIDC configuration detected, running without OIDC features.");
+		}
 		// TODO For LONG running tasks, see the following:
 		//
 		//   - https://stackoverflow.com/questions/17648725/long-running-blocking-operations-in-boost-asio-handlers
