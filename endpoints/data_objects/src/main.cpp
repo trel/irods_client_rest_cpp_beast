@@ -1012,25 +1012,22 @@ namespace
 					irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
 
 					if (const auto iter = _args.find("lpath"); iter != std::end(_args)) {
-						std::strncpy(input.objPath, iter->second.c_str(), sizeof(DataObjInp::objPath));
+						std::strncpy(input.objPath, iter->second.c_str(), sizeof(DataObjInp::objPath) - 1);
 					}
 					else {
 						log::error("{}: Missing [lpath] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
-					if (auto iter = _args.find("resource"); iter != std::end(_args)) {
-						addKeyVal(&input.condInput, RESC_NAME_KW, iter->second.c_str());
-					}
-					else if (iter = _args.find("replica-number"); iter != std::end(_args)) {
+					if (const auto iter = _args.find("replica-number"); iter != std::end(_args)) {
 						addKeyVal(&input.condInput, REPL_NUM_KW, iter->second.c_str());
 					}
 					else {
-						log::error("{}: Missing [resource] or [replica-number] parameter.", fn);
+						log::error("{}: Missing [replica-number] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
-					if (const auto iter = _args.find("unregister"); iter != std::end(_args) && iter->second == "1") {
+					if (const auto iter = _args.find("catalog-only"); iter != std::end(_args) && iter->second == "1") {
 						input.oprType = UNREG_OPR;
 					}
 
