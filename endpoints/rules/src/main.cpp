@@ -159,7 +159,7 @@ namespace
 				irods::at_scope_exit clear_kvp{[&input] { clearKeyVal(&input.condInput); }};
 
 				const auto rule_text = fmt::format("@external rule {{ {} }}", rule_text_iter->second);
-				std::strncpy(input.myRule, rule_text.c_str(), sizeof(ExecMyRuleInp::myRule));
+				irods::strncpy_null_terminated(input.myRule, rule_text.c_str());
 
 				const auto rep_instance_iter = _args.find("rep-instance");
 				if (rep_instance_iter != std::end(_args)) {
@@ -174,7 +174,7 @@ namespace
 				}};
 
 				input.inpParamArray = &param_array;
-				std::strncpy(input.outParamDesc, "ruleExecOut", sizeof(input.outParamDesc));
+				irods::strncpy_null_terminated(input.outParamDesc, "ruleExecOut");
 
 				MsParamArray* out_param_array{};
 
@@ -268,8 +268,7 @@ namespace
 					}
 
 					RuleExecDeleteInput input{};
-					std::strncpy(
-						input.ruleExecId, rule_id_iter->second.c_str(), sizeof(RuleExecDeleteInput::ruleExecId));
+					irods::strncpy_null_terminated(input.ruleExecId, rule_id_iter->second.c_str());
 
 					auto conn = irods::get_connection(client_info.username);
 					const auto ec = rcRuleExecDel(static_cast<RcComm*>(conn), &input);

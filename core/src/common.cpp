@@ -376,8 +376,8 @@ namespace irods
 
 		irods::at_scope_exit clear_options{[&input] { clearKeyVal(&input.options); }};
 
-		std::strncpy(input.username, _username.c_str(), sizeof(SwitchUserInput::username));
-		std::strncpy(input.zone, zone.c_str(), sizeof(SwitchUserInput::zone));
+		irods::strncpy_null_terminated(input.username, _username.c_str());
+		irods::strncpy_null_terminated(input.zone, zone.c_str());
 		addKeyVal(&input.options, KW_CLOSE_OPEN_REPLICAS, "");
 
 		if (const auto ec = rc_switch_user(static_cast<RcComm*>(conn), &input); ec < 0) {
