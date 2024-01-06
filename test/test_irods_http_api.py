@@ -719,6 +719,119 @@ class test_data_objects_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
+    def test_calculating_and_verifying_checksums(self):
+        rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+
+        resc_name = 'test_ufs_checksums_resc'
+        data_object = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'checksums.txt')
+
+        try:
+            # Create a unixfilesystem resource.
+            r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
+                'op': 'create',
+                'name': resc_name,
+                'type': 'unixfilesystem',
+                'host': self.server_hostname,
+                'vault-path': os.path.join('/tmp', f'{resc_name}_vault')
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Create a non-empty data object.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'write',
+                'lpath': data_object,
+                'bytes': 'hello, this message was written via the iRODS HTTP API!'
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Replicate the data object.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'replicate',
+                'lpath': data_object,
+                'dst-resource': resc_name
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show there are two replicas.
+            coll_name = os.path.dirname(data_object)
+            data_name = os.path.basename(data_object)
+            r = requests.get(f'{self.url_base}/query', headers=rodsuser_headers, params={
+                'op': 'execute_genquery',
+                'query': f"select DATA_NAME, RESC_NAME where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(len(result['rows']), 2)
+
+            # Calculate a checksum for first replica.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'calculate_checksum',
+                'lpath': data_object,
+                'replica-number': 0
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(result['checksum'], 'sha2:1SgRcbKcy3+4fjwMvf7xQNG5OZmiYzBVbNuMIgiWbBE=')
+
+            # Verify checksum information across all replicas.
+            r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={
+                'op': 'verify_checksum',
+                'lpath': data_object
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], irods_error_codes.CHECK_VERIFICATION_RESULTS)
+            self.assertEqual(result['results'][0]['error_code'], irods_error_codes.CAT_NO_CHECKSUM_FOR_REPLICA)
+            self.assertEqual(result['results'][0]['message'], 'WARNING: No checksum available for replica [1].')
+            self.assertEqual(result['results'][0]['severity'], 'warning')
+
+        finally:
+            # Remove the data objects.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'catalog-only': 0,
+                'no-trash': 1
+            })
+            logging.debug(r.content)
+
+            # Remove the resource.
+            r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
+                'op': 'remove',
+                'name': resc_name
+            })
+            logging.debug(r.content)
+
+    def test_calculate_checksum_operation_handles_non_existent_data_objects_gracefully(self):
+        r = requests.post(self.url_endpoint, headers={'Authorization': 'Bearer ' + self.rodsuser_bearer_token}, data={
+            'op': 'calculate_checksum',
+            'lpath': '/tempZone/does/not/exist.txt'
+        })
+        logging.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.CAT_NO_ROWS_FOUND)
+
+    def test_verify_checksum_operation_handles_non_existent_data_objects_gracefully(self):
+        r = requests.get(self.url_endpoint, headers={'Authorization': 'Bearer ' + self.rodsuser_bearer_token}, params={
+            'op': 'verify_checksum',
+            'lpath': '/tempZone/does/not/exist.txt'
+        })
+        logging.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.CAT_NO_ROWS_FOUND)
+
     def test_registering_a_new_data_object(self):
         rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
 
