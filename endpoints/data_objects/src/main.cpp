@@ -962,21 +962,25 @@ namespace
 					auto conn = irods::get_connection(client_info.username);
 					const auto ec = rcDataObjRepl(static_cast<RcComm*>(conn), &input);
 
-					res.body() =
-						json{
-							{"irods_response",
-				             {
-								 {"status_code", ec},
-							 }},
-						}
-							.dump();
+					// clang-format off
+					res.body() = json{
+						{"irods_response", {
+							{"status_code", ec}
+						}}
+					}.dump();
+					// clang-format on
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
 					res.result(http::status::bad_request);
-					res.body() = json{{"irods_response",
-				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-				                     .dump();
+					// clang-format off
+					res.body() = json{
+						{"irods_response", {
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
+						}}
+					}.dump();
+					// clang-format on
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
@@ -1044,10 +1048,14 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
-					res.body() = json{{"irods_response",
-				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-				                     .dump();
+					// clang-format off
+					res.body() = json{
+						{"irods_response", {
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
+						}
+					}}.dump();
+					// clang-format on
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
@@ -1193,10 +1201,14 @@ namespace
 				if (const auto iter = _args.find("ticket"); iter != std::end(_args)) {
 					if (const auto ec = irods::enable_ticket(conn, iter->second); ec < 0) {
 						res.result(http::status::internal_server_error);
-						res.body() =
-							json{{"irods_response",
-						          {{"status_code", ec}, {"status_message", "Error enabling ticket on connection."}}}}
-								.dump();
+						// clang-format off
+						res.body() = json{
+							{"irods_response", {
+								{"status_code", ec},
+								{"status_message", "Error enabling ticket on connection."}
+							}}
+						}.dump();
+						// clang-format on
 						res.prepare_payload();
 						return _sess_ptr->send(std::move(res));
 					}
@@ -1329,10 +1341,14 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
-					res.body() = json{{"irods_response",
-				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-				                     .dump();
+					// clang-format off
+					res.body() = json{
+						{"irods_response", {
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
+						}}
+					}.dump();
+					// clang-format on
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
@@ -1554,20 +1570,26 @@ namespace
 				}
 				catch (const fs::filesystem_error& e) {
 					log::error("{}: {}", fn, e.what());
-					res.result(http::status::bad_request);
-					res.body() =
-						json{{"irods_response",
-				              {{"status_code",
-				                e.code().value() == INVALID_OBJECT_TYPE ? NOT_A_DATA_OBJECT : e.code().value()},
-				               {"status_message", e.what()}}}}
-							.dump();
+					const auto ec = e.code().value();
+					// clang-format off
+					res.body() = json{
+						{"irods_response", {
+							{"status_code", ec == INVALID_OBJECT_TYPE ? NOT_A_DATA_OBJECT : ec},
+							{"status_message", e.what()}
+						}}
+					}.dump();
+					// clang-format on
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
-					res.body() = json{{"irods_response",
-				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-				                     .dump();
+					// clang-format off
+					res.body() = json{
+						{"irods_response", {
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
+						}}
+					}.dump();
+					// clang-format on
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
@@ -1743,10 +1765,14 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
-					res.body() = json{{"irods_response",
-				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-				                     .dump();
+					// clang-format off
+					res.body() = json{
+						{"irods_response", {
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
+						}}
+					}.dump();
+					// clang-format on
 				}
 				catch (const std::exception& e) {
 					log::error("{}: {}", fn, e.what());
