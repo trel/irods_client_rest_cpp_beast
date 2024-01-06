@@ -1,4 +1,8 @@
+import logging
+
 test_config = {
+    'log_level': logging.INFO,
+
     'host': 'localhost',
     'port': 9000,
     'url_base': '/irods-http-api/0.1.0',
