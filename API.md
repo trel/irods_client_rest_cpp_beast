@@ -526,7 +526,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin.
 ```
 
-`resource` and `replica-number` are mutually exclusive parameters.
+`resource`, `replica-number`, and `all` are mutually exclusive parameters.
 
 #### Response
 
