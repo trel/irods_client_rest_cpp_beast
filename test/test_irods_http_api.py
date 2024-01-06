@@ -543,10 +543,11 @@ class test_collections_endpoint(unittest.TestCase):
             self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_COLLECTION)
 
         finally:
-            # Remove data object.
+            # Remove the data object.
             r = requests.post(f'{self.url_base}/data-objects', headers=rodsuser_headers, data={
                 'op': 'remove',
                 'lpath': data_object,
+                'catalog-only': 0,
                 'no-trash': 1
             })
             logging.debug(r.content)
@@ -702,8 +703,13 @@ class test_data_objects_endpoint(unittest.TestCase):
         # Remove the data objects.
         for data_object in [data_object_renamed, data_object_copied]:
             with self.subTest(f'Removing [{data_object}]'):
-                r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={'op': 'remove', 'lpath': data_object, 'no-trash': 1})
-                #print(r.content) # Debug
+                r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                    'op': 'remove',
+                    'lpath': data_object,
+                    'catalog-only': 0,
+                    'no-trash': 1
+                })
+                logging.debug(r.content)
                 self.assertEqual(r.status_code, 200)
                 self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -763,11 +769,11 @@ class test_data_objects_endpoint(unittest.TestCase):
             self.assertEqual(result['rows'][0][3], resource)
 
         finally:
-            # Remove the data object by unregistering it.
+            # Unregister the data object.
             r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
                 'op': 'remove',
                 'lpath': data_object,
-                'unregister': 1
+                'catalog-only': 1
             })
             logging.debug(r.content)
 
@@ -837,11 +843,35 @@ class test_data_objects_endpoint(unittest.TestCase):
             self.assertEqual(result['rows'][0][2], physical_path)
             self.assertEqual(result['rows'][0][3], other_resource)
 
+            # Unregister replica 1.
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'trim',
+                'lpath': data_object,
+                'replica-number': 1,
+                'catalog-only': 1
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show the replica 1 no longer exists.
+            r = requests.get(f'{self.url_base}/query', headers=rodsadmin_headers, params={
+                'op': 'execute_genquery',
+                'query': 'select COLL_NAME, DATA_NAME ' +
+                         f"where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{filename}' and DATA_REPL_NUM = '1'"
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(len(result['rows']), 0)
+
         finally:
-            # Remove the data object by unregistering it.
+            # Remove the data object.
             r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
                 'op': 'remove',
                 'lpath': data_object,
+                'catalog-only': 0,
                 'no-trash': 1
             })
             logging.debug(r.content)
@@ -909,10 +939,11 @@ class test_data_objects_endpoint(unittest.TestCase):
             self.assertGreater(new_mtime, original_mtime)
 
         finally:
-            # Remove data object.
+            # Remove the data object.
             r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
                 'op': 'remove',
                 'lpath': data_object,
+                'catalog-only': 0,
                 'no-trash': 1
             })
             logging.debug(r.content)
@@ -1021,8 +1052,13 @@ class test_data_objects_endpoint(unittest.TestCase):
         self.assertEqual(r.content.decode('utf-8'), 'A' * 10 + 'B' * 10 + 'C' * 10)
 
         # Remove the data object.
-        r = requests.post(self.url_endpoint, headers=headers, data={'op': 'remove', 'lpath': data_object, 'no-trash': 1})
-        #print(r.content) # Debug
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'remove',
+            'lpath': data_object,
+            'catalog-only': 0,
+            'no-trash': 1
+        })
+        logging.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1102,6 +1138,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data={
             'op': 'remove',
             'lpath': data_object,
+            'catalog-only': 0,
             'no-trash': 1
         })
         logging.debug(r.content)
@@ -1187,6 +1224,7 @@ class test_data_objects_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data={
             'op': 'remove',
             'lpath': data_object,
+            'catalog-only': 0,
             'no-trash': 1
         })
         logging.debug(r.content)
@@ -1248,11 +1286,151 @@ class test_data_objects_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data={
             'op': 'remove',
             'lpath': data_object,
+            'catalog-only': 0,
             'no-trash': 1
         })
         logging.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+    def test_remove_operation_returns_an_error_when_catalog_only_is_1_and_no_trash_is_1(self):
+        r = requests.post(self.url_endpoint, headers={'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}, data={
+            'op': 'remove',
+            'lpath': 'ignored',
+            'catalog-only': 1,
+            'no-trash': 1
+        })
+        logging.debug(r.content)
+        self.assertEqual(r.status_code, 400)
+
+    def test_remove_operation_supports_unregistering_all_replicas(self):
+        rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+        data_object = f'/{self.zone_name}/home/{self.rodsadmin_username}/remove_op_unreg.txt'
+        resc_name = 'remove_op_unreg_resc'
+
+        try:
+            # Create a non-empty data object.
+            logging.debug('Creating data object')
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'write',
+                'lpath': data_object,
+                'bytes': 'hello, this message was written via the iRODS HTTP API!'
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Create a unixfilesystem resource.
+            logging.debug('Creating resource')
+            r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
+                'op': 'create',
+                'name': resc_name,
+                'type': 'unixfilesystem',
+                'host': self.server_hostname,
+                'vault-path': os.path.join('/tmp', f'{resc_name}_vault')
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Replicate the data object.
+            logging.debug('Replicating replica to new resource')
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'replicate',
+                'lpath': data_object,
+                'dst-resource': resc_name
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Get the physical path of the replicas.
+            # We include the replica number so the replicas are listed in the order in which
+            # they were created.
+            coll_name = os.path.dirname(data_object)
+            data_name = os.path.basename(data_object)
+            r = requests.get(f'{self.url_base}/query', headers=rodsadmin_headers, params={
+                'op': 'execute_genquery',
+                'parser': 'genquery1',
+                'query': f"select DATA_REPL_NUM, DATA_PATH where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(len(result['rows']), 2)
+
+            replica_paths = result['rows']
+            logging.debug(f'replica 0 => [{replica_paths[0][1]}]')
+            logging.debug(f'replica 1 => [{replica_paths[1][1]}]')
+
+            # Unregister all replicas.
+            logging.debug(f'Calling remove op to unregister all replicas')
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'catalog-only': 1
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Because the user running the tests may not have permission to view the
+            # files in vault, we have to register them and show iRODS can read them.
+            # This proves the files were left in-place.
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'register',
+                'lpath': data_object,
+                'ppath': replica_paths[0][1],
+                'resource': 'demoResc'
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'register',
+                'lpath': data_object,
+                'ppath': replica_paths[1][1],
+                'resource': resc_name,
+                'as-additional-replica': 1
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Calculate a checksum for each replica.
+            # This serves as proof that things are working as expected because
+            # calculating a checksum requires reading the physical file.
+            for replica_number in range(2):
+                with self.subTest(f'Calculating checksum for replica [{replica_number}] of data object [{data_object}]'):
+                    r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                        'op': 'calculate_checksum',
+                        'lpath': data_object,
+                        'replica-number': replica_number
+                    })
+                    logging.debug(r.content)
+                    self.assertEqual(r.status_code, 200)
+                    result = r.json()
+                    self.assertEqual(result['irods_response']['status_code'], 0)
+                    self.assertEqual(result['checksum'], 'sha2:1SgRcbKcy3+4fjwMvf7xQNG5OZmiYzBVbNuMIgiWbBE=')
+
+        finally:
+            # Remove the data object.
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'catalog-only': 0,
+                'no-trash': 1
+            })
+            logging.debug(r.content)
+
+            # Remove resource.
+            r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
+                'op': 'remove',
+                'name': resc_name
+            })
+            logging.debug(r.content)
 
     @unittest.skip('Test needs to be implemented.')
     def test_return_error_on_missing_parameters(self):
@@ -1357,10 +1535,11 @@ class test_query_endpoint(unittest.TestCase):
             self.assertEqual(len(result['rows']), 2)
 
         finally:
-            # Remove data object.
+            # Remove the data object.
             r = requests.post(f'{self.url_base}/data-objects', headers=rodsuser_headers, data={
                 'op': 'remove',
                 'lpath': data_object,
+                'catalog-only': 0,
                 'no-trash': 1
             })
             logging.debug(r.content)
@@ -1420,10 +1599,11 @@ class test_query_endpoint(unittest.TestCase):
             self.assertEqual(len(result['rows']), 0)
 
         finally:
-            # Remove data object.
+            # Remove the data object.
             r = requests.post(f'{self.url_base}/data-objects', headers=headers, data={
                 'op': 'remove',
                 'lpath': data_object,
+                'catalog-only': 0,
                 'no-trash': 1
             })
             logging.debug(r.content)
@@ -1667,10 +1847,11 @@ class test_resources_endpoint(unittest.TestCase):
         # Clean-up
         #
 
-        # Remove data object.
+        # Remove the data object.
         r = requests.post(f'{self.url_base}/data-objects', headers=headers, data={
             'op': 'remove',
             'lpath': data_object,
+            'catalog-only': 0,
             'no-trash': 1
         })
         logging.debug(r.content)
@@ -1958,6 +2139,7 @@ class test_tickets_endpoint(unittest.TestCase):
         r = requests.post(f'{self.url_base}/data-objects', headers=headers, data={
             'op': 'remove',
             'lpath': data_object,
+            'catalog-only': 0,
             'no-trash': 1
         })
         logging.debug(r.content)

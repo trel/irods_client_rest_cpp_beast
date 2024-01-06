@@ -479,9 +479,7 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 ### remove
 
-Removes a data object.
-
-The data object will be permanently deleted if `no-trash=1` is passed.
+Removes a data object or unregisters all replicas.
 
 #### Request
 
@@ -490,9 +488,14 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
     --data-urlencode 'op=remove' \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
+    --data-urlencode 'catalog-only=<integer>' \ # 0 or 1. If set to 1, removes only the catalog entry.
     --data-urlencode 'no-trash=<integer>' \ # 0 or 1. Defaults to 0. If set to 1, permanently deletes the data object.
-    --data-urlencode 'unregister=<integer>' # 0 or 1. Defaults to 0. Removes only the catalog entry.
+    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin.
 ```
+
+`catalog-only` and `no-trash` are mutually exclusive parameters. Setting both to 1 will result in an error.
+
+`catalog-only` requires rodsadmin level privileges. This requirement can be relaxed by adjusting the iRODS server's policy.
 
 #### Response
 
