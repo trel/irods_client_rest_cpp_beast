@@ -44,6 +44,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 // clang-format off
@@ -308,6 +309,114 @@ namespace irods::http::handler
 namespace
 {
 	//
+	// Utility functions
+	//
+
+	class incremental_read : public std::enable_shared_from_this<incremental_read>
+	{
+	  public:
+		incremental_read(
+			irods::http::session_pointer_type& _sess_ptr,
+			unsigned int _http_version,
+			bool _http_keep_alive,
+			irods::experimental::client_connection& _conn,
+			std::unique_ptr<io::client::native_transport>& _tp,
+			io::idstream& _in,
+			std::int64_t _buffer_size,
+			std::int64_t _remaining_bytes)
+			: sess_ptr_{_sess_ptr->shared_from_this()}
+			, res_{http::status::ok, _http_version}
+			, serializer_{res_}
+			, conn_{std::move(_conn)}
+			, tp_{std::move(_tp)}
+			, in_{std::move(_in)}
+			, buffer_(_buffer_size)
+			, remaining_bytes_{_remaining_bytes}
+		{
+			res_.set(http::field::server, irods::http::version::server_name);
+			res_.set(http::field::content_type, "application/octet-stream");
+			res_.keep_alive(_http_keep_alive);
+			res_.chunked(true);
+			res_.body().data = nullptr;
+			res_.body().more = true;
+		}
+
+		auto start() -> void
+		{
+			log::trace("{}: Posting task for asynchronously writing headers.", __func__);
+
+			async_write_header(
+				sess_ptr_->stream(),
+				serializer_,
+				[self = shared_from_this(), fn = __func__](const auto& ec, std::size_t _bytes_transferred) mutable {
+					log::trace("{}: Wrote [{}] bytes representing headers.", fn, _bytes_transferred);
+
+					if (ec) {
+						log::error("{}: Encountered unexpected error while writing headers.", fn);
+						return;
+					}
+
+					self->stream_bytes_to_client();
+				});
+		} // start
+
+	  private:
+		auto stream_bytes_to_client() -> void
+		{
+			irods::http::globals::background_task([self = shared_from_this(), fn = __func__]() mutable {
+				self->in_.read(
+					self->buffer_.data(),
+					// NOLINTNEXTLINE(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+					std::min<std::streamsize>(self->buffer_.size(), self->remaining_bytes_));
+
+				if (self->in_.fail()) {
+					log::error("{}: Stream is in a bad state.", fn);
+					return;
+				}
+
+				if (self->in_.eof() || 0 == self->remaining_bytes_) {
+					log::debug("{}: All bytes have been read.", fn);
+					self->res_.body().data = nullptr;
+					self->res_.body().more = false;
+				}
+				else {
+					log::debug("{}: Read [{}] bytes from data object.", fn, self->in_.gcount());
+					self->remaining_bytes_ -= self->in_.gcount();
+					self->res_.body().data = self->buffer_.data();
+					self->res_.body().size = self->in_.gcount();
+					self->res_.body().more = true;
+				}
+
+				async_write(
+					self->sess_ptr_->stream(),
+					self->serializer_,
+					[self = self->shared_from_this(), fn = fn](
+						const auto& _ec, std::size_t _bytes_transferred) mutable {
+						log::debug("{}: Wrote [{}] bytes to socket.", fn, _bytes_transferred);
+
+						if (_ec == http::error::need_buffer) {
+							self->stream_bytes_to_client();
+						}
+						else if (_ec) {
+							log::error("{}: Error writing bytes to socket: {}", fn, _ec.what());
+						}
+					});
+			});
+		} // stream_bytes_to_client
+
+		irods::http::session_pointer_type sess_ptr_;
+		http::response<http::buffer_body> res_;
+		http::response_serializer<http::buffer_body> serializer_;
+
+		irods::experimental::client_connection conn_;
+		std::unique_ptr<io::client::native_transport> tp_;
+		io::idstream in_;
+
+		std::vector<char> buffer_;
+		std::int64_t remaining_bytes_;
+	}; // incremental_read
+
+	//
 	// Operation handler implementations
 	//
 
@@ -324,7 +433,7 @@ namespace
 		                                       client_info,
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
-		                                       _args = std::move(_args)] {
+		                                       _args = std::move(_args)]() mutable {
 			log::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
@@ -354,84 +463,210 @@ namespace
 					}
 				}
 
+				const auto status = fs::client::status(conn, lpath_iter->second);
+
+				if (!fs::client::is_data_object(status)) {
+					log::error(
+						"{}: Logical path [{}] does not point to a data object or does not exist.",
+						fn,
+						lpath_iter->second);
+					res.result(http::status::internal_server_error);
+					res.prepare_payload();
+					return _sess_ptr->send(std::move(res));
+				}
+
+				std::int64_t offset = 0;
+				if (const auto iter = _args.find("offset"); iter != std::end(_args)) {
+					try {
+						offset = std::stoll(iter->second);
+					}
+					catch (const std::exception& e) {
+						log::error("{}: Invalid value for [offset] parameter. Received [{}].", fn, iter->second);
+						res.result(http::status::internal_server_error);
+						res.prepare_payload();
+						return _sess_ptr->send(std::move(res));
+					}
+
+					if (std::cmp_less(offset, 0)) {
+						log::error(
+							"{}: Invalid value for [offset] parameter. Must be non-negative. Received [{}].",
+							fn,
+							iter->second);
+						res.result(http::status::bad_request);
+						res.prepare_payload();
+						return _sess_ptr->send(std::move(res));
+					}
+				}
+
+				const auto data_object_size = fs::client::data_object_size(conn, lpath_iter->second);
+				std::int64_t count = data_object_size - offset;
+
+				if (const auto iter = _args.find("count"); iter != std::end(_args)) {
+					try {
+						count = std::stoll(iter->second);
+					}
+					catch (const std::exception& e) {
+						log::error("{}: Invalid value for [count] parameter. Received [{}].", fn, iter->second);
+						res.result(http::status::internal_server_error);
+						res.prepare_payload();
+						return _sess_ptr->send(std::move(res));
+					}
+
+					if (std::cmp_less(count, 0)) {
+						log::error(
+							"{}: Invalid value for [count] parameter. Must be non-negative. Received [{}].",
+							fn,
+							iter->second);
+						res.result(http::status::bad_request);
+						res.prepare_payload();
+						return _sess_ptr->send(std::move(res));
+					}
+
+					if (const auto real_count = data_object_size - offset; std::cmp_greater(count, real_count)) {
+						count = real_count;
+					}
+				}
+
+				// When the internal buffer size is exceeded, we have to execute the reads across
+				// multiple tasks. Each read would be posted to the thread pool individually and
+				// sequentially. For that reason, the reads must have a dedicated connection. We
+				// can't use the connections from the connection pool because doing that can lead
+				// to an unresponsive server.
+
+				static const auto read_buffer_size =
+					irods::http::globals::configuration()
+						.at(json::json_pointer{"/irods_client/max_number_of_bytes_per_read_operation"})
+						.get<int>();
+
+				if (std::cmp_greater(count, read_buffer_size)) {
+					static const auto enable_4_2_compat =
+						irods::http::globals::configuration()
+							.at(json::json_pointer{"/irods_client/enable_4_2_compatibility"})
+							.get<bool>();
+
+					irods::experimental::client_connection dedicated_conn{irods::experimental::defer_connection};
+
+					if (enable_4_2_compat) {
+						log::trace("{}: 4.2 compatibility enabled. Using existing iRODS connection.", fn);
+
+						// get_connection() always returns connections to the iRODS server when 4.2
+						// compatibility is enabled. Therefore, we can continue to use the existing
+						// connection instead of creating another connection like in the else-branch.
+						dedicated_conn = std::move(conn.get_ref<irods::experimental::client_connection>());
+					}
+					else {
+						log::trace(
+							"{}: 4.2 compatibility disabled. Internal buffer size exceeded. Using dedicated iRODS "
+							"connection.",
+							fn);
+
+						const auto& config = irods::http::globals::configuration();
+						const auto& host =
+							config.at(json::json_pointer{"/irods_client/host"}).get_ref<const std::string&>();
+						const auto port = config.at(json::json_pointer{"/irods_client/port"}).get<int>();
+						const auto& zone =
+							config.at(json::json_pointer{"/irods_client/zone"}).get_ref<const std::string&>();
+						const auto& rodsadmin_username =
+							config.at(json::json_pointer{"/irods_client/proxy_admin_account/username"})
+								.get_ref<const std::string&>();
+						auto rodsadmin_password =
+							config.at(json::json_pointer{"/irods_client/proxy_admin_account/password"})
+								.get<std::string>();
+
+						log::trace("{}: Connecting to iRODS server as [{}].", fn, client_info.username);
+						dedicated_conn.connect(
+							irods::experimental::defer_authentication,
+							host,
+							port,
+							{rodsadmin_username, zone},
+							{client_info.username, zone});
+
+						const auto ec =
+							clientLoginWithPassword(static_cast<RcComm*>(dedicated_conn), rodsadmin_password.data());
+						if (ec < 0) {
+							log::error("{}: Could not create dedicated connection for read operation.", fn);
+							return _sess_ptr->send(irods::http::fail(
+								res,
+								http::status::internal_server_error,
+								json{{"irods_response", {{"status_code", ec}}}}.dump()));
+						}
+					}
+
+					log::trace("{}: Opening stream for reading to data object [{}].", fn, lpath_iter->second);
+					auto tp = std::make_unique<io::client::native_transport>(dedicated_conn);
+					io::idstream in{*tp, lpath_iter->second};
+
+					if (!in) {
+						log::error("{}: Could not open data object [{}] for read.", fn, lpath_iter->second);
+						res.result(http::status::internal_server_error);
+						res.prepare_payload();
+						return _sess_ptr->send(std::move(res));
+					}
+
+					log::trace("{}: Seeking to offset [{}] in data object [{}].", fn, offset, lpath_iter->second);
+					if (offset > 0 && !in.seekg(offset)) {
+						log::error(
+							"{}: Could not seek to position [{}] in data object [{}].", fn, offset, lpath_iter->second);
+						res.result(http::status::internal_server_error);
+						res.prepare_payload();
+						return _sess_ptr->send(std::move(res));
+					}
+
+					// clang-format off
+					std::make_shared<incremental_read>(
+						_sess_ptr, _req.version(), _req.keep_alive(), dedicated_conn, tp, in, read_buffer_size, count)
+							->start();
+					// clang-format on
+
+					return;
+				}
+
+				//
+				// At this point, we know the requested number of bytes to read can fit inside the
+				// the buffer used for reading data object (i.e. the size defined in the config file).
+				//
+
+				log::trace(
+					"{}: Requested number of bytes fits into internal buffer. Using existing connection.",
+					fn,
+					lpath_iter->second);
+
 				io::client::native_transport tp{conn};
 				io::idstream in{tp, lpath_iter->second};
 
 				if (!in) {
 					log::error("{}: Could not open data object [{}] for read.", fn, lpath_iter->second);
-					res.result(http::status::bad_request);
+					res.result(http::status::internal_server_error);
 					res.prepare_payload();
 					return _sess_ptr->send(std::move(res));
 				}
 
-				auto iter = _args.find("offset");
-				if (iter != std::end(_args)) {
-					try {
-						in.seekg(std::stoll(iter->second));
-					}
-					catch (const std::exception& e) {
-						log::error(
-							"{}: Could not seek to position [{}] in data object [{}].",
-							fn,
-							iter->second,
-							lpath_iter->second);
-						res.result(http::status::bad_request);
-						res.prepare_payload();
-						return _sess_ptr->send(std::move(res));
-					}
-				}
-
-				std::vector<char> buffer;
-
-				iter = _args.find("count");
-				if (iter == std::end(_args)) {
-					res.result(http::status::bad_request);
-					res.prepare_payload();
-					return _sess_ptr->send(std::move(res));
-				}
-
-				try {
-					const auto count = std::stoi(iter->second);
-
-					if (count > irods::http::globals::configuration()
-					                .at(json::json_pointer{"/irods_client/max_number_of_bytes_per_read_operation"})
-					                .get<int>())
-					{
-						res.result(http::status::bad_request);
-						res.prepare_payload();
-						return _sess_ptr->send(std::move(res));
-					}
-
-					buffer.resize(count);
-				}
-				catch (const std::exception& e) {
+				if (offset > 0 && !in.seekg(offset)) {
 					log::error(
-						"{}: Could not initialize read buffer to size [{}] for data object [{}].",
-						fn,
-						iter->second,
-						lpath_iter->second);
-					res.result(http::status::bad_request);
+						"{}: Could not seek to position [{}] in data object [{}].", fn, offset, lpath_iter->second);
+					res.result(http::status::internal_server_error);
 					res.prepare_payload();
 					return _sess_ptr->send(std::move(res));
 				}
 
-				in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+				std::vector<char> buffer(count);
 
-				res.set(http::field::content_type, "application/octet-stream");
+				if (!in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()))) {
+					log::error("{}: Could not read bytes from data object [{}].", fn, lpath_iter->second);
+					res.result(http::status::internal_server_error);
+					res.prepare_payload();
+					return _sess_ptr->send(std::move(res));
+				}
+
 				res.body() = std::string_view(buffer.data(), in.gcount());
 			}
 			catch (const fs::filesystem_error& e) {
 				log::error("{}: {}", fn, e.what());
-				res.result(http::status::bad_request);
-				res.body() =
-					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
+				res.result(http::status::internal_server_error);
 			}
 			catch (const irods::exception& e) {
 				log::error("{}: {}", fn, e.client_display_what());
-				res.result(http::status::bad_request);
-				res.body() =
-					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-						.dump();
+				res.result(http::status::internal_server_error);
 			}
 			catch (const std::exception& e) {
 				log::error("{}: {}", fn, e.what());

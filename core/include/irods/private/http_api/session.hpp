@@ -6,16 +6,10 @@
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
-//#include <boost/beast/version.hpp>
-//#include <boost/asio/dispatch.hpp>
-//#include <boost/asio/strand.hpp>
-//#include <boost/asio/signal_set.hpp>
-//#include <boost/asio/thread_pool.hpp>
-//#include <boost/config.hpp>
+//#include "boost/beast/core/tcp_stream.hpp"
 
 #include <memory>
 #include <optional>
-//#include <utility>
 
 namespace irods::http
 {
@@ -39,6 +33,11 @@ namespace irods::http
 		auto on_write(bool close, boost::beast::error_code ec, std::size_t bytes_transferred) -> void;
 
 		auto do_close() -> void;
+
+		auto stream() -> boost::beast::tcp_stream&
+		{
+			return stream_;
+		} // stream
 
 		template <bool isRequest, class Body, class Fields>
 		auto send(boost::beast::http::message<isRequest, Body, Fields>&& msg) -> void
