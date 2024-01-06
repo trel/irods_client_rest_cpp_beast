@@ -109,7 +109,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
     "irods_response": {
         "status_code": 0
         "status_message": "string" // Optional
-    }
+    },
+    "created": false // Conditionally available. Check "irods_response/status_code" first.
 }
 ```
 

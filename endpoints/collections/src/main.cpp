@@ -7,9 +7,16 @@
 #include "irods/private/http_api/shared_api_operations.hpp"
 #include "irods/private/http_api/version.hpp"
 
+#include <irods/collCreate.h>
+#include <irods/dataObjInpOut.h>
 #include <irods/filesystem.hpp>
+#include <irods/filesystem/path_utilities.hpp>
+#include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
+#include <irods/rcMisc.h>
 #include <irods/rodsErrorTable.h>
+#include <irods/rodsKeyWdDef.h>
+#include <irods/system_error.hpp> // For make_error_code
 #include <irods/touch.h>
 
 #include <boost/asio.hpp>
@@ -18,6 +25,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -348,22 +356,71 @@ namespace
 				}
 
 				auto conn = irods::get_connection(client_info.username);
-				fs::client::create_collections(conn, lpath_iter->second);
+				bool created = false;
+				int ec = 0;
+				const auto iter = _args.find("create-intermediates");
 
-				res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
+				if (iter != std::end(_args) && iter->second == "1") {
+					//
+					// This branch implements a modified version of irods::filesystem::_::create_collections().
+					// These changes may be absorbed into the filesystem library. If that happens, don't forget
+					// to update this code block to use the official implementation.
+					//
+
+					fs::throw_if_path_length_exceeds_limit(lpath_iter->second);
+
+					if (!fs::client::exists(conn, lpath_iter->second)) {
+						CollInp input{};
+						irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
+
+						lpath_iter->second.copy(input.collName, sizeof(CollInp::collName) - 1);
+						addKeyVal(&input.condInput, RECURSIVE_OPR__KW, "");
+
+						ec = rcCollCreate(static_cast<RcComm*>(conn), &input);
+						if (ec < 0) {
+							throw fs::filesystem_error{
+								"cannot create collection",
+								lpath_iter->second,
+								irods::experimental::make_error_code(ec)};
+						}
+
+						created = (ec >= 0);
+					}
+				}
+				else {
+					created = fs::client::create_collection(conn, lpath_iter->second);
+				}
+
+				// clang-format off
+				res.body() = json{
+					{"irods_response", {
+						{"status_code", ec}
+					}},
+					{"created", created}
+				}.dump();
+				// clang-format on
 			}
 			catch (const fs::filesystem_error& e) {
 				log::error("{}: {}", fn, e.what());
-				res.result(http::status::bad_request);
-				res.body() =
-					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
+				// clang-format off
+				res.body() = json{
+					{"irods_response", {
+						{"status_code", e.code().value()},
+						{"status_message", e.what()}
+					}}
+				}.dump();
+				// clang-format on
 			}
 			catch (const irods::exception& e) {
 				log::error("{}: {}", fn, e.client_display_what());
-				res.result(http::status::bad_request);
-				res.body() =
-					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-						.dump();
+				// clang-format off
+				res.body() = json{
+					{"irods_response", {
+						{"status_code", e.code()},
+						{"status_message", e.client_display_what()}
+					}}
+				}.dump();
+				// clang-format on
 			}
 			catch (const std::exception& e) {
 				log::error("{}: {}", fn, e.what());
