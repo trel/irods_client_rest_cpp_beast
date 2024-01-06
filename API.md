@@ -558,7 +558,8 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'resource=<string>' \ # The resource holding the target replica. Optional.
     --data-urlencode 'replica-number=<integer>' \ # The replica number of the target replica. Optional.
     --data-urlencode 'compute-checksums=<integer>' \ # 0 or 1. Defaults to 1. Can be used to skip the checksum calculation step.
-    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin.
+    --data-urlencode 'admin=<integer>' \ # 0 or 1. Defaults to 0. Execute as a rodsadmin.
+    -G
 ```
 
 #### Response
