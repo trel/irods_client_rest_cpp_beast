@@ -22,6 +22,12 @@ curl -X POST -u <username>:<password> http://localhost:<port>/irods-http-api/<ve
 
 A string representing a bearer token that can be used to execute operations as the authenticated user.
 
+Tokens obtained via this authentication scheme have a finite lifetime. The lifetime of a token is defined in the configuration file at `/http_server/authentication/basic/timeout_in_seconds`. **Use of the token does NOT extend its lifetime**.
+
+Attempting to use an expired or invalid token will result in a response containing a status code of **401 Unauthorized**. Checking for this status code is key to detecting when the client needs to reauthenticate.
+
+Reauthentication can be performed at anytime and will result in a brand new token. This does NOT invalidate previously acquired tokens.
+
 ### Scheme: OpenID Connect (OIDC)
 
 For authenticating with OpenID Connect, there are two methods:
