@@ -4,6 +4,8 @@ This document covers all endpoint operations.
 
 If you discover that some topic related to the behavior of the endpoint operation isn't documented, please open an issue in the repository.
 
+Throughout the document you'll come across identifiers such as `<version>`, `<string>`, `<integer>`, etc. These identifiers represent placeholders. Users are expected to replace placeholders with appropriate values.
+
 ## Authentication Operations
 
 ### Scheme: Basic
@@ -13,6 +15,8 @@ If you discover that some topic related to the behavior of the endpoint operatio
 ```bash
 curl -X POST -u <username>:<password> http://localhost:<port>/irods-http-api/<version>/authenticate
 ```
+
+`<version>` must match the format, **X.Y.Z**, where **X** is the major version number, **Y** is the minor version number, and **Z** is the patch version number.
 
 #### Response
 
