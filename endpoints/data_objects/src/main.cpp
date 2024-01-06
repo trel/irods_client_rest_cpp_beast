@@ -13,6 +13,7 @@
 #include <irods/dataObjChksum.h>
 #include <irods/dataObjRepl.h>
 #include <irods/dataObjTrim.h>
+#include <irods/dataObjUnlink.h>
 #include <irods/filesystem.hpp>
 #include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
@@ -1375,42 +1376,48 @@ namespace
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
+				const auto catalog_only_iter = _args.find("catalog-only");
+				if (catalog_only_iter == std::end(_args)) {
+					log::error("{}: Missing [catalog-only] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+				}
+
+				DataObjInp input{};
+				irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
+
+				std::strncpy(input.objPath, lpath_iter->second.c_str(), sizeof(DataObjInp::objPath) - 1);
+
+				if (catalog_only_iter->second == "1") {
+					input.oprType = UNREG_OPR;
+
+					if (const auto iter = _args.find("no-trash"); iter != std::end(_args) && iter->second == "1") {
+						log::error("{}: [catalog-only] and [no-trash] parameters are incompatible.", fn);
+						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+					}
+				}
+				else if (const auto iter = _args.find("no-trash"); iter != std::end(_args) && iter->second == "1") {
+					addKeyVal(&input.condInput, FORCE_FLAG_KW, "");
+				}
+
+				if (const auto iter = _args.find("admin"); iter != std::end(_args) && iter->second == "1") {
+					addKeyVal(&input.condInput, ADMIN_KW, "");
+				}
+
 				auto conn = irods::get_connection(client_info.username);
+				const auto ec = rcDataObjUnlink(static_cast<RcComm*>(conn), &input);
 
-				if (!fs::client::is_data_object(conn, lpath_iter->second)) {
-					return _sess_ptr->send(irods::http::fail(
-						res,
-						http::status::bad_request,
-						json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump()));
-				}
-
-				fs::extended_remove_options opts{};
-
-				if (const auto iter = _args.find("no-trash"); iter != std::end(_args) && iter->second == "1") {
-					opts.no_trash = true;
-				}
-
-				if (const auto iter = _args.find("unregister"); iter != std::end(_args) && iter->second == "1") {
-					opts.unregister = true;
-				}
-
-				// There's no admin flag for removal.
-				fs::client::remove(conn, lpath_iter->second, opts);
-
-				res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
-			}
-			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
-				res.result(http::status::bad_request);
-				res.body() =
-					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
+				res.body() = json{{"irods_response", {{"status_code", ec}}}}.dump();
 			}
 			catch (const irods::exception& e) {
 				log::error("{}: {}", fn, e.client_display_what());
-				res.result(http::status::bad_request);
-				res.body() =
-					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
-						.dump();
+				// clang-format off
+				res.body() = json{
+					{"irods_response", {
+						{"status_code", e.code()},
+						{"status_message", e.client_display_what()}
+					}}
+				}.dump();
+				// clang-format on
 			}
 			catch (const std::exception& e) {
 				log::error("{}: {}", fn, e.what());
