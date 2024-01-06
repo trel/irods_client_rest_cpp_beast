@@ -731,7 +731,7 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 ### trim
 
-Trims an existing replica.
+Trims an existing replica or removes its catalog entry.
 
 #### Request
 
@@ -740,13 +740,10 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
     --data-urlencode 'op=trim' \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
-    --data-urlencode 'resource=<string>' \ # Name of the resource to trim from.
     --data-urlencode 'replica-number=<integer>' \ # The replica number identifying the replica to trim.
-    --data-urlencode 'unregister=<integer>' \ # 0 or 1. Optional. Instructs the server to only remove the catalog entry.
+    --data-urlencode 'catalog-only=<integer>' \ # 0 or 1. If set to 1, removes only the catalog entry. Optional.
     --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin.
 ```
-
-`resource` and `replica-number` are mutually exclusive parameters. At least one of them MUST be included in the request.
 
 #### Response
 
