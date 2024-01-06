@@ -116,6 +116,16 @@ namespace irods::http
 			THROW(SYS_INTERNAL_ERR, "Cannot return reference to connection object. connection_facade is empty.");
 		} // operator RcComm&
 
+		template <typename T>
+		auto get_ref() -> T&
+		{
+			if (auto* p = std::get_if<T>(&conn_); p) {
+				return *p;
+			}
+
+			THROW(SYS_INTERNAL_ERR, "Cannot return reference to connection object. connection_facade is empty.");
+		} // get_ref
+
 	  private:
 		std::variant<std::monostate, irods::experimental::client_connection, irods::connection_pool::connection_proxy>
 			conn_;
