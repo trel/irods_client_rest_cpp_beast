@@ -184,6 +184,13 @@ namespace irods
 	auto fail(boost::beast::error_code ec, char const* what) -> void;
 
 	auto enable_ticket(RcComm& _comm, const std::string& _ticket) -> int;
+
+	template <std::size_t N>
+	// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays, modernize-avoid-c-arrays)
+	constexpr auto strncpy_null_terminated(char (&_dst)[N], const char* _src) -> char*
+	{
+		return std::strncpy(_dst, _src, N - 1);
+	} // strncpy_null_terminated
 } // namespace irods
 
 #endif // IRODS_HTTP_API_ENDPOINT_COMMON_HPP
