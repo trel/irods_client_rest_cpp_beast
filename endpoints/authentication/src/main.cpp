@@ -203,6 +203,9 @@ namespace irods::http::handler
 	IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(authentication)
 	{
 		if (_req.method() == boost::beast::http::verb::get) {
+			static const auto oidc_stanza_exists = irods::http::globals::configuration().contains(
+				nlohmann::json::json_pointer{"/http_server/authentication/oidc"});
+
 			url url;
 			bool did_except{false};
 			try {
@@ -212,7 +215,7 @@ namespace irods::http::handler
 				did_except = true;
 			}
 
-			if (did_except) {
+			if (oidc_stanza_exists && did_except) {
 				irods::http::globals::background_task([fn = __func__, _sess_ptr, _req = std::move(_req)] {
 					const auto timeout{
 						irods::http::globals::oidc_configuration().at("state_timeout_in_seconds").get<int>()};
@@ -244,7 +247,7 @@ namespace irods::http::handler
 					return _sess_ptr->send(std::move(res));
 				});
 			}
-			else {
+			else if (oidc_stanza_exists) {
 				irods::http::globals::background_task([fn = __func__,
 				                                       _sess_ptr,
 				                                       _req = std::move(_req),
