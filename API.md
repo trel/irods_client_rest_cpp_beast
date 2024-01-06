@@ -840,7 +840,7 @@ This is the full set of parameters supported by the operation.
 
 When sending large amounts of data or writing in parallel, prefer multipart/form-data over application/x-www-form-urlencoded as the Content-Type.
 
-`parallel-write-handle` and `stream-index` only apply when writing to a replica in parallel. To obtain a parallel-write-handle, see [parallel-write-init](#parallel-write-init).
+`parallel-write-handle` and `stream-index` only apply when writing to a replica in parallel. To obtain a parallel-write-handle, see [parallel_write_init](#parallel_write_init).
 
 #### Response
 
@@ -857,7 +857,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 
 If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
-### parallel-write-init
+### parallel_write_init
 
 Initializes server-side state used for writing to a data object in parallel.
 
@@ -868,7 +868,7 @@ Returns a parallel-write-handle that can be used for parallel write operations.
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
-    --data-urlencode 'op=parallel-write-init' \
+    --data-urlencode 'op=parallel_write_init' \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'stream-count=<integer>' \ # Number of streams to open.
     --data-urlencode 'truncate=<integer>' \ # 0 or 1. Defaults to 1. Truncates the data object before writing.
@@ -888,7 +888,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 }
 ```
 
-### parallel-write-shutdown
+### parallel_write_shutdown
 
 Instructs the server to shutdown and release any resources used for parallel write operations.
 
@@ -899,8 +899,8 @@ This operation MUST be called to complete the parallel write operation. Failing 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
-    --data-urlencode 'op=parallel-write-shutdown' \
-    --data-urlencode 'parallel-write-handle=<string>' # A handle obtained via the parallel-write-init operation.
+    --data-urlencode 'op=parallel_write_shutdown' \
+    --data-urlencode 'parallel-write-handle=<string>' # A handle obtained via the parallel_write_init operation.
 ```
 
 #### Response
