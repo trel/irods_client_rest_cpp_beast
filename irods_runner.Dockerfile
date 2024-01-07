@@ -23,9 +23,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -y \
         gnupg \
         lsb-release \
+        python3 \
+        python3-pip \
         wget \
     && \
-    rm -rf /tmp/*
+    rm -rf /tmp/* && \
+    python3 -m pip install jsonschema
 
 RUN wget -qO - https://packages.irods.org/irods-signing-key.asc | apt-key add - && \
     echo "deb [arch=amd64] https://packages.irods.org/apt/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/renci-irods.list

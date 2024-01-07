@@ -24,6 +24,11 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#include <boost/process.hpp>
+#pragma clang diagnostic pop
+
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
@@ -39,6 +44,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string_view>
+#include <system_error>
 #include <thread>
 #include <unordered_map>
 #include <utility>
@@ -172,8 +178,270 @@ auto print_version_info() -> void
 	fmt::print("{} v{}-{}\n", version::binary_name, version::api_version, sha.substr(0, sha_size));
 } // print_version_info
 
+constexpr auto default_jsonschema() -> std::string_view
+{
+	// clang-format on
+	return R"({{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.irods.org/http_api/0.1.0/schema.json",
+    "type": "object",
+    "properties": {{
+        "http_server": {{
+            "type": "object",
+            "properties": {{
+                "host": {{
+                    "type": "string",
+                    "pattern": "^[0-9]{{1,3}}\\.[0-9]{{1,3}}\\.[0-9]{{1,3}}\\.[0-9]{{1,3}}$"
+                }},
+                "port": {{
+                    "type": "integer"
+                }},
+                "log_level": {{
+                    "enum": [
+                        "trace",
+                        "debug",
+                        "info",
+                        "warn",
+                        "error",
+                        "critical"
+                    ]
+                }},
+                "authentication": {{
+                    "type": "object",
+                    "properties": {{
+                        "eviction_check_interval_in_seconds": {{
+                            "type": "integer",
+                            "minimum": 1
+                        }},
+                        "basic": {{
+                            "type": "object",
+                            "properties": {{
+                                "timeout_in_seconds": {{
+                                    "type": "integer",
+                                    "minimum": 1
+                                }}
+                            }},
+                            "required": [
+                                "timeout_in_seconds"
+                            ]
+                        }},
+                        "oidc": {{
+                            "type": "object",
+                            "properties": {{
+                                "config_host": {{
+                                    "type": "string"
+                                }},
+                                "port": {{
+                                    "type": "integer",
+                                    "minimum": 1
+                                }},
+                                "well_known_uri": {{
+                                    "type": "string"
+                                }},
+                                "client_id": {{
+                                    "type": "string"
+                                }},
+                                "redirect_uri": {{
+                                    "type": "string"
+                                }}
+                            }},
+                            "required": [
+                                "config_host",
+                                "port",
+                                "well_known_uri",
+                                "client_id",
+                                "redirect_uri"
+                            ]
+                        }}
+                    }},
+                    "anyOf": [
+                        {{
+                            "required": [
+                                "eviction_check_interval_in_seconds",
+                                "basic"
+                            ]
+                        }},
+                        {{
+                             "required": [
+                                "eviction_check_interval_in_seconds",
+                                "oidc"
+                             ]
+                        }}
+                    ]
+                }},
+                "requests": {{
+                    "type": "object",
+                    "properties": {{
+                        "threads": {{
+                            "type": "integer",
+                            "minimum": 1
+                        }},
+                        "max_size_of_request_body_in_bytes": {{
+                            "type": "integer",
+                            "minimum": 0
+                        }},
+                        "timeout_in_seconds": {{
+                            "type": "integer",
+                            "minimum": 1
+                        }}
+                    }},
+                    "required": [
+                        "threads",
+                        "max_size_of_request_body_in_bytes",
+                        "timeout_in_seconds"
+                    ]
+                }},
+                "background_io": {{
+                    "type": "object",
+                    "properties": {{
+                        "threads": {{
+                            "type": "integer",
+                            "minimum": 1
+                        }}
+                    }},
+                    "required": [
+                        "threads"
+                    ]
+                }}
+            }},
+            "required": [
+                "host",
+                "port",
+                "authentication",
+                "requests",
+                "background_io"
+            ]
+        }},
+        "irods_client": {{
+            "type": "object",
+            "properties": {{
+                "host": {{
+                    "type": "string"
+                }},
+                "port": {{
+                    "type": "integer"
+                }},
+                "zone": {{
+                    "type": "string"
+                }},
+                "tls": {{
+                    "type": "object",
+                    "properties": {{
+                        "client_server_policy": {{
+                            "enum": [
+                                "CS_NEG_REFUSE",
+                                "CS_NEG_DONT_CARE",
+                                "CS_NEG_REQUIRE"
+                            ]
+                        }},
+                        "ca_certificate_file": {{
+                            "type": "string"
+                        }},
+                        "certificate_chain_file": {{
+                            "type": "string"
+                        }},
+                        "dh_params_file": {{
+                            "type": "string"
+                        }},
+                        "verify_server": {{
+                            "enum": [
+                                "none",
+                                "cert",
+                                "hostname"
+                            ]
+                        }}
+                    }},
+                    "required": [
+                        "client_server_policy",
+                        "ca_certificate_file",
+                        "dh_params_file",
+                        "verify_server"
+                    ]
+                }},
+                "enable_4_2_compatibility": {{
+                    "type": "boolean"
+                }},
+                "proxy_admin_account": {{
+                    "type": "object",
+                    "properties": {{
+                        "username": {{
+                            "type": "string"
+                        }},
+                        "password": {{
+                            "type": "string"
+                        }}
+                    }},
+                    "required": [
+                        "username",
+                        "password"
+                    ]
+                }},
+                "connection_pool": {{
+                    "type": "object",
+                    "properties": {{
+                        "size": {{
+                            "type": "integer",
+                            "minimum": 1
+                        }},
+                        "refresh_timeout_in_seconds": {{
+                            "type": "integer",
+                            "minimum": 1
+                        }},
+                        "max_retrievals_before_refresh": {{
+                            "type": "integer",
+                            "minimum": 1
+                        }},
+                        "refresh_when_resource_changes_detected": {{
+                            "type": "boolean"
+                        }}
+                    }},
+                    "required": [
+                        "size"
+                    ]
+                }},
+                "max_number_of_parallel_write_streams": {{
+                    "type": "integer",
+                    "minimum": 1
+                }},
+                "max_number_of_bytes_per_read_operation": {{
+                    "type": "integer",
+                    "minimum": 1
+                }},
+                "buffer_size_in_bytes_for_write_operations": {{
+                    "type": "integer",
+                    "minimum": 1
+                }},
+                "max_number_of_rows_per_catalog_query": {{
+                    "type": "integer",
+                    "minimum": 1
+                }}
+            }},
+            "required": [
+                "host",
+                "port",
+                "zone",
+                "enable_4_2_compatibility",
+                "proxy_admin_account",
+                "connection_pool",
+                "max_number_of_parallel_write_streams",
+                "max_number_of_bytes_per_read_operation",
+                "buffer_size_in_bytes_for_write_operations",
+                "max_number_of_rows_per_catalog_query"
+            ]
+        }}
+    }},
+    "required": [
+        "http_server",
+        "irods_client"
+    ]
+}}
+)";
+	// clang-format on
+} // default_jsonschema
+
 auto print_configuration_template() -> void
 {
+	// clang-format off
 	fmt::print(R"({{
     "http_server": {{
         "host": "0.0.0.0",
@@ -244,6 +512,7 @@ auto print_configuration_template() -> void
     }}
 }}
 )");
+	// clang-format on
 } // print_configuration_template
 
 auto print_usage() -> void
@@ -258,12 +527,24 @@ configuration options.
 --dump-config-template can be used to generate a default configuration file.
 See this option's description for more information.
 
+--dump-default-jsonschema can be used to generate a default schema file.
+See this option's description for more information.
+
 Options:
       --dump-config-template
                      Print configuration template to stdout and exit. Some
                      options have values which act as placeholders. If used
                      to generate a configuration file, those options will
                      need to be updated.
+      --dump-default-jsonschema
+                     Print the default JSON schema to stdout and exit. The
+                     JSON schema output can be used to create a custom
+                     schema. This is for cases where the default schema is
+                     too restrictive or contains a bug.
+      --jsonschema-file SCHEMA_FILE_PATH
+                     Validate server configuration against SCHEMA_FILE_PATH.
+                     Validation is performed before startup. If validation
+                     fails, the server will exit.
   -h, --help         Display this help message and exit.
   -v, --version      Display version information and exit.
 
@@ -271,6 +552,65 @@ Options:
 
 	print_version_info();
 } // print_usage
+
+auto is_valid_configuration(const std::string& _schema_path, const std::string& _config_path) -> bool
+{
+	try {
+		fmt::print("Validating configuration file ...\n");
+
+		const auto validate_config = [&_config_path](const std::string_view _schema_path) -> int {
+			constexpr std::string_view python_code = "import json, jsonschema; "
+													 "config_file = open('{}'); "
+													 "config = json.load(config_file); "
+													 "config_file.close(); "
+													 "schema_file = open('{}'); "
+													 "schema = json.load(schema_file); "
+													 "schema_file.close(); "
+													 "jsonschema.validate(config, schema);";
+
+			return boost::process::system(
+				boost::process::search_path("python3"), "-c", fmt::format(python_code, _config_path, _schema_path));
+		};
+
+		std::string schema;
+		int ec = -1;
+
+		if (_schema_path.empty()) {
+			fmt::print("No JSON schema file provided. Using default.\n");
+
+			constexpr const char* default_schema_file_path = "/tmp/default_irods_http_api_jsonschema.json";
+
+			if (std::ofstream out{default_schema_file_path}; out) {
+				out << fmt::format(default_jsonschema());
+			}
+			else {
+				fmt::print(stderr, "Could not create local schema file for validation.\n");
+				return false;
+			}
+
+			ec = validate_config(default_schema_file_path);
+		}
+		else {
+			fmt::print("Using user-provided schema file [{}].\n", _schema_path);
+			ec = validate_config(_schema_path);
+		}
+
+		if (ec == 0) {
+			fmt::print("Configuration passed validation!\n");
+			return true;
+		}
+
+		fmt::print(stderr, "Configuration failed validation.\n");
+	}
+	catch (const std::system_error& e) {
+		fmt::print(stderr, "Error: {}\n", e.what());
+	}
+	catch (const std::exception& e) {
+		fmt::print(stderr, "Error: {}\n", e.what());
+	}
+
+	return false;
+} // is_valid_configuration
 
 auto set_log_level(const json& _config) -> void
 {
@@ -462,7 +802,9 @@ auto main(int _argc, char* _argv[]) -> int
 	// clang-format off
 	opts_desc.add_options()
 		("config-file,f", po::value<std::string>(), "")
+		("jsonschema-file", po::value<std::string>(), "")
 		("dump-config-template", "")
+		("dump-default-jsonschema", "")
 		("help,h", "")
 		("version,v", "");
 	// clang-format on
@@ -492,6 +834,11 @@ auto main(int _argc, char* _argv[]) -> int
 			return 0;
 		}
 
+		if (vm.count("dump-default-jsonschema") > 0) {
+			fmt::print(default_jsonschema());
+			return 0;
+		}
+
 		if (vm.count("config-file") == 0) {
 			fmt::print(stderr, "Error: Missing [CONFIG_FILE_PATH] parameter.");
 			return 1;
@@ -499,6 +846,13 @@ auto main(int _argc, char* _argv[]) -> int
 
 		const auto config = json::parse(std::ifstream{vm["config-file"].as<std::string>()});
 		irods::http::globals::set_configuration(config);
+
+		{
+			const auto schema_file = (vm.count("jsonschema-file") > 0) ? vm["jsonschema-file"].as<std::string>() : "";
+			if (!is_valid_configuration(schema_file, vm["config-file"].as<std::string>())) {
+				return 1;
+			}
+		}
 
 		const auto& http_server_config = config.at("http_server");
 		set_log_level(http_server_config);
