@@ -93,8 +93,8 @@ class listener : public std::enable_shared_from_this<listener>
 	listener(net::io_context& ioc, const tcp::endpoint& endpoint, const json& _config)
 		: ioc_{ioc}
 		, acceptor_{net::make_strand(ioc)}
-		, max_rbuffer_size_{_config.at(json::json_pointer{"/http_server/requests/max_rbuffer_size_in_bytes"})
-	                            .get<int>()}
+		, max_body_size_{_config.at(json::json_pointer{"/http_server/requests/max_size_of_request_body_in_bytes"})
+	                         .get<int>()}
 		, timeout_in_secs_{_config.at(json::json_pointer{"/http_server/requests/timeout_in_seconds"}).get<int>()}
 	{
 		beast::error_code ec;
@@ -150,7 +150,7 @@ class listener : public std::enable_shared_from_this<listener>
 		}
 		else {
 			// Create the session and run it
-			std::make_shared<irods::http::session>(std::move(socket), req_handlers, max_rbuffer_size_, timeout_in_secs_)
+			std::make_shared<irods::http::session>(std::move(socket), req_handlers, max_body_size_, timeout_in_secs_)
 				->run();
 		}
 
@@ -160,7 +160,7 @@ class listener : public std::enable_shared_from_this<listener>
 
 	net::io_context& ioc_;
 	tcp::acceptor acceptor_;
-	const int max_rbuffer_size_;
+	const int max_body_size_;
 	const int timeout_in_secs_;
 }; // class listener
 
@@ -199,7 +199,7 @@ auto print_configuration_template() -> void
 
         "requests": {{
             "threads": 3,
-            "max_rbuffer_size_in_bytes": 8388608,
+            "max_size_of_request_body_in_bytes": 8388608,
             "timeout_in_seconds": 30
         }},
 

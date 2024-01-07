@@ -26,11 +26,11 @@ namespace irods::http
 	session::session(
 		boost::asio::ip::tcp::socket&& socket,
 		const request_handler_map_type& _request_handler_map,
-		int _max_rbuffer_size,
+		int _max_body_size,
 		int _timeout_in_seconds)
 		: stream_(std::move(socket))
 		, req_handlers_{&_request_handler_map}
-		, max_rbuffer_size_{_max_rbuffer_size}
+		, max_body_size_{_max_body_size}
 		, timeout_in_secs_{_timeout_in_seconds}
 	{
 	} // session (constructor)
@@ -57,7 +57,7 @@ namespace irods::http
 		parser_.emplace();
 
 		// Apply the limit defined in the configuration file.
-		parser_->body_limit(max_rbuffer_size_);
+		parser_->body_limit(max_body_size_);
 
 		// Set the timeout.
 		stream_.expires_after(std::chrono::seconds(timeout_in_secs_));
