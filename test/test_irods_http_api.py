@@ -895,10 +895,15 @@ class test_data_objects_endpoint(unittest.TestCase):
         # The name of the resource we'll use to register an additional replica under.
         other_resource = 'test_registration_resc'
 
+        # The basename and logical path of the data object.
+        filename = 'test_registering_replica.txt'
+        data_object = f'/{self.zone_name}/home/{self.rodsadmin_username}/{filename}'
+
+        # The name of the physical file to create and register as an additional replica.
+        physical_path = f'/tmp/{filename}'
+
         try:
             # Create a non-empty data object.
-            filename = 'newly_registered_replica.txt'
-            data_object = f'/{self.zone_name}/home/{self.rodsadmin_username}/{filename}'
             content = 'hello, this message was written via the iRODS HTTP API!'
             r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
                 'op': 'write',
@@ -915,18 +920,18 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'name': other_resource,
                 'type': 'unixfilesystem',
                 'host': self.server_hostname,
-                'vault-path': os.path.join('/tmp', f'{other_resource}_vault')
+                'vault-path': f'/tmp/{other_resource}_vault'
             })
             logging.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
-            # Create a local file.
-            physical_path = f'/tmp/{filename}'
+            # Create a local file that will serve as the additional replica.
+            # To avoid making replica 0 stale, we must write the same data to this file.
             with open(physical_path, 'w') as f:
-                f.write('some data')
+                f.write(content)
 
-            # Register the local file into the catalog as a new replica of the data object.
+            # Register the local file into the catalog as an additional replica of the data object.
             r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
                 'op': 'register',
                 'lpath': data_object,
@@ -938,10 +943,26 @@ class test_data_objects_endpoint(unittest.TestCase):
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
-            # Show a new replica exists with the expected replica information.
+            # Show replica 0 exists with the expected replica information.
+            # Replica 0 must be a good replica, else the call to the trim operation will fail.
             r = requests.get(f'{self.url_base}/query', headers=rodsadmin_headers, params={
                 'op': 'execute_genquery',
-                'query': 'select COLL_NAME, DATA_NAME, DATA_PATH, RESC_NAME ' +
+                'query': 'select DATA_PATH, DATA_REPL_STATUS ' +
+                         f"where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{filename}' and DATA_REPL_NUM = '0'"
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(len(result['rows']), 1)
+            self.assertNotEqual(result['rows'][0][0], physical_path)
+            self.assertEqual(result['rows'][0][1], '1')
+
+            # Show a new replica exists with the expected replica information.
+            # Replica 1 must be a good replica since it is the latest replica in the system.
+            r = requests.get(f'{self.url_base}/query', headers=rodsadmin_headers, params={
+                'op': 'execute_genquery',
+                'query': 'select DATA_PATH, RESC_NAME, DATA_REPL_STATUS ' +
                          f"where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{filename}' and DATA_REPL_NUM = '1'"
             })
             logging.debug(r.content)
@@ -949,10 +970,9 @@ class test_data_objects_endpoint(unittest.TestCase):
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
             self.assertEqual(len(result['rows']), 1)
-            self.assertEqual(result['rows'][0][0], os.path.dirname(data_object))
-            self.assertEqual(result['rows'][0][1], filename)
-            self.assertEqual(result['rows'][0][2], physical_path)
-            self.assertEqual(result['rows'][0][3], other_resource)
+            self.assertEqual(result['rows'][0][0], physical_path)
+            self.assertEqual(result['rows'][0][1], other_resource)
+            self.assertEqual(result['rows'][0][2], '1')
 
             # Unregister replica 1.
             r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
@@ -965,7 +985,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
-            # Show the replica 1 no longer exists.
+            # Show replica 1 no longer exists.
             r = requests.get(f'{self.url_base}/query', headers=rodsadmin_headers, params={
                 'op': 'execute_genquery',
                 'query': 'select COLL_NAME, DATA_NAME ' +
@@ -993,6 +1013,9 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'name': other_resource
             })
             logging.debug(r.content)
+
+            # Remove the file so the test is idempotent.
+            os.remove(physical_path)
 
     def test_touch_operation_updates_mtime(self):
         rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
