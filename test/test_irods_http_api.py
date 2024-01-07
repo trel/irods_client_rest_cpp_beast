@@ -1588,7 +1588,7 @@ class test_information_endpoint(unittest.TestCase):
         self.assertIn('build', info)
         self.assertIn('irods_zone', info)
         self.assertIn('genquery2_enabled', info)
-        self.assertIn('max_http_request_size_in_bytes', info)
+        self.assertIn('max_size_of_request_body_in_bytes', info)
         self.assertIn('max_number_of_parallel_write_streams', info)
         self.assertIn('max_number_of_rows_per_catalog_query', info)
 

@@ -46,8 +46,7 @@ namespace irods::http::handler
 				{"build", irods::http::version::sha},
 				{"genquery2_enabled", GENQUERY2_ENABLED},
 				{"irods_zone", irods_client_config.at("zone")},
-				// TODO These may not be defined.
-				{"max_http_request_size_in_bytes", http_server_config.at(json::json_pointer{"/requests/max_rbuffer_size_in_bytes"})},
+				{"max_size_of_request_body_in_bytes", http_server_config.at(json::json_pointer{"/requests/max_size_of_request_body_in_bytes"})},
 				{"max_number_of_parallel_write_streams", irods_client_config.at("max_number_of_parallel_write_streams")},
 				{"max_number_of_rows_per_catalog_query", irods_client_config.at("max_number_of_rows_per_catalog_query")}
 			}.dump();

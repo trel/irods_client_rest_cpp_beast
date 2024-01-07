@@ -263,7 +263,7 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
             "threads": 3,
 
             // The maximum size allowed for the body of a request.
-            "max_rbuffer_size_in_bytes": 8388608,
+            "max_size_of_request_body_in_bytes": 8388608,
 
             // The amount of time allowed to service a request. If the timeout
             // is exceeded, the client's connection is terminated immediately.
