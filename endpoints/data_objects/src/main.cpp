@@ -1540,6 +1540,10 @@ namespace
 					if (const auto iter = _args.find("resource"); iter != std::end(_args)) {
 						addKeyVal(&input.condInput, DEST_RESC_NAME_KW, iter->second.c_str());
 					}
+					else {
+						log::error("{}: Missing [resource] parameter.", fn);
+						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+					}
 
 					if (const auto iter = _args.find("as-additional-replica"); iter != std::end(_args)) {
 						if (iter->second == "1") {
