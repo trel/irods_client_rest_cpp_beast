@@ -58,6 +58,7 @@ namespace irods::http::handler
 		}
 		catch (const std::exception& e) {
 			log::error("{}: {}", __func__, e.what());
+			return _sess_ptr->send(irods::http::fail(boost::beast::http::status::internal_server_error));
 		}
 	} // information
 } //namespace irods::http::handler
