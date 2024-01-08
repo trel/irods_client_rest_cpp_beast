@@ -121,8 +121,7 @@ This project provides two Dockerfiles, one for building and one for running the 
 
 The builder image is responsible for building the iRODS HTTP API package. Before you can use it, you must build the image. To do that, run the following:
 ```bash
-docker build -t irods-http-api-builder \
-    -f irods_builder.Dockerfile .
+docker build -t irods-http-api-builder -f irods_builder.Dockerfile .
 ```
 
 With the builder image in hand, all that's left is to get the source code for the GenQuery2 project and HTTP API project. The builder image is designed to compile code sitting on your machine. This is important because it gives you the ability to build any fork or branch of the projects.
