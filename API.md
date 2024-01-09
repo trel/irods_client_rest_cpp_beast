@@ -829,7 +829,6 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     [-F,--data-urlencode] 'lpath=<string>' \ # Absolute logical path to a data object.
     [-F,--data-urlencode] 'resource=<string>' \ # The root resource to write to. Optional.
     [-F,--data-urlencode] 'offset=<integer>' \ # Number of bytes to skip. Defaults to 0.
-    [-F,--data-urlencode] 'count=<integer>' \ # Number of bytes to write.
     [-F,--data-urlencode] 'truncate=<integer>' \ # 0 or 1. Defaults to 1. Truncates the data object before writing.
     [-F,--data-urlencode] 'append=<integer>' \ # 0 or 1. Defaults to 0. Appends the bytes to the data object.
     [-F,--data-urlencode] 'bytes=<binary_data>;type=application/octet-stream' \ # The bytes to write.
