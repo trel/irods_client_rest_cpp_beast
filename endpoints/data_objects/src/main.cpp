@@ -837,18 +837,16 @@ namespace
 					}
 				}
 
-				iter = _args.find("count");
-				if (iter == std::end(_args)) {
-					log::error("{}: Missing [count] parameter.", fn);
-					res.result(http::status::bad_request);
-					res.prepare_payload();
-					return _sess_ptr->send(std::move(res));
-				}
-				auto remaining_bytes = std::stoll(iter->second);
-
 				iter = _args.find("bytes");
 				if (iter == std::end(_args)) {
 					log::error("{}: Missing [bytes] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+				}
+
+				auto remaining_bytes = iter->second.size();
+
+				if (!std::cmp_equal(remaining_bytes, iter->second.size())) {
+					log::error("{}: Requirement violated: [count] and size of [bytes] do not match.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -883,13 +881,11 @@ namespace
 			}
 			catch (const fs::filesystem_error& e) {
 				log::error("{}: {}", fn, e.what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
 				log::error("{}: {}", fn, e.client_display_what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
