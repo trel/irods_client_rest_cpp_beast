@@ -127,6 +127,34 @@ def tear_down_class(cls):
         logging.debug(f'Failed to remove rodsuser [{cls.rodsuser_username}].')
         return
 
+class test_authenticate_endpoint(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        setup_class(cls, {'endpoint_name': 'authenticate'})
+
+    @classmethod
+    def tearDownClass(cls):
+        tear_down_class(cls)
+
+    def setUp(self):
+        self.assertFalse(self._class_init_error, 'Class initialization failed. Cannot continue.')
+
+    def test_server_does_not_crash_when_incorrect_http_method_is_used_to_authenticate(self):
+        # Try to authenticate using the HTTP GET method.
+        r = requests.get(self.url_endpoint, auth=('rods', 'rods'))
+        logging.debug(r.content)
+        self.assertEqual(r.status_code, 405)
+
+        # Show the server is still running.
+        r = requests.get(f'{self.url_base}/collections', headers={'Authorization': f'Bearer {self.rodsuser_bearer_token}'}, params={
+            'op': 'stat',
+            'lpath': f'/{self.zone_name}/home/{self.rodsuser_username}'
+        })
+        logging.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
 class test_collections_endpoint(unittest.TestCase):
 
     @classmethod

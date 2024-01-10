@@ -206,6 +206,11 @@ namespace irods::http::handler
 			static const auto oidc_stanza_exists = irods::http::globals::configuration().contains(
 				nlohmann::json::json_pointer{"/http_server/authentication/oidc"});
 
+			if (!oidc_stanza_exists) {
+				log::error("{}: HTTP GET method cannot be used for Basic authentication.", __func__);
+				return _sess_ptr->send(fail(status_type::method_not_allowed));
+			}
+
 			url url;
 			bool did_except{false};
 			try {
@@ -215,7 +220,7 @@ namespace irods::http::handler
 				did_except = true;
 			}
 
-			if (oidc_stanza_exists && did_except) {
+			if (did_except) {
 				irods::http::globals::background_task([fn = __func__, _sess_ptr, _req = std::move(_req)] {
 					const auto timeout{
 						irods::http::globals::oidc_configuration().at("state_timeout_in_seconds").get<int>()};
@@ -247,7 +252,7 @@ namespace irods::http::handler
 					return _sess_ptr->send(std::move(res));
 				});
 			}
-			else if (oidc_stanza_exists) {
+			else {
 				irods::http::globals::background_task([fn = __func__,
 				                                       _sess_ptr,
 				                                       _req = std::move(_req),
