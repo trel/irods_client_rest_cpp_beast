@@ -602,6 +602,63 @@ class test_collections_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_COLLECTION)
 
+    def test_enabling_and_disabling_inheritance(self):
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        collection = f'/{self.zone_name}/home/{self.rodsuser_username}'
+
+        # Show inheritance is not enabled.
+        r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={
+            'op': 'stat',
+            'lpath': collection
+        })
+        logging.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        result = r.json()
+        self.assertEqual(result['irods_response']['status_code'], 0)
+        self.assertEqual(result['inheritance_enabled'], False)
+
+        # Enable inheritance.
+        r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+            'op': 'set_inheritance',
+            'lpath': collection,
+            'enable': 1
+        })
+        logging.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+        # Show inheritance is enabled.
+        r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={
+            'op': 'stat',
+            'lpath': collection
+        })
+        logging.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        result = r.json()
+        self.assertEqual(result['irods_response']['status_code'], 0)
+        self.assertEqual(result['inheritance_enabled'], True)
+
+        # Disable inheritance.
+        r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+            'op': 'set_inheritance',
+            'lpath': collection,
+            'enable': 0
+        })
+        logging.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+        # Show inheritance is not enabled.
+        r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={
+            'op': 'stat',
+            'lpath': collection
+        })
+        logging.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        result = r.json()
+        self.assertEqual(result['irods_response']['status_code'], 0)
+        self.assertEqual(result['inheritance_enabled'], False)
+
     @unittest.skip('Test needs to be implemented.')
     def test_return_error_on_missing_parameters(self):
         pass

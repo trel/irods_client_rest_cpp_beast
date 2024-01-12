@@ -259,6 +259,36 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 
 If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
+### set_inheritance
+
+Enable or disable inheritance on a collection.
+
+#### Request
+
+```bash
+curl http://localhost:<port>/irods-http-api/<version>/collections \
+    -H 'Authorization: Bearer <token>' \
+    --data-urlencode 'op=set_inheritance' \
+    --data-urlencode 'lpath=<string>' \
+    --data-urlencode 'enable=<integer>' \ # 0 or 1.
+    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Optional.
+```
+
+#### Response
+
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
+
+```js
+{
+    "irods_response": {
+        "status_code": 0
+        "status_message": "string" // Optional
+    }
+}
+```
+
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
+
 ### modify_permissions
 
 Adjust permissions for multiple users and groups on a collection atomically.
