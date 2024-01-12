@@ -27,20 +27,32 @@ def setup_class(cls, opts):
     cls._class_init_error = False
     cls._remove_rodsuser = False
 
-    logging.basicConfig(format='[%(asctime)s] [%(levelname)s] %(message)s', level=config.test_config.get('log_level', logging.INFO))
+    # Initialize the class logger.
+    cls.logger = logging.getLogger(cls.__name__)
+
+    log_level = config.test_config.get('log_level', logging.INFO)
+    cls.logger.setLevel(log_level)
+
+    ch = logging.StreamHandler()
+    ch.setLevel(log_level)
+    ch.setFormatter(logging.Formatter(f'[%(asctime)s] [{cls.__name__}] [%(levelname)s] %(message)s'))
+
+    cls.logger.addHandler(ch)
+
+    # Initialize state.
 
     if config.test_config.get('host', None) == None:
-        logging.debug('Missing configuration property: host')
+        cls.logger.debug('Missing configuration property: host')
         cls._class_init_error = True
         return
 
     if config.test_config.get('port', None) == None:
-        logging.debug('Missing configuration property: port')
+        cls.logger.debug('Missing configuration property: port')
         cls._class_init_error = True
         return
 
     if config.test_config.get('url_base', None) == None:
-        logging.debug('Missing configuration property: url_base')
+        cls.logger.debug('Missing configuration property: url_base')
         cls._class_init_error = True
         return
 
@@ -53,22 +65,22 @@ def setup_class(cls, opts):
     # create_rodsuser cannot be honored if init_rodsadmin is set to False.
     # Therefore, return immediately.
     if not opts.get('init_rodsadmin', True):
-        logging.debug('init_rodsadmin is False. Class setup complete.')
+        cls.logger.debug('init_rodsadmin is False. Class setup complete.')
         return
 
     # Authenticate as a rodsadmin and store the bearer token.
     cls.rodsadmin_username = config.test_config['rodsadmin']['username']
     r = requests.post(f'{cls.url_base}/authenticate', auth=(cls.rodsadmin_username, config.test_config['rodsadmin']['password']))
-    logging.debug(r.content)
+    cls.logger.debug(r.content)
     if r.status_code != 200:
         cls._class_init_error = True
-        logging.debug(f'Failed to authenticate as rodsadmin [{cls.rodsadmin_username}].')
+        cls.logger.debug(f'Failed to authenticate as rodsadmin [{cls.rodsadmin_username}].')
         return
     cls.rodsadmin_bearer_token = r.text
 
     # Create a rodsuser for testing.
     if not opts.get('create_rodsuser', True):
-        logging.debug('create_rodsuser is False. Class setup complete.')
+        cls.logger.debug('create_rodsuser is False. Class setup complete.')
         return
 
     cls.rodsuser_username = config.test_config['rodsuser']['username']
@@ -78,10 +90,10 @@ def setup_class(cls, opts):
         'name': cls.rodsuser_username,
         'zone': cls.zone_name
     })
-    logging.debug(r.content)
+    cls.logger.debug(r.content)
     if r.status_code != 200:
         cls._class_init_error = True
-        logging.debug(f'Failed to create rodsuser [{cls.rodsuser_username}].')
+        cls.logger.debug(f'Failed to create rodsuser [{cls.rodsuser_username}].')
         return
     cls._remove_rodsuser = True
 
@@ -92,22 +104,22 @@ def setup_class(cls, opts):
         'zone': cls.zone_name,
         'new-password': config.test_config['rodsuser']['password']
     })
-    logging.debug(r.content)
+    cls.logger.debug(r.content)
     if r.status_code != 200:
         cls._class_init_error = True
-        logging.debug(f'Failed to set password for rodsuser [{cls.rodsuser_username}].')
+        cls.logger.debug(f'Failed to set password for rodsuser [{cls.rodsuser_username}].')
         return
 
     # Authenticate as the rodsuser and store the bearer token.
     r = requests.post(f'{cls.url_base}/authenticate', auth=(cls.rodsuser_username, config.test_config['rodsuser']['password']))
-    logging.debug(r.content)
+    cls.logger.debug(r.content)
     if r.status_code != 200:
         cls._class_init_error = True
-        logging.debug(f'Failed to authenticate as rodsuser [{cls.rodsuser_username}].')
+        cls.logger.debug(f'Failed to authenticate as rodsuser [{cls.rodsuser_username}].')
         return
     cls.rodsuser_bearer_token = r.text
 
-    logging.debug('Class setup complete.')
+    cls.logger.debug('Class setup complete.')
 
 def tear_down_class(cls):
     if cls._class_init_error:
@@ -122,9 +134,9 @@ def tear_down_class(cls):
         'name': cls.rodsuser_username,
         'zone': cls.zone_name
     })
-    logging.debug(r.content)
+    cls.logger.debug(r.content)
     if r.status_code != 200:
-        logging.debug(f'Failed to remove rodsuser [{cls.rodsuser_username}].')
+        cls.logger.debug(f'Failed to remove rodsuser [{cls.rodsuser_username}].')
         return
 
 def do_test_server_reports_error_when_http_method_is_not_supported(cls):
@@ -161,7 +173,7 @@ class test_authenticate_endpoint(unittest.TestCase):
     def test_server_does_not_crash_when_incorrect_http_method_is_used_to_authenticate(self):
         # Try to authenticate using the HTTP GET method.
         r = requests.get(self.url_endpoint, auth=('rods', 'rods'))
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 405)
 
         # Show the server is still running.
@@ -169,7 +181,7 @@ class test_authenticate_endpoint(unittest.TestCase):
             'op': 'stat',
             'lpath': f'/{self.zone_name}/home/{self.rodsuser_username}'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -196,7 +208,7 @@ class test_collections_endpoint(unittest.TestCase):
         # Create a new collection.
         data = {'op': 'create', 'lpath': collection_path}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
@@ -205,7 +217,7 @@ class test_collections_endpoint(unittest.TestCase):
         # Stat the collection to show that it exists.
         params = {'op': 'stat', 'lpath': collection_path}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
@@ -215,7 +227,7 @@ class test_collections_endpoint(unittest.TestCase):
         new_collection_path = collection_path + '.renamed'
         data = {'op': 'rename', 'old-lpath': collection_path, 'new-lpath': new_collection_path}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         # Stat the original collection to show that it does not exist.
@@ -236,13 +248,13 @@ class test_collections_endpoint(unittest.TestCase):
             'permission': 'read_object'
         }
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         # Show that the rodsadmin user now has read permission on the collection.
         params = {'op': 'stat', 'lpath': new_collection_path}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
@@ -259,13 +271,13 @@ class test_collections_endpoint(unittest.TestCase):
         # Remove the collection.
         data = {'op': 'remove', 'lpath': new_collection_path}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         # Stat the collection to show that it does not exist.
         params = {'op': 'stat', 'lpath': new_collection_path}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 400)
 
         stat_info = r.json()
@@ -281,7 +293,7 @@ class test_collections_endpoint(unittest.TestCase):
             'op': 'create',
             'lpath': collection
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.OBJ_PATH_DOES_NOT_EXIST)
 
@@ -292,7 +304,7 @@ class test_collections_endpoint(unittest.TestCase):
             'lpath': f'{collection}/more/path/elements', # Guards against incorrect implementations.
             'create-intermediates': 1
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         # Sadly, there's nothing we can do within the HTTP API implementation to make
         # this call and the one before result in the same iRODS error code. Fixing this
@@ -303,7 +315,7 @@ class test_collections_endpoint(unittest.TestCase):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
         params = {'op': 'stat', 'lpath': os.path.join('/', self.zone_name, 'home', self.rodsuser_username)}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
@@ -326,7 +338,7 @@ class test_collections_endpoint(unittest.TestCase):
             'op': 'stat',
             'lpath': os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'does_not_exist')
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_COLLECTION)
 
@@ -341,7 +353,7 @@ class test_collections_endpoint(unittest.TestCase):
             'lpath': collection,
             'create-intermediates': 1
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -355,13 +367,13 @@ class test_collections_endpoint(unittest.TestCase):
         for name in data_objects:
             data_object = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, name)
             r = requests.post(f'{self.url_base}/data-objects', headers=headers, data={'op': 'touch', 'lpath': data_object})
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # List only the contents of the home collection.
         r = requests.get(self.url_endpoint, headers=headers, params={'op': 'list', 'lpath': home_collection})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
@@ -369,7 +381,7 @@ class test_collections_endpoint(unittest.TestCase):
 
         # List the home collection recursively.
         r = requests.get(self.url_endpoint, headers=headers, params={'op': 'list', 'lpath': home_collection, 'recurse': 1})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
@@ -392,7 +404,7 @@ class test_collections_endpoint(unittest.TestCase):
             'recurse': 1,
             'no-trash': 1
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -413,7 +425,7 @@ class test_collections_endpoint(unittest.TestCase):
                 }
             ])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -422,7 +434,7 @@ class test_collections_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': "select COLL_NAME where META_COLL_ATTR_NAME = 'a1' and META_COLL_ATTR_VALUE = 'v1' and META_COLL_ATTR_UNITS = 'u1'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -442,7 +454,7 @@ class test_collections_endpoint(unittest.TestCase):
                 }
             ])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -451,7 +463,7 @@ class test_collections_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': "select COLL_NAME where META_COLL_ATTR_NAME = 'a1' and META_COLL_ATTR_VALUE = 'v1' and META_COLL_ATTR_UNITS = 'u1'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -473,7 +485,7 @@ class test_collections_endpoint(unittest.TestCase):
                 }
             ])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -482,7 +494,7 @@ class test_collections_endpoint(unittest.TestCase):
             'op': 'stat',
             'lpath': collection
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -504,7 +516,7 @@ class test_collections_endpoint(unittest.TestCase):
                 }
             ])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -513,7 +525,7 @@ class test_collections_endpoint(unittest.TestCase):
             'op': 'stat',
             'lpath': collection
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -533,7 +545,7 @@ class test_collections_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': f"select COLL_MODIFY_TIME where COLL_NAME = '{collection}'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
@@ -549,7 +561,7 @@ class test_collections_endpoint(unittest.TestCase):
             'op': 'touch',
             'lpath': collection
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -559,7 +571,7 @@ class test_collections_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': f"select COLL_MODIFY_TIME where COLL_NAME = '{collection}'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
@@ -577,7 +589,7 @@ class test_collections_endpoint(unittest.TestCase):
                 'op': 'touch',
                 'lpath': data_object
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -587,7 +599,7 @@ class test_collections_endpoint(unittest.TestCase):
                 'op': 'touch',
                 'lpath': data_object
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 400)
             self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_COLLECTION)
 
@@ -599,7 +611,7 @@ class test_collections_endpoint(unittest.TestCase):
                 'catalog-only': 0,
                 'no-trash': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
     def test_touch_operation_does_not_create_collections_or_data_objects(self):
         rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -610,7 +622,7 @@ class test_collections_endpoint(unittest.TestCase):
             'op': 'touch',
             'lpath': f'/{self.zone_name}/home/{self.rodsuser_username}/does_not_exist'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -619,7 +631,7 @@ class test_collections_endpoint(unittest.TestCase):
             'op': 'stat',
             'lpath': f'/{self.zone_name}/home/{self.rodsuser_username}/does_not_exist'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_COLLECTION)
 
@@ -716,7 +728,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'host': self.server_hostname,
             'vault-path': os.path.join('/tmp', f'{resc_name}_vault')
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -728,7 +740,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'lpath': data_object,
             'bytes': content
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -738,7 +750,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'lpath': data_object,
             'dst-resource': resc_name
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -749,7 +761,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': f"select DATA_NAME, RESC_NAME where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
@@ -761,7 +773,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'lpath': data_object,
             'replica-number': 0
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -772,7 +784,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'old-lpath': data_object,
             'new-lpath': data_object_renamed,
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -783,7 +795,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'src-lpath': data_object_renamed,
             'dst-lpath': data_object_copied,
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -794,13 +806,13 @@ class test_data_objects_endpoint(unittest.TestCase):
             'entity-name': self.rodsadmin_username,
             'permission': 'read_object'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show the permissions were updated.
         r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={'op': 'stat', 'lpath': data_object_copied})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
@@ -820,13 +832,13 @@ class test_data_objects_endpoint(unittest.TestCase):
                     'catalog-only': 0,
                     'no-trash': 1
                 })
-                logging.debug(r.content)
+                self.logger.debug(r.content)
                 self.assertEqual(r.status_code, 200)
                 self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Remove the resource.
         r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={'op': 'remove', 'name': resc_name})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -846,7 +858,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'host': self.server_hostname,
                 'vault-path': os.path.join('/tmp', f'{resc_name}_vault')
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -856,7 +868,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'lpath': data_object,
                 'bytes': 'hello, this message was written via the iRODS HTTP API!'
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -866,7 +878,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'lpath': data_object,
                 'dst-resource': resc_name
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -877,7 +889,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'op': 'execute_genquery',
                 'query': f"select DATA_NAME, RESC_NAME where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
@@ -889,7 +901,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'lpath': data_object,
                 'replica-number': 0
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
@@ -900,7 +912,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'op': 'verify_checksum',
                 'lpath': data_object
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], irods_error_codes.CHECK_VERIFICATION_RESULTS)
@@ -916,21 +928,21 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'catalog-only': 0,
                 'no-trash': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
             # Remove the resource.
             r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
                 'op': 'remove',
                 'name': resc_name
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
     def test_calculate_checksum_operation_handles_non_existent_data_objects_gracefully(self):
         r = requests.post(self.url_endpoint, headers={'Authorization': 'Bearer ' + self.rodsuser_bearer_token}, data={
             'op': 'calculate_checksum',
             'lpath': '/tempZone/does/not/exist.txt'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.CAT_NO_ROWS_FOUND)
 
@@ -939,7 +951,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'verify_checksum',
             'lpath': '/tempZone/does/not/exist.txt'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.CAT_NO_ROWS_FOUND)
 
@@ -959,7 +971,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'op': 'stat',
                 'lpath': data_object
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 400)
             self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_DATA_OBJECT)
 
@@ -973,7 +985,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'ppath': physical_path,
                 'resource': resource
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -982,7 +994,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'op': 'execute_genquery',
                 'query': f"select COLL_NAME, DATA_NAME, DATA_PATH, RESC_NAME where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{filename}'"
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
@@ -999,7 +1011,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'lpath': data_object,
                 'catalog-only': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
     def test_registering_an_additional_replica_for_an_existing_data_object(self):
         rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
@@ -1022,7 +1034,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'lpath': data_object,
                 'bytes': content
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1034,7 +1046,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'host': self.server_hostname,
                 'vault-path': f'/tmp/{other_resource}_vault'
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1051,7 +1063,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'resource': other_resource,
                 'as-additional-replica': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1062,7 +1074,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'query': 'select DATA_PATH, DATA_REPL_STATUS ' +
                          f"where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{filename}' and DATA_REPL_NUM = '0'"
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
@@ -1077,7 +1089,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'query': 'select DATA_PATH, RESC_NAME, DATA_REPL_STATUS ' +
                          f"where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{filename}' and DATA_REPL_NUM = '1'"
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
@@ -1093,7 +1105,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'replica-number': 1,
                 'catalog-only': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1103,7 +1115,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'query': 'select COLL_NAME, DATA_NAME ' +
                          f"where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{filename}' and DATA_REPL_NUM = '1'"
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
@@ -1117,14 +1129,14 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'catalog-only': 0,
                 'no-trash': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
             # Remove the unixfilesystem resource.
             r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
                 'op': 'remove',
                 'name': other_resource
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
             # Remove the file so the test is idempotent.
             os.remove(physical_path)
@@ -1139,7 +1151,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'op': 'touch',
                 'lpath': data_object
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1150,7 +1162,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'op': 'execute_genquery',
                 'query': f"select DATA_MODIFY_TIME where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
@@ -1166,7 +1178,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'op': 'touch',
                 'lpath': data_object
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1176,7 +1188,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'op': 'execute_genquery',
                 'query': f"select DATA_MODIFY_TIME where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
@@ -1192,7 +1204,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'catalog-only': 0,
                 'no-trash': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
     def test_touch_operation_reports_error_when_given_a_path_to_a_collection(self):
         rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -1200,7 +1212,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'touch',
             'lpath': f'/{self.zone_name}/home/{self.rodsuser_username}'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_DATA_OBJECT)
 
@@ -1223,7 +1235,7 @@ class test_data_objects_endpoint(unittest.TestCase):
 
         body += f'--{boundary}--\r\n'
 
-        logging.debug(f'body = {body}')
+        self.logger.debug(f'body = {body}')
 
         conn = http.client.HTTPConnection(config.test_config['host'], config.test_config['port'])
         conn.request('POST', config.test_config['url_base'] + '/data-objects', bytes(body, 'utf-8'), {
@@ -1233,7 +1245,7 @@ class test_data_objects_endpoint(unittest.TestCase):
 
         response = conn.getresponse()
         result = json.loads(response.read().decode('utf-8'))
-        logging.debug(result)
+        self.logger.debug(result)
         conn.close()
 
         self.assertEqual(response.status, 200)
@@ -1250,7 +1262,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'lpath': data_object,
             'stream-count': 3
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
@@ -1274,7 +1286,7 @@ class test_data_objects_endpoint(unittest.TestCase):
 
             for f in concurrent.futures.as_completed(futures):
                 result = f.result()
-                logging.debug(result)
+                self.logger.debug(result)
                 self.assertEqual(result['irods_response']['status_code'], 0)
 
         # End the parallel write.
@@ -1282,7 +1294,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'parallel_write_shutdown',
             'parallel-write-handle': parallel_write_handle
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1292,7 +1304,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'lpath': data_object,
             'count': 30
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.content.decode('utf-8'), 'A' * 10 + 'B' * 10 + 'C' * 10)
 
@@ -1303,7 +1315,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'catalog-only': 0,
             'no-trash': 1
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1316,7 +1328,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'touch',
             'lpath': data_object
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1333,7 +1345,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 }
             ])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1342,7 +1354,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': "select COLL_NAME, DATA_NAME where META_DATA_ATTR_NAME = 'a1' and META_DATA_ATTR_VALUE = 'v1' and META_DATA_ATTR_UNITS = 'u1'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -1363,7 +1375,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 }
             ])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1372,7 +1384,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': "select COLL_NAME, DATA_NAME where META_DATA_ATTR_NAME = 'a1' and META_DATA_ATTR_VALUE = 'v1' and META_DATA_ATTR_UNITS = 'u1'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -1386,7 +1398,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'catalog-only': 0,
             'no-trash': 1
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1399,7 +1411,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'touch',
             'lpath': data_object
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1414,7 +1426,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 }
             ])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1423,7 +1435,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'stat',
             'lpath': data_object
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -1445,7 +1457,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 }
             ])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1454,7 +1466,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'stat',
             'lpath': data_object
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -1472,7 +1484,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'catalog-only': 0,
             'no-trash': 1
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1485,7 +1497,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'touch',
             'lpath': data_object
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1494,7 +1506,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': f"select DATA_REPL_STATUS, DATA_SIZE where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{os.path.basename(data_object)}'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -1510,7 +1522,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'new-data-replica-status': 0,
             'new-data-size': 15
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1519,7 +1531,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': f"select DATA_REPL_STATUS, DATA_SIZE where COLL_NAME = '{os.path.dirname(data_object)}' and DATA_NAME = '{os.path.basename(data_object)}'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -1534,7 +1546,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'catalog-only': 0,
             'no-trash': 1
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1545,7 +1557,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'catalog-only': 1,
             'no-trash': 1
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 400)
 
     def test_remove_operation_supports_unregistering_all_replicas(self):
@@ -1555,18 +1567,18 @@ class test_data_objects_endpoint(unittest.TestCase):
 
         try:
             # Create a non-empty data object.
-            logging.debug('Creating data object')
+            self.logger.debug('Creating data object')
             r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
                 'op': 'write',
                 'lpath': data_object,
                 'bytes': 'hello, this message was written via the iRODS HTTP API!'
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
             # Create a unixfilesystem resource.
-            logging.debug('Creating resource')
+            self.logger.debug('Creating resource')
             r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
                 'op': 'create',
                 'name': resc_name,
@@ -1574,18 +1586,18 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'host': self.server_hostname,
                 'vault-path': os.path.join('/tmp', f'{resc_name}_vault')
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
             # Replicate the data object.
-            logging.debug('Replicating replica to new resource')
+            self.logger.debug('Replicating replica to new resource')
             r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
                 'op': 'replicate',
                 'lpath': data_object,
                 'dst-resource': resc_name
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1599,24 +1611,24 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'parser': 'genquery1',
                 'query': f"select DATA_REPL_NUM, DATA_PATH where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
             self.assertEqual(len(result['rows']), 2)
 
             replica_paths = result['rows']
-            logging.debug(f'replica 0 => [{replica_paths[0][1]}]')
-            logging.debug(f'replica 1 => [{replica_paths[1][1]}]')
+            self.logger.debug(f'replica 0 => [{replica_paths[0][1]}]')
+            self.logger.debug(f'replica 1 => [{replica_paths[1][1]}]')
 
             # Unregister all replicas.
-            logging.debug(f'Calling remove op to unregister all replicas')
+            self.logger.debug(f'Calling remove op to unregister all replicas')
             r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
                 'op': 'remove',
                 'lpath': data_object,
                 'catalog-only': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1629,7 +1641,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'ppath': replica_paths[0][1],
                 'resource': 'demoResc'
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1640,7 +1652,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'resource': resc_name,
                 'as-additional-replica': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1654,7 +1666,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                         'lpath': data_object,
                         'replica-number': replica_number
                     })
-                    logging.debug(r.content)
+                    self.logger.debug(r.content)
                     self.assertEqual(r.status_code, 200)
                     result = r.json()
                     self.assertEqual(result['irods_response']['status_code'], 0)
@@ -1668,14 +1680,14 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'catalog-only': 0,
                 'no-trash': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
             # Remove resource.
             r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
                 'op': 'remove',
                 'name': resc_name
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
     def test_attempting_to_read_non_existent_data_object_results_in_an_error(self):
         rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -1683,7 +1695,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             'op': 'read',
             'lpath': f'/{self.zone_name}/home/{self.rodsuser_username}/does_not_exist'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 404)
 
     def test_attempting_to_read_data_object_with_insufficient_permissions_results_in_an_error(self):
@@ -1697,7 +1709,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'op': 'touch',
                 'lpath': data_object
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1707,7 +1719,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'op': 'read',
                 'lpath': data_object
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 404)
 
         finally:
@@ -1718,7 +1730,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'catalog-only': 0,
                 'no-trash': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
     def test_passing_invalid_values_to_offset_and_count_parameters_for_read_operation_results_in_an_error(self):
         rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -1730,7 +1742,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'op': 'touch',
                 'lpath': data_object
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1740,7 +1752,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'lpath': data_object,
                 'offset': 'triggers_error'
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 400)
 
             # Show an invalid value for the "count" parameter results in an http error.
@@ -1749,7 +1761,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'lpath': data_object,
                 'count': 'triggers_error'
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 400)
 
         finally:
@@ -1760,7 +1772,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'catalog-only': 0,
                 'no-trash': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
     def test_server_reports_error_when_http_method_is_not_supported(self):
         do_test_server_reports_error_when_http_method_is_not_supported(self)
@@ -1783,7 +1795,7 @@ class test_information_endpoint(unittest.TestCase):
 
     def test_expected_properties_exist_in_json_structure(self):
         r = requests.get(self.url_endpoint)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         info = r.json()
@@ -1815,7 +1827,7 @@ class test_query_endpoint(unittest.TestCase):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
         params = {'op': 'execute_genquery', 'parser': 'genquery1', 'query': 'select COLL_NAME'}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -1829,7 +1841,7 @@ class test_query_endpoint(unittest.TestCase):
         # Create a data object on the default resource.
         data_object = os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'test_genquery1_no_distinct.txt')
         r = requests.post(f'{self.url_base}/data-objects', headers=rodsuser_headers, data={'op': 'touch', 'lpath': data_object})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
@@ -1845,7 +1857,7 @@ class test_query_endpoint(unittest.TestCase):
                 'host': self.server_hostname,
                 'vault-path': os.path.join('/tmp', f'{resc_name}_vault')
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1855,7 +1867,7 @@ class test_query_endpoint(unittest.TestCase):
                 'lpath': data_object,
                 'dst-resource': resc_name
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1867,7 +1879,7 @@ class test_query_endpoint(unittest.TestCase):
                 'distinct': 0,
                 'query': f"select DATA_NAME where COLL_NAME = '{coll_name}' and DATA_NAME = '{data_name}'"
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
@@ -1881,14 +1893,14 @@ class test_query_endpoint(unittest.TestCase):
                 'catalog-only': 0,
                 'no-trash': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
             # Remove resource.
             r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
                 'op': 'remove',
                 'name': resc_name
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
     def test_genquery1_case_sensitivity_option(self):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -1900,7 +1912,7 @@ class test_query_endpoint(unittest.TestCase):
                 'op': 'touch',
                 'lpath': data_object
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -1915,7 +1927,7 @@ class test_query_endpoint(unittest.TestCase):
                 'case-sensitive': 0,
                 'query': f"select DATA_NAME where COLL_NAME = '{coll_name.upper()}' and DATA_NAME = '{data_name.lower()}'"
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
@@ -1931,7 +1943,7 @@ class test_query_endpoint(unittest.TestCase):
                 'case-sensitive': 1,
                 'query': f"select DATA_NAME where COLL_NAME = '{coll_name.upper()}' and DATA_NAME = '{data_name.lower()}'"
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
             result = r.json()
             self.assertEqual(result['irods_response']['status_code'], 0)
@@ -1945,7 +1957,7 @@ class test_query_endpoint(unittest.TestCase):
                 'catalog-only': 0,
                 'no-trash': 1
             })
-            logging.debug(r.content)
+            self.logger.debug(r.content)
 
     @unittest.skip('Test needs to be implemented.')
     def test_genquery1_zone_option(self):
@@ -1961,7 +1973,7 @@ class test_query_endpoint(unittest.TestCase):
             'parser': 'genquery2',
             'query': 'select COLL_NAME'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -1981,7 +1993,7 @@ class test_query_endpoint(unittest.TestCase):
             'query': 'select COLL_NAME',
             'sql-only': 1
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -1997,7 +2009,7 @@ class test_query_endpoint(unittest.TestCase):
             'args': collection_path,
             'count': 100
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2037,7 +2049,7 @@ class test_resources_endpoint(unittest.TestCase):
             'name': resc_repl,
             'type': 'replication'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2045,7 +2057,7 @@ class test_resources_endpoint(unittest.TestCase):
 
         # Show the replication resource was created.
         r = requests.get(self.url_endpoint, headers=headers, params={'op': 'stat', 'name': resc_repl})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2085,7 +2097,7 @@ class test_resources_endpoint(unittest.TestCase):
                     'host': hostname,
                     'vault-path': vault_path
                 })
-                logging.debug(r.content)
+                self.logger.debug(r.content)
                 self.assertEqual(r.status_code, 200)
                 self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -2095,13 +2107,13 @@ class test_resources_endpoint(unittest.TestCase):
                     'parent-name': resc_repl,
                     'child-name': resc_name
                 })
-                logging.debug(r.content)
+                self.logger.debug(r.content)
                 self.assertEqual(r.status_code, 200)
                 self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
                 # Show that the resource was created and configured successfully.
                 r = requests.get(self.url_endpoint, headers=headers, params={'op': 'stat', 'name': resc_name})
-                logging.debug(r.content)
+                self.logger.debug(r.content)
                 self.assertEqual(r.status_code, 200)
 
                 result = r.json()
@@ -2133,7 +2145,7 @@ class test_resources_endpoint(unittest.TestCase):
             'bytes': contents,
             'offset': 0
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -2142,7 +2154,7 @@ class test_resources_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': f"select DATA_NAME, RESC_NAME where DATA_NAME = '{os.path.basename(data_object)}'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2158,7 +2170,7 @@ class test_resources_endpoint(unittest.TestCase):
             'lpath': data_object,
             'replica-number': 0
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2169,7 +2181,7 @@ class test_resources_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': f"select DATA_NAME, RESC_NAME where DATA_NAME = '{os.path.basename(data_object)}'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2178,7 +2190,7 @@ class test_resources_endpoint(unittest.TestCase):
 
         # Launch rebalance.
         r = requests.post(self.url_endpoint, headers=headers, data={'op': 'rebalance', 'name': resc_repl})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2198,7 +2210,7 @@ class test_resources_endpoint(unittest.TestCase):
             'catalog-only': 0,
             'no-trash': 1
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2213,7 +2225,7 @@ class test_resources_endpoint(unittest.TestCase):
                     'parent-name': resc_repl,
                     'child-name': resc_name
                 })
-                logging.debug(r.content)
+                self.logger.debug(r.content)
                 self.assertEqual(r.status_code, 200)
 
                 result = r.json()
@@ -2221,7 +2233,7 @@ class test_resources_endpoint(unittest.TestCase):
 
                 # Remove ufs resource.
                 r = requests.post(self.url_endpoint, headers=headers, data={'op': 'remove', 'name': resc_name})
-                logging.debug(r.content)
+                self.logger.debug(r.content)
                 self.assertEqual(r.status_code, 200)
 
                 result = r.json()
@@ -2229,7 +2241,7 @@ class test_resources_endpoint(unittest.TestCase):
 
                 # Show that the resource no longer exists.
                 r = requests.get(self.url_endpoint, headers=headers, params={'op': 'stat', 'name': resc_name})
-                logging.debug(r.content)
+                self.logger.debug(r.content)
                 self.assertEqual(r.status_code, 200)
 
                 result = r.json()
@@ -2238,7 +2250,7 @@ class test_resources_endpoint(unittest.TestCase):
 
         # Remove replication resource.
         r = requests.post(self.url_endpoint, headers=headers, data={'op': 'remove', 'name': resc_repl})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2246,7 +2258,7 @@ class test_resources_endpoint(unittest.TestCase):
 
         # Show that the resource no longer exists.
         r = requests.get(self.url_endpoint, headers=headers, params={'op': 'stat', 'name': resc_repl})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2270,7 +2282,7 @@ class test_resources_endpoint(unittest.TestCase):
                 }
             ])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -2279,7 +2291,7 @@ class test_resources_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': "select RESC_NAME where META_RESC_ATTR_NAME = 'a1' and META_RESC_ATTR_VALUE = 'v1' and META_RESC_ATTR_UNITS = 'u1'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2299,7 +2311,7 @@ class test_resources_endpoint(unittest.TestCase):
                 }
             ])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -2308,7 +2320,7 @@ class test_resources_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': "select RESC_NAME where META_RESC_ATTR_NAME = 'a1' and META_RESC_ATTR_VALUE = 'v1' and META_RESC_ATTR_UNITS = 'u1'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2337,7 +2349,7 @@ class test_rules_endpoint(unittest.TestCase):
     def test_list_all_rule_engine_plugins(self):
         headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
         r = requests.get(self.url_endpoint, headers=headers, params={'op': 'list_rule_engines'})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2354,7 +2366,7 @@ class test_rules_endpoint(unittest.TestCase):
             'rep-instance': 'irods_rule_engine_plugin-irods_rule_language-instance',
             'rule-text': f'writeLine("stdout", "{test_msg}")'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
  
         result = r.json()
@@ -2375,7 +2387,7 @@ class test_rules_endpoint(unittest.TestCase):
             'rep-instance': rep_instance,
             'rule-text': f'delay("<INST_NAME>{rep_instance}</INST_NAME><PLUSET>1h</PLUSET>") {{ writeLine("serverLog", "iRODS HTTP API"); }}'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
  
         result = r.json()
@@ -2388,7 +2400,7 @@ class test_rules_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': 'select max(RULE_EXEC_ID)'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
  
         result = r.json()
@@ -2400,7 +2412,7 @@ class test_rules_endpoint(unittest.TestCase):
             'op': 'remove_delay_rule',
             'rule-id': str(result['rows'][0][0])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
  
         result = r.json()
@@ -2431,7 +2443,7 @@ class test_tickets_endpoint(unittest.TestCase):
 
         # Create a data object.
         r = requests.post(f'{self.url_base}/data-objects', headers=headers, data={'op': 'touch', 'lpath': data_object})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2446,7 +2458,7 @@ class test_tickets_endpoint(unittest.TestCase):
             'type': ticket_type,
             'use-count': ticket_use_count
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2461,7 +2473,7 @@ class test_tickets_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': 'select TICKET_STRING, TICKET_TYPE, TICKET_DATA_NAME, TICKET_USES_LIMIT'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2473,7 +2485,7 @@ class test_tickets_endpoint(unittest.TestCase):
 
         # Remove the ticket.
         r = requests.post(self.url_endpoint, headers=headers, data={'op': 'remove', 'name': ticket_string})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2484,7 +2496,7 @@ class test_tickets_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': 'select TICKET_STRING'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2498,7 +2510,7 @@ class test_tickets_endpoint(unittest.TestCase):
             'catalog-only': 0,
             'no-trash': 1
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2523,7 +2535,7 @@ class test_tickets_endpoint(unittest.TestCase):
             'groups': ticket_groups,
             'hosts': ticket_hosts
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2538,7 +2550,7 @@ class test_tickets_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': 'select TICKET_STRING, TICKET_TYPE, TICKET_COLL_NAME, TICKET_USES_LIMIT, TICKET_ALLOWED_USER_NAME, TICKET_ALLOWED_GROUP_NAME, TICKET_ALLOWED_HOST'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2553,7 +2565,7 @@ class test_tickets_endpoint(unittest.TestCase):
 
         # Remove the ticket.
         r = requests.post(self.url_endpoint, headers=headers, data={'op': 'remove', 'name': ticket_string})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2564,7 +2576,7 @@ class test_tickets_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': 'select TICKET_STRING'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2602,13 +2614,13 @@ class test_users_groups_endpoint(unittest.TestCase):
         # Create a new user.
         data = {'op': 'create_user', 'name': new_username, 'zone': self.zone_name, 'user-type': user_type}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
  
         # Stat the user.
         params = {'op': 'stat', 'name': new_username, 'zone': self.zone_name}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
@@ -2621,7 +2633,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         # Remove the user.
         data = {'op': 'remove_user', 'name': new_username, 'zone': self.zone_name}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
     def test_create_stat_and_remove_rodsadmin(self):
@@ -2632,13 +2644,13 @@ class test_users_groups_endpoint(unittest.TestCase):
         # Create a new user.
         data = {'op': 'create_user', 'name': new_username, 'zone': self.zone_name, 'user-type': user_type}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
  
         # Stat the user.
         params = {'op': 'stat', 'name': new_username, 'zone': self.zone_name}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
@@ -2651,7 +2663,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         # Remove the user.
         data = {'op': 'remove_user', 'name': new_username, 'zone': self.zone_name}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
     def test_create_stat_and_remove_groupadmin(self):
@@ -2662,13 +2674,13 @@ class test_users_groups_endpoint(unittest.TestCase):
         # Create a new user.
         data = {'op': 'create_user', 'name': new_username, 'zone': self.zone_name, 'user-type': user_type}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
  
         # Stat the user.
         params = {'op': 'stat', 'name': new_username, 'zone': self.zone_name}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
@@ -2681,7 +2693,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         # Remove the user.
         data = {'op': 'remove_user', 'name': new_username, 'zone': self.zone_name}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
     def test_add_remove_user_to_and_from_group(self):
@@ -2691,14 +2703,14 @@ class test_users_groups_endpoint(unittest.TestCase):
         new_group = 'test_group'
         data = {'op': 'create_group', 'name': new_group}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Stat the group.
         params = {'op': 'stat', 'name': new_group}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
@@ -2712,21 +2724,21 @@ class test_users_groups_endpoint(unittest.TestCase):
         user_type = 'rodsuser'
         data = {'op': 'create_user', 'name': new_username, 'zone': self.zone_name, 'user-type': user_type}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
  
         # Add user to group.
         data = {'op': 'add_to_group', 'group': new_group, 'user': new_username, 'zone': self.zone_name}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show that the user is a member of the group.
         params = {'op': 'is_member_of_group', 'group': new_group, 'user': new_username, 'zone': self.zone_name}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
@@ -2735,28 +2747,28 @@ class test_users_groups_endpoint(unittest.TestCase):
         # Remove user from group.
         data = {'op': 'remove_from_group', 'group': new_group, 'user': new_username, 'zone': self.zone_name}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Remove the user.
         data = {'op': 'remove_user', 'name': new_username, 'zone': self.zone_name}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Remove group.
         data = {'op': 'remove_group', 'name': new_group}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Show that the group no longer exists.
         params = {'op': 'stat', 'name': new_group}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -2772,7 +2784,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         user_type = 'rodsuser'
         data = {'op': 'create_user', 'name': new_username, 'zone': self.zone_name, 'user-type': user_type}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -2780,7 +2792,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         new_user_type = 'groupadmin'
         data = {'op': 'set_user_type', 'name': new_username, 'zone': self.zone_name, 'new-user-type': new_user_type}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -2788,14 +2800,14 @@ class test_users_groups_endpoint(unittest.TestCase):
         headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
         data = {'op': 'set_user_type', 'name': new_username, 'zone': self.zone_name, 'new-user-type': 'rodsuser'}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.SYS_NO_API_PRIV)
 
         # Show that the user type matches the type set by the rodsadmin.
         params = {'op': 'stat', 'name': new_username, 'zone': self.zone_name}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
@@ -2808,7 +2820,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
         data = {'op': 'remove_user', 'name': new_username, 'zone': self.zone_name}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -2823,7 +2835,7 @@ class test_users_groups_endpoint(unittest.TestCase):
             'zone': self.zone_name,
             'new-password': 'not_going_to_work'
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.SYS_NO_API_PRIV)
 
@@ -2834,7 +2846,7 @@ class test_users_groups_endpoint(unittest.TestCase):
 
     def test_listing_all_users_in_zone(self):
         r = requests.get(self.url_endpoint, headers={'Authorization': f'Bearer {self.rodsuser_bearer_token}'}, params={'op': 'users'})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
@@ -2847,13 +2859,13 @@ class test_users_groups_endpoint(unittest.TestCase):
         # Create a new group.
         new_group = 'test_group'
         r = requests.post(self.url_endpoint, headers=headers, data={'op': 'create_group', 'name': new_group})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Get all groups.
         r = requests.get(self.url_endpoint, headers={'Authorization': f'Bearer {self.rodsuser_bearer_token}'}, params={'op': 'groups'})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
@@ -2862,7 +2874,7 @@ class test_users_groups_endpoint(unittest.TestCase):
 
         # Remove the new group.
         r = requests.post(self.url_endpoint, headers=headers, data={'op': 'remove_group', 'name': new_group})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -2883,7 +2895,7 @@ class test_users_groups_endpoint(unittest.TestCase):
                 }
             ])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -2892,7 +2904,7 @@ class test_users_groups_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': "select USER_NAME where META_USER_ATTR_NAME = 'a1' and META_USER_ATTR_VALUE = 'v1' and META_USER_ATTR_UNITS = 'u1'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2912,7 +2924,7 @@ class test_users_groups_endpoint(unittest.TestCase):
                 }
             ])
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
@@ -2921,7 +2933,7 @@ class test_users_groups_endpoint(unittest.TestCase):
             'op': 'execute_genquery',
             'query': "select USER_NAME where META_USER_ATTR_NAME = 'a1' and META_USER_ATTR_VALUE = 'v1' and META_USER_ATTR_UNITS = 'u1'"
         })
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
@@ -2990,7 +3002,7 @@ class test_zones_endpoint(unittest.TestCase):
     def test_report_operation(self):
         headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
         r = requests.get(self.url_endpoint, headers=headers, params={'op': 'report'})
-        logging.debug(r.content)
+        self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
 
         result = r.json()
