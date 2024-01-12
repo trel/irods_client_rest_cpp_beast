@@ -1565,6 +1565,91 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             logging.debug(r.content)
 
+    def test_attempting_to_read_non_existent_data_object_results_in_an_error(self):
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={
+            'op': 'read',
+            'lpath': f'/{self.zone_name}/home/{self.rodsuser_username}/does_not_exist'
+        })
+        logging.debug(r.content)
+        self.assertEqual(r.status_code, 404)
+
+    def test_attempting_to_read_data_object_with_insufficient_permissions_results_in_an_error(self):
+        rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        data_object = f'/{self.zone_name}/home/{self.rodsadmin_username}/http_api_invalid_values_for_read_op.txt'
+
+        try:
+            # Create a data object as the rodsadmin.
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'touch',
+                'lpath': data_object
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Attempting to read a data object without appropriate permissions will
+            # result in an error.
+            r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={
+                'op': 'read',
+                'lpath': data_object
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 404)
+
+        finally:
+            # Remove the data object.
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'catalog-only': 0,
+                'no-trash': 1
+            })
+            logging.debug(r.content)
+
+    def test_passing_invalid_values_to_offset_and_count_parameters_for_read_operation_results_in_an_error(self):
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        data_object = f'/{self.zone_name}/home/{self.rodsuser_username}/http_api_invalid_values_for_read_op.txt'
+
+        try:
+            # Create a data object.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'touch',
+                'lpath': data_object
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show an invalid value for the "offset" parameter results in an http error.
+            r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={
+                'op': 'read',
+                'lpath': data_object,
+                'offset': 'triggers_error'
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 400)
+
+            # Show an invalid value for the "count" parameter results in an http error.
+            r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={
+                'op': 'read',
+                'lpath': data_object,
+                'count': 'triggers_error'
+            })
+            logging.debug(r.content)
+            self.assertEqual(r.status_code, 400)
+
+        finally:
+            # Remove the data object.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'catalog-only': 0,
+                'no-trash': 1
+            })
+            logging.debug(r.content)
+
     @unittest.skip('Test needs to be implemented.')
     def test_return_error_on_missing_parameters(self):
         pass
