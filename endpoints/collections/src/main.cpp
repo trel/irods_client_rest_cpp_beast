@@ -64,6 +64,7 @@ namespace
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove);
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_rename);
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_set_permission);
+	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_set_inheritance);
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_permissions);
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_metadata);
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_touch);
@@ -84,7 +85,7 @@ namespace
 		{"rename", op_rename},
 		//{"copy", op_copy}, // TODO
 		{"set_permission", op_set_permission},
-		//{"enable_inheritance", op_enable_inheritance} // TODO set_permission handles inheritance?
+		{"set_inheritance", op_set_inheritance},
 		{"modify_permissions", op_modify_permissions},
 		{"modify_metadata", op_modify_metadata},
 		{"touch", op_touch}
@@ -688,6 +689,92 @@ namespace
 			return _sess_ptr->send(std::move(res));
 		});
 	} // op_set_permission
+
+	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_set_inheritance)
+	{
+		auto result = irods::http::resolve_client_identity(_req);
+		if (result.response) {
+			return _sess_ptr->send(std::move(*result.response));
+		}
+
+		const auto client_info = result.client_info;
+
+		irods::http::globals::background_task([fn = __func__,
+		                                       client_info,
+		                                       _sess_ptr,
+		                                       _req = std::move(_req),
+		                                       _args = std::move(_args)] {
+			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+
+			http::response<http::string_body> res{http::status::ok, _req.version()};
+			res.set(http::field::server, irods::http::version::server_name);
+			res.set(http::field::content_type, "application/json");
+			res.keep_alive(_req.keep_alive());
+
+			try {
+				const auto lpath_iter = _args.find("lpath");
+				if (lpath_iter == std::end(_args)) {
+					log::error("{}: Missing [lpath] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+				}
+
+				const auto enable_iter = _args.find("enable");
+				if (enable_iter == std::end(_args)) {
+					log::error("{}: Missing [enable] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+				}
+
+				auto conn = irods::get_connection(client_info.username);
+
+				if (!fs::client::is_collection(conn, lpath_iter->second)) {
+					return _sess_ptr->send(irods::http::fail(
+						res,
+						http::status::bad_request,
+						json{{"irods_response", {{"status_code", NOT_A_COLLECTION}}}}.dump()));
+				}
+
+				const auto admin_mode_iter = _args.find("admin");
+				if (admin_mode_iter != std::end(_args) && admin_mode_iter->second == "1") {
+					fs::client::enable_inheritance(fs::admin, conn, lpath_iter->second, (enable_iter->second == "1"));
+				}
+				else {
+					fs::client::enable_inheritance(conn, lpath_iter->second, (enable_iter->second == "1"));
+				}
+
+				res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
+			}
+			catch (const fs::filesystem_error& e) {
+				log::error("{}: {}", fn, e.what());
+				// clang-format off
+				res.body() = json{
+					{"irods_response", {
+						{"status_code", e.code().value()},
+						{"status_message", e.what()}
+					}}
+				}.dump();
+				// clang-format off
+			}
+			catch (const irods::exception& e) {
+				log::error("{}: {}", fn, e.client_display_what());
+				// clang-format off
+				res.body() = json{
+					{"irods_response", {
+						{"status_code", e.code()},
+						{"status_message", e.client_display_what()}
+					}}
+				}.dump();
+				// clang-format off
+			}
+			catch (const std::exception& e) {
+				log::error("{}: {}", fn, e.what());
+				res.result(http::status::internal_server_error);
+			}
+
+			res.prepare_payload();
+
+			return _sess_ptr->send(std::move(res));
+		});
+	} // op_set_inheritance
 
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify_permissions)
 	{
