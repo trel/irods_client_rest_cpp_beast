@@ -470,7 +470,7 @@ namespace
 						"{}: Logical path [{}] does not point to a data object or does not exist.",
 						fn,
 						lpath_iter->second);
-					res.result(http::status::internal_server_error);
+					res.result(http::status::not_found);
 					res.prepare_payload();
 					return _sess_ptr->send(std::move(res));
 				}
@@ -482,7 +482,7 @@ namespace
 					}
 					catch (const std::exception& e) {
 						log::error("{}: Invalid value for [offset] parameter. Received [{}].", fn, iter->second);
-						res.result(http::status::internal_server_error);
+						res.result(http::status::bad_request);
 						res.prepare_payload();
 						return _sess_ptr->send(std::move(res));
 					}
@@ -507,7 +507,7 @@ namespace
 					}
 					catch (const std::exception& e) {
 						log::error("{}: Invalid value for [count] parameter. Received [{}].", fn, iter->second);
-						res.result(http::status::internal_server_error);
+						res.result(http::status::bad_request);
 						res.prepare_payload();
 						return _sess_ptr->send(std::move(res));
 					}
