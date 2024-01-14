@@ -2789,8 +2789,8 @@ class test_users_groups_endpoint(unittest.TestCase):
         data = {'op': 'set_user_type', 'name': new_username, 'zone': self.zone_name, 'new-user-type': 'rodsuser'}
         r = requests.post(self.url_endpoint, headers=headers, data=data)
         logging.debug(r.content)
-        self.assertEqual(r.status_code, 400)
-        self.assertNotEqual(r.json()['irods_response']['status_code'], 0)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.SYS_NO_API_PRIV)
 
         # Show that the user type matches the type set by the rodsadmin.
         params = {'op': 'stat', 'name': new_username, 'zone': self.zone_name}
@@ -2824,8 +2824,8 @@ class test_users_groups_endpoint(unittest.TestCase):
             'new-password': 'not_going_to_work'
         })
         logging.debug(r.content)
-        self.assertEqual(r.status_code, 400)
-        self.assertNotEqual(r.json()['irods_response']['status_code'], 0)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.SYS_NO_API_PRIV)
 
         # Authenticate as the user to prove the first password modification was successful.
         r = requests.post(f'{self.url_base}/authenticate', auth=(self.rodsuser_username, config.test_config['rodsuser']['password']))
