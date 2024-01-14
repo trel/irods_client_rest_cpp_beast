@@ -152,15 +152,14 @@ namespace
 							user_type = adm::user_type::groupadmin;
 						}
 						else {
-							log::error("{}: Invalid user-type.", fn);
+							log::error("{}: Invalid value for [user-type] parameter.", fn);
 							return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 						}
 					}
 
 					auto zone_type = adm::zone_type::local;
-					if (const auto& client = irods::http::globals::configuration().at("irods_client");
-				        zone_iter->second != client.at("zone").get_ref<const std::string&>())
-					{
+					const auto& client = irods::http::globals::configuration().at("irods_client");
+					if (zone_iter->second != client.at("zone").get_ref<const std::string&>()) {
 						zone_type = adm::zone_type::remote;
 					}
 
@@ -177,7 +176,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -242,7 +240,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -313,7 +310,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -386,7 +382,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -539,7 +534,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -598,7 +592,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -668,7 +661,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
@@ -733,7 +725,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
@@ -782,7 +773,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
@@ -831,7 +821,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
@@ -944,7 +933,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
@@ -1034,7 +1022,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();

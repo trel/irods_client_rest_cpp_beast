@@ -121,7 +121,6 @@ namespace irods::http::shared_api_operations
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(::http::status::bad_request);
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -236,7 +235,6 @@ namespace irods::http::shared_api_operations
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(::http::status::bad_request);
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {

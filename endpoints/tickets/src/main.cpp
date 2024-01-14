@@ -212,7 +212,7 @@ namespace
 						ticket_type = adm::ticket::ticket_type::write;
 					}
 					else if (type_iter->second != "read") {
-						log::error("{}: Missing [type] parameter.", fn);
+						log::error("{}: Invalid value for [type] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 				}
@@ -293,7 +293,6 @@ namespace
 			}
 			catch (const irods::exception& e) {
 				log::error("{}: {}", fn, e.client_display_what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
@@ -345,7 +344,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
