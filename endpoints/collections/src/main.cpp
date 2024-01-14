@@ -173,13 +173,11 @@ namespace
 			}
 			catch (const fs::filesystem_error& e) {
 				log::error("{}: {}", fn, e.what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
 				log::error("{}: {}", fn, e.client_display_what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
@@ -270,13 +268,11 @@ namespace
 			}
 			catch (const fs::filesystem_error& e) {
 				log::error("{}: {}", fn, e.what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
 				log::error("{}: {}", fn, e.client_display_what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
@@ -454,13 +450,11 @@ namespace
 			}
 			catch (const fs::filesystem_error& e) {
 				log::error("{}: {}", fn, e.what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
 				log::error("{}: {}", fn, e.client_display_what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
@@ -534,13 +528,11 @@ namespace
 			}
 			catch (const fs::filesystem_error& e) {
 				log::error("{}: {}", fn, e.what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
 				log::error("{}: {}", fn, e.client_display_what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
@@ -632,13 +624,11 @@ namespace
 			}
 			catch (const fs::filesystem_error& e) {
 				log::error("{}: {}", fn, e.what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
 				log::error("{}: {}", fn, e.client_display_what());
-				res.result(http::status::bad_request);
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
@@ -818,7 +808,6 @@ namespace
 				}
 				catch (const irods::exception& e) {
 					log::error("{}: {}", fn, e.client_display_what());
-					res.result(http::status::bad_request);
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {

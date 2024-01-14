@@ -75,6 +75,7 @@ namespace irods::http::handler
 			}
 			catch (const std::exception& e) {
 				log::error("{}: {}", fn, e.what());
+				res.result(status_type::internal_server_error);
 			}
 
 			res.prepare_payload();
