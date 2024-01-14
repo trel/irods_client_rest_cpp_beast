@@ -97,7 +97,7 @@ curl http://localhost:<port>/irods-http-api/<version>/collections \
     -H 'Authorization: Bearer <token>' \
     --data-urlencode 'op=create' \
     --data-urlencode 'lpath=<string>' \
-    --data-urlencode 'create-intermediates=<integer>' # 0 or 1. Defaults to 0.
+    --data-urlencode 'create-intermediates=<integer>' # 0 or 1. Defaults to 0. Optional.
 ```
 
 #### Response
@@ -127,8 +127,8 @@ curl http://localhost:<port>/irods-http-api/<version>/collections \
     -H 'Authorization: Bearer <token>' \
     --data-urlencode 'op=remove' \
     --data-urlencode 'lpath=<string>' \
-    --data-urlencode 'recurse=<integer>' \ # 0 or 1. Defaults to 0.
-    --data-urlencode 'no-trash=<integer>' # 0 or 1. Defaults to 0.
+    --data-urlencode 'recurse=<integer>' \ # 0 or 1. Defaults to 0. Optional.
+    --data-urlencode 'no-trash=<integer>' # 0 or 1. Defaults to 0. Optional.
 ```
 
 If `recurse` is set to 1, the contents of the collection will be removed. If `no-trash` is set to 1, the collection is permanently removed.
@@ -203,7 +203,7 @@ curl http://localhost:<port>/irods-http-api/<version>/collections \
     -H 'Authorization: Bearer <token>' \
     --data-urlencode 'op=list' \
     --data-urlencode 'lpath=<string>' \
-    --data-urlencode 'recurse=<integer>' \ # 0 or 1. Defaults to 0.
+    --data-urlencode 'recurse=<integer>' \ # 0 or 1. Defaults to 0. Optional.
     --data-urlencode 'ticket=<string>' \ # Optional
     -G
 ```
@@ -241,7 +241,7 @@ curl http://localhost:<port>/irods-http-api/<version>/collections \
     --data-urlencode 'lpath=<string>' \
     --data-urlencode 'entity-name=<string>' \ # The name of a user or group.
     --data-urlencode 'permission=<string>' \ # null, read, write, or own.
-    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0.
+    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
 ```
 
 #### Response
@@ -301,7 +301,7 @@ curl http://localhost:<port>/irods-http-api/<version>/collections \
     --data-urlencode 'op=modify_permissions' \
     --data-urlencode 'lpath=<string>' \
     --data-urlencode 'operations=<json_object>' \
-    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin.
+    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
 ```
 
 The JSON object passed to the `operations` parameter must have the following structure:
@@ -361,7 +361,7 @@ curl http://localhost:<port>/irods-http-api/<version>/collections \
     --data-urlencode 'op=modify_metadata' \
     --data-urlencode 'lpath=<string>' \
     --data-urlencode 'operations=<json_object>' \
-    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0.
+    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
 ```
 
 The JSON object passed to the `operations` parameter must have the following structure:
@@ -485,7 +485,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
     --data-urlencode 'op=touch' \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
-    --data-urlencode 'no-create=<integer>' \ # 0 or 1. Defaults to 0. If set to 1, no data objects will be created.
+    --data-urlencode 'no-create=<integer>' \ # 0 or 1. Defaults to 0. If set to 1, no data objects will be created. Optional.
     --data-urlencode 'replica-number=<integer>' \ # The replica to update. The replica must exist. Optional.
     --data-urlencode 'leaf-resource=<string>' \ # The resource holding an existing replica. If it does not exist, it will be created on the specified resource. Optional.
     --data-urlencode 'seconds-since-epoch=<integer>' \ # The mtime to assign to the replica. Optional.
@@ -519,8 +519,8 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'op=remove' \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'catalog-only=<integer>' \ # 0 or 1. If set to 1, removes only the catalog entry.
-    --data-urlencode 'no-trash=<integer>' \ # 0 or 1. Defaults to 0. If set to 1, permanently deletes the data object.
-    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin.
+    --data-urlencode 'no-trash=<integer>' \ # 0 or 1. Defaults to 0. If set to 1, permanently deletes the data object. Optional.
+    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
 ```
 
 `catalog-only` and `no-trash` are mutually exclusive parameters. Setting both to 1 will result in an error.
@@ -555,9 +555,9 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'resource=<string>' \ # The resource holding the target replica. Optional.
     --data-urlencode 'replica-number=<integer>' \ # The replica number of the target replica. Optional.
-    --data-urlencode 'force=<integer>' \ # 0 or 1. Defaults to 0. Overwrite the existing checksum.
-    --data-urlencode 'all=<integer>' \ # 0 or 1. Defaults to 0. Calculate checksums for all replicas.
-    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin.
+    --data-urlencode 'force=<integer>' \ # 0 or 1. Defaults to 0. Overwrite the existing checksum. Optional.
+    --data-urlencode 'all=<integer>' \ # 0 or 1. Defaults to 0. Calculate checksums for all replicas. Optional.
+    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
 ```
 
 `resource`, `replica-number`, and `all` are mutually exclusive parameters.
@@ -591,8 +591,8 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'resource=<string>' \ # The resource holding the target replica. Optional.
     --data-urlencode 'replica-number=<integer>' \ # The replica number of the target replica. Optional.
-    --data-urlencode 'compute-checksums=<integer>' \ # 0 or 1. Defaults to 1. Can be used to skip the checksum calculation step.
-    --data-urlencode 'admin=<integer>' \ # 0 or 1. Defaults to 0. Execute as a rodsadmin.
+    --data-urlencode 'compute-checksums=<integer>' \ # 0 or 1. Defaults to 1. Can be used to skip the checksum calculation step. Optional.
+    --data-urlencode 'admin=<integer>' \ # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
     -G
 ```
 
@@ -741,7 +741,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'src-resource=<string>' \ # The resource to replicate from.
     --data-urlencode 'dst-resource=<string>' \ # The resource to replicate to.
-    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0.
+    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
 ```
 
 #### Response
@@ -772,7 +772,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'replica-number=<integer>' \ # The replica number identifying the replica to trim.
     --data-urlencode 'catalog-only=<integer>' \ # 0 or 1. If set to 1, removes only the catalog entry. Optional.
-    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin.
+    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
 ```
 
 #### Response
@@ -803,7 +803,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'ppath=<string>' \ # Absolute physical path to file on the iRODS server.
     --data-urlencode 'resource=<string>' \ # The resource which will own the replica.
-    --data-urlencode 'as-additional-replica=<integer>' \ # 0 or 1. Defaults to 0. Register as an additional replica for an existing data object.
+    --data-urlencode 'as-additional-replica=<integer>' \ # 0 or 1. Defaults to 0. Register as an additional replica for an existing data object. Optional.
     --data-urlencode 'data-size=<integer>' \ # The size of the replica in bytes. Optional.
     --data-urlencode 'checksum=<string>' \ # The checksum to associate with the replica. Optional.
 ```
@@ -834,8 +834,8 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
     --data-urlencode 'op=read' \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
-    --data-urlencode 'offset=<integer>' \ # Number of bytes to skip. Defaults to 0.
-    --data-urlencode 'count=<integer>' \ # Number of bytes to read.
+    --data-urlencode 'offset=<integer>' \ # Number of bytes to skip. Defaults to 0. Optional.
+    --data-urlencode 'count=<integer>' \ # Number of bytes to read. Optional.
     --data-urlencode 'ticket=<string>' \ # The ticket to enable before reading the data object. Optional.
     -G
 ```
@@ -858,9 +858,9 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     [-F,--data-urlencode] 'op=write' \
     [-F,--data-urlencode] 'lpath=<string>' \ # Absolute logical path to a data object.
     [-F,--data-urlencode] 'resource=<string>' \ # The root resource to write to. Optional.
-    [-F,--data-urlencode] 'offset=<integer>' \ # Number of bytes to skip. Defaults to 0.
-    [-F,--data-urlencode] 'truncate=<integer>' \ # 0 or 1. Defaults to 1. Truncates the data object before writing.
-    [-F,--data-urlencode] 'append=<integer>' \ # 0 or 1. Defaults to 0. Appends the bytes to the data object.
+    [-F,--data-urlencode] 'offset=<integer>' \ # Number of bytes to skip. Defaults to 0. Optional.
+    [-F,--data-urlencode] 'truncate=<integer>' \ # 0 or 1. Defaults to 1. Truncates the data object before writing. Optional.
+    [-F,--data-urlencode] 'append=<integer>' \ # 0 or 1. Defaults to 0. Appends the bytes to the data object. Optional.
     [-F,--data-urlencode] 'bytes=<binary_data>;type=application/octet-stream' \ # The bytes to write.
     [-F,--data-urlencode] 'parallel-write-handle=<string>' \ # The handle to use when writing in parallel. Optional.
     [-F,--data-urlencode] 'stream-index=<integer>' # The stream to use when writing in parallel. Optional.
@@ -901,8 +901,8 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'op=parallel_write_init' \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'stream-count=<integer>' \ # Number of streams to open.
-    --data-urlencode 'truncate=<integer>' \ # 0 or 1. Defaults to 1. Truncates the data object before writing.
-    --data-urlencode 'append=<integer>' \ # 0 or 1. Defaults to 0. Appends the bytes to the data object.
+    --data-urlencode 'truncate=<integer>' \ # 0 or 1. Defaults to 1. Truncates the data object before writing. Optional.
+    --data-urlencode 'append=<integer>' \ # 0 or 1. Defaults to 0. Appends the bytes to the data object. Optional.
     --data-urlencode 'ticket=<string>' # The ticket to enable for all streams. Optional.
 ```
 
@@ -956,7 +956,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'op=modify_metadata' \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'operations=<json_object>' \
-    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin.
+    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
 ```
 
 The JSON object passed to the `operations` parameter must have the following structure:
@@ -1021,7 +1021,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'entity-name=<string>' \ # The name of a user or group.
     --data-urlencode 'permission=<string>' \ # null, read, write, or own.
-    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin.
+    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
 ```
 
 #### Response
@@ -1051,7 +1051,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'op=modify_permissions' \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'operations=<json_object>' \
-    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin.
+    --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
 ```
 
 The JSON object passed to the `operations` parameter must have the following structure:
@@ -1188,15 +1188,17 @@ curl http://localhost:<port>/irods-http-api/<version>/query \
     -H 'Authorization: Bearer <token>' \
     --data-urlencode 'op=execute_genquery' \
     --data-urlencode 'query=<string>' \
-    --data-urlencode 'offset=<integer>' \ # Number of rows to skip. Defaults to 0.
-    --data-urlencode 'count=<integer>' \ # Number of rows to return. Default set by administrator.
-    --data-urlencode 'case-sensitive=<integer>' \ # Execute a case sensitive/insensitive query. Defaults to 1. Only supported by GenQuery1.
-    --data-urlencode 'distinct=<integer>' \ # Collapse duplicate rows. Defaults to 1. Only supported by GenQuery1.
-    --data-urlencode 'parser=<string>' \ # genquery1 or genquery2. Defaults to genquery1.
-    --data-urlencode 'sql-only=<integer>' \ # 0 or 1. Defaults to 0. Only supported by GenQuery2.
-    --data-urlencode 'zone=<string>' \ # The zone name. Defaults to the local zone.
+    --data-urlencode 'offset=<integer>' \ # Number of rows to skip. Defaults to 0. Optional.
+    --data-urlencode 'count=<integer>' \ # Number of rows to return. Default set by administrator. Optional.
+    --data-urlencode 'case-sensitive=<integer>' \ # Execute a case sensitive/insensitive query. Defaults to 1. Only supported by GenQuery1. Optional.
+    --data-urlencode 'distinct=<integer>' \ # Collapse duplicate rows. Defaults to 1. Only supported by GenQuery1. Optional.
+    --data-urlencode 'parser=<string>' \ # genquery1 or genquery2. Defaults to genquery1. Optional.
+    --data-urlencode 'sql-only=<integer>' \ # 0 or 1. Defaults to 0. Only supported by GenQuery2. Optional.
+    --data-urlencode 'zone=<string>' \ # The zone name. Defaults to the local zone. Optional.
     -G
 ```
+
+`count` will be clamped to the range [1, _N_] where _N_ represents the max number of rows that can be returned by any query. The max number of rows is defined by the administrator of the iRODS HTTP API and can be obtained by sending an HTTP GET request to the /info endpoint. See [Information Operations](#information-operations) for more details.
 
 #### Response
 
@@ -1230,16 +1232,14 @@ curl http://localhost:<port>/irods-http-api/<version>/query \
     -H 'Authorization: Bearer <token>' \
     --data-urlencode 'op=execute_specific_query' \
     --data-urlencode 'name=<string>' \ # Name of specific query.
-    --data-urlencode 'args=<string>' \ # List of arguments.
-    --data-urlencode 'args-delimiter=<string>' \ # Delimiter used to separate arguments. Defaults to comma (,).
-    --data-urlencode 'offset=<integer>' \ # Number of rows to skip. Defaults to 0.
-    --data-urlencode 'count=<integer>' \ # Number of rows to return. Default set by administrator.
+    --data-urlencode 'args=<string>' \ # List of arguments. Optional.
+    --data-urlencode 'args-delimiter=<string>' \ # Delimiter used to separate arguments. Defaults to comma (,). Optional.
+    --data-urlencode 'offset=<integer>' \ # Number of rows to skip. Defaults to 0. Optional.
+    --data-urlencode 'count=<integer>' \ # Number of rows to return. Default set by administrator. Optional.
     -G
 ```
 
-#### Response
-
-If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
+`count` will be clamped to the range [1, _N_] where _N_ represents the max number of rows that can be returned by any query. The max number of rows is defined by the administrator of the iRODS HTTP API and can be obtained by sending an HTTP GET request to the /info endpoint. See [Information Operations](#information-operations) for more details.
 
 ```js
 {
@@ -1624,7 +1624,7 @@ curl http://localhost:<port>/irods-http-api/<version>/tickets \
     -H 'Authorization: Bearer <token>' \
     --data-urlencode 'op=create' \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object or collection.
-    --data-urlencode 'type=<string>' \ # read or write. Defaults to read.
+    --data-urlencode 'type=<string>' \ # read or write. Defaults to read. Optional.
     --data-urlencode 'use-count=<integer>' \ # Number of times the ticket can be used. Optional.
     --data-urlencode 'write-data-object-count=<integer>' \ # Max number of writes that can be performed. Optional.
     --data-urlencode 'write-byte-count=<integer>' \ # Max number of bytes that can be written. Optional.
@@ -1692,7 +1692,7 @@ curl http://localhost:<port>/irods-http-api/<version>/users-groups \
     --data-urlencode 'op=create_user' \
     --data-urlencode 'name=<string>' \ # Name of user.
     --data-urlencode 'zone=<string>' \ # Name of zone for user.
-    --data-urlencode 'user-type=<string>' # rodsuser, groupadmin, or rodsadmin. Defaults to rodsuser.
+    --data-urlencode 'user-type=<string>' # rodsuser, groupadmin, or rodsadmin. Defaults to rodsuser. Optional.
 ```
 
 #### Response
