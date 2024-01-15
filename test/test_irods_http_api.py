@@ -127,6 +127,24 @@ def tear_down_class(cls):
         logging.debug(f'Failed to remove rodsuser [{cls.rodsuser_username}].')
         return
 
+def do_test_server_reports_error_when_http_method_is_not_supported(cls):
+    r = requests.delete(cls.url_endpoint)
+    logging.debug(r.content)
+    cls.assertEqual(r.status_code, 405)
+
+def do_test_server_reports_error_when_op_is_not_supported(cls, test_http_post_method=True):
+    rodsuser_headers = {'Authorization': f'Bearer {cls.rodsadmin_bearer_token}'}
+    invalid_op = {'op': 'invalid_op'}
+
+    r = requests.get(cls.url_endpoint, headers=rodsuser_headers, params=invalid_op)
+    logging.debug(r.content)
+    cls.assertEqual(r.status_code, 400)
+
+    if test_http_post_method:
+        r = requests.post(cls.url_endpoint, headers=rodsuser_headers, data=invalid_op)
+        logging.debug(r.content)
+        cls.assertEqual(r.status_code, 400)
+
 class test_authenticate_endpoint(unittest.TestCase):
 
     @classmethod
@@ -154,6 +172,9 @@ class test_authenticate_endpoint(unittest.TestCase):
         logging.debug(r.content)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+    def test_server_reports_error_when_http_method_is_not_supported(self):
+        do_test_server_reports_error_when_http_method_is_not_supported(self)
 
 class test_collections_endpoint(unittest.TestCase):
 
@@ -658,6 +679,12 @@ class test_collections_endpoint(unittest.TestCase):
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(result['inheritance_enabled'], False)
+
+    def test_server_reports_error_when_http_method_is_not_supported(self):
+        do_test_server_reports_error_when_http_method_is_not_supported(self)
+
+    def test_server_reports_error_when_op_is_not_supported(self):
+        do_test_server_reports_error_when_op_is_not_supported(self)
 
     @unittest.skip('Test needs to be implemented.')
     def test_return_error_on_missing_parameters(self):
@@ -1735,6 +1762,12 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             logging.debug(r.content)
 
+    def test_server_reports_error_when_http_method_is_not_supported(self):
+        do_test_server_reports_error_when_http_method_is_not_supported(self)
+
+    def test_server_reports_error_when_op_is_not_supported(self):
+        do_test_server_reports_error_when_op_is_not_supported(self)
+
     @unittest.skip('Test needs to be implemented.')
     def test_return_error_on_missing_parameters(self):
         pass
@@ -1761,6 +1794,9 @@ class test_information_endpoint(unittest.TestCase):
         self.assertIn('max_size_of_request_body_in_bytes', info)
         self.assertIn('max_number_of_parallel_write_streams', info)
         self.assertIn('max_number_of_rows_per_catalog_query', info)
+
+    def test_server_reports_error_when_http_method_is_not_supported(self):
+        do_test_server_reports_error_when_http_method_is_not_supported(self)
 
 class test_query_endpoint(unittest.TestCase):
 
@@ -1967,6 +2003,12 @@ class test_query_endpoint(unittest.TestCase):
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertGreaterEqual(len(result['rows']), 0)
+
+    def test_server_reports_error_when_http_method_is_not_supported(self):
+        do_test_server_reports_error_when_http_method_is_not_supported(self)
+
+    def test_server_reports_error_when_op_is_not_supported(self):
+        do_test_server_reports_error_when_op_is_not_supported(self)
 
 class test_resources_endpoint(unittest.TestCase):
 
@@ -2273,6 +2315,12 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 0)
 
+    def test_server_reports_error_when_http_method_is_not_supported(self):
+        do_test_server_reports_error_when_http_method_is_not_supported(self)
+
+    def test_server_reports_error_when_op_is_not_supported(self):
+        do_test_server_reports_error_when_op_is_not_supported(self)
+
 class test_rules_endpoint(unittest.TestCase):
 
     @classmethod
@@ -2357,6 +2405,12 @@ class test_rules_endpoint(unittest.TestCase):
  
         result = r.json()
         self.assertEqual(result['irods_response']['status_code'], 0)
+
+    def test_server_reports_error_when_http_method_is_not_supported(self):
+        do_test_server_reports_error_when_http_method_is_not_supported(self)
+
+    def test_server_reports_error_when_op_is_not_supported(self):
+        do_test_server_reports_error_when_op_is_not_supported(self)
 
 class test_tickets_endpoint(unittest.TestCase):
 
@@ -2520,6 +2574,12 @@ class test_tickets_endpoint(unittest.TestCase):
     @unittest.skip('Test and HTTP API operation need to be implemented.')
     def test_modification_of_ticket_properties(self):
         pass
+
+    def test_server_reports_error_when_http_method_is_not_supported(self):
+        do_test_server_reports_error_when_http_method_is_not_supported(self)
+
+    def test_server_reports_error_when_op_is_not_supported(self):
+        do_test_server_reports_error_when_op_is_not_supported(self)
 
 class test_users_groups_endpoint(unittest.TestCase):
 
@@ -2868,6 +2928,12 @@ class test_users_groups_endpoint(unittest.TestCase):
         self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 0)
 
+    def test_server_reports_error_when_http_method_is_not_supported(self):
+        do_test_server_reports_error_when_http_method_is_not_supported(self)
+
+    def test_server_reports_error_when_op_is_not_supported(self):
+        do_test_server_reports_error_when_op_is_not_supported(self)
+
     @unittest.skip('Test needs to be implemented.')
     def test_create_user_returns_error_when_missing_required_parameters(self):
         pass
@@ -2934,6 +3000,12 @@ class test_zones_endpoint(unittest.TestCase):
         self.assertIn('schema_version', zone_report)
         self.assertIn('zones', zone_report)
         self.assertGreaterEqual(len(zone_report['zones']), 1)
+
+    def test_server_reports_error_when_http_method_is_not_supported(self):
+        do_test_server_reports_error_when_http_method_is_not_supported(self)
+
+    def test_server_reports_error_when_op_is_not_supported(self):
+        do_test_server_reports_error_when_op_is_not_supported(self, test_http_post_method=False)
 
 if __name__ == '__main__':
     unittest.main()

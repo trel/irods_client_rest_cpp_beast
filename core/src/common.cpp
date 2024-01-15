@@ -1,8 +1,10 @@
 #include "irods/private/http_api/common.hpp"
 
+#include "irods/private/http_api/crlf_parser.hpp"
 #include "irods/private/http_api/globals.hpp"
 #include "irods/private/http_api/log.hpp"
 #include "irods/private/http_api/process_stash.hpp"
+#include "irods/private/http_api/session.hpp"
 #include "irods/private/http_api/version.hpp"
 
 #include <irods/client_connection.hpp>
@@ -253,6 +255,79 @@ namespace irods::http
 		log::trace("{}: Client is authenticated.", __func__);
 		return {.client_info = std::move(*client_info)};
 	} // resolve_client_identity
+
+	auto execute_operation(
+		session_pointer_type _sess_ptr,
+		request_type& _req,
+		const std::unordered_map<std::string, handler_type>& _op_table_get,
+		const std::unordered_map<std::string, handler_type>& _op_table_post) -> void
+	{
+		if (_req.method() == verb_type::get) {
+			if (_op_table_get.empty()) {
+				log::error("{}: HTTP method not supported.", __func__);
+				return _sess_ptr->send(irods::http::fail(status_type::method_not_allowed));
+			}
+
+			auto url = irods::http::parse_url(_req);
+
+			const auto op_iter = url.query.find("op");
+			if (op_iter == std::end(url.query)) {
+				log::error("{}: Missing [op] parameter.", __func__);
+				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
+			}
+
+			if (const auto iter = _op_table_get.find(op_iter->second); iter != std::end(_op_table_get)) {
+				return (iter->second)(_sess_ptr, _req, url.query);
+			}
+
+			log::error("{}: Operation [{}] not supported.", __func__, op_iter->second);
+			return _sess_ptr->send(fail(status_type::bad_request));
+		}
+
+		if (_req.method() == verb_type::post) {
+			if (_op_table_post.empty()) {
+				log::error("{}: HTTP method not supported.", __func__);
+				return _sess_ptr->send(irods::http::fail(status_type::method_not_allowed));
+			}
+
+			query_arguments_type args;
+
+			if (auto content_type = _req.base()["content-type"];
+			    boost::istarts_with(content_type, "multipart/form-data")) {
+				const auto boundary = irods::http::get_multipart_form_data_boundary(content_type);
+
+				if (!boundary) {
+					log::error("{}: Could not extract [boundary] from [Content-Type] header. ", __func__);
+					return _sess_ptr->send(irods::http::fail(status_type::bad_request));
+				}
+
+				args = irods::http::parse_multipart_form_data(*boundary, _req.body());
+			}
+			else if (boost::istarts_with(content_type, "application/x-www-form-urlencoded")) {
+				args = irods::http::to_argument_list(_req.body());
+			}
+			else {
+				log::error("{}: Content type [{}] not supported.", __func__, content_type);
+				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
+			}
+
+			const auto op_iter = args.find("op");
+			if (op_iter == std::end(args)) {
+				log::error("{}: Missing [op] parameter.", __func__);
+				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
+			}
+
+			if (const auto iter = _op_table_post.find(op_iter->second); iter != std::end(_op_table_post)) {
+				return (iter->second)(_sess_ptr, _req, args);
+			}
+
+			log::error("{}: Operation [{}] not supported.", __func__, op_iter->second);
+			return _sess_ptr->send(fail(status_type::bad_request));
+		}
+
+		log::error("{}: HTTP method not supported.", __func__);
+		return _sess_ptr->send(irods::http::fail(status_type::method_not_allowed));
+	} // operation_dispatch
 } // namespace irods::http
 
 namespace irods

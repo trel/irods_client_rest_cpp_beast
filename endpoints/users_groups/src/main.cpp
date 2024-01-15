@@ -44,9 +44,6 @@ using json = nlohmann::json;
 
 namespace
 {
-	using handler_type =
-		void (*)(irods::http::session_pointer_type, irods::http::request_type&, irods::http::query_arguments_type&);
-
 	//
 	// Handler function prototypes
 	//
@@ -75,7 +72,7 @@ namespace
 	//
 
 	// clang-format off
-	const std::unordered_map<std::string, handler_type> handlers_for_get{
+	const std::unordered_map<std::string, irods::http::handler_type> handlers_for_get{
 		{"users", op_users},
 		{"groups", op_groups},
 		{"members", op_members},
@@ -83,7 +80,7 @@ namespace
 		{"stat", op_stat}
 	};
 
-	const std::unordered_map<std::string, handler_type> handlers_for_post{
+	const std::unordered_map<std::string, irods::http::handler_type> handlers_for_post{
 		{"create_user", op_create_user},
 		{"remove_user", op_remove_user},
 		{"set_password", op_set_password},
@@ -104,40 +101,7 @@ namespace irods::http::handler
 	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(users_groups)
 	{
-		if (_req.method() == verb_type::get) {
-			auto url = irods::http::parse_url(_req);
-
-			const auto op_iter = url.query.find("op");
-			if (op_iter == std::end(url.query)) {
-				log::error("{}: Missing [op] parameter.", __func__);
-				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
-			}
-
-			if (const auto iter = handlers_for_get.find(op_iter->second); iter != std::end(handlers_for_get)) {
-				return (iter->second)(_sess_ptr, _req, url.query);
-			}
-
-			return _sess_ptr->send(fail(status_type::bad_request));
-		}
-
-		if (_req.method() == verb_type::post) {
-			auto args = irods::http::to_argument_list(_req.body());
-
-			const auto op_iter = args.find("op");
-			if (op_iter == std::end(args)) {
-				log::error("{}: Missing [op] parameter.", __func__);
-				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
-			}
-
-			if (const auto iter = handlers_for_post.find(op_iter->second); iter != std::end(handlers_for_post)) {
-				return (iter->second)(_sess_ptr, _req, args);
-			}
-
-			return _sess_ptr->send(fail(status_type::bad_request));
-		}
-
-		log::error("{}: Incorrect HTTP method.", __func__);
-		return _sess_ptr->send(irods::http::fail(status_type::method_not_allowed));
+		execute_operation(_sess_ptr, _req, handlers_for_get, handlers_for_post);
 	} // users_groups
 } // namespace irods::http::handler
 

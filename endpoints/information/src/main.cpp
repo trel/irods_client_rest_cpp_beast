@@ -20,6 +20,7 @@ namespace irods::http::handler
 	{
 		try {
 			if (_req.method() != boost::beast::http::verb::get) {
+				log::error("{}: HTTP method not supported.", __func__);
 				return _sess_ptr->send(fail(status_type::method_not_allowed));
 			}
 

@@ -629,6 +629,7 @@ namespace irods::http::handler
 		}
 		else {
 			// Nothing recognized
+			log::error("{}: HTTP method not supported.", __func__);
 			return _sess_ptr->send(fail(status_type::method_not_allowed));
 		}
 	} // authentication

@@ -24,7 +24,7 @@ namespace irods::http::handler
 		namespace log = irods::http::log;
 
 		if (_req.method() != boost::beast::http::verb::get) {
-			log::error("{}: Incorrect HTTP method.", __func__);
+			log::error("{}: HTTP method not supported.", __func__);
 			return _sess_ptr->send(fail(status_type::method_not_allowed));
 		}
 
@@ -47,7 +47,7 @@ namespace irods::http::handler
 			}
 
 			if (op_iter->second != "report") {
-				log::error("{}: Invalid [op] value.", fn);
+				log::error("{}: Operation [{}] not supported.", fn, op_iter->second);
 				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
 			}
 
