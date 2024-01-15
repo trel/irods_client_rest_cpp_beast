@@ -1,7 +1,6 @@
 #include "irods/private/http_api/handlers.hpp"
 
 #include "irods/private/http_api/common.hpp"
-#include "irods/private/http_api/crlf_parser.hpp"
 #include "irods/private/http_api/globals.hpp"
 #include "irods/private/http_api/log.hpp"
 #include "irods/private/http_api/session.hpp"
@@ -68,9 +67,6 @@ using json = nlohmann::json;
 
 namespace
 {
-	using handler_type =
-		void (*)(irods::http::session_pointer_type, irods::http::request_type&, irods::http::query_arguments_type&);
-
 	class parallel_write_stream
 	{
 	  public:
@@ -205,13 +201,13 @@ namespace
 	//
 
 	// clang-format off
-	const std::unordered_map<std::string, handler_type> handlers_for_get{
+	const std::unordered_map<std::string, irods::http::handler_type> handlers_for_get{
 		{"read", op_read},
 		{"stat", op_stat},
 		{"verify_checksum", op_verify_checksum}
 	};
 
-	const std::unordered_map<std::string, handler_type> handlers_for_post{
+	const std::unordered_map<std::string, irods::http::handler_type> handlers_for_post{
 		{"touch", op_touch},
 		{"remove", op_remove},
 
@@ -244,65 +240,7 @@ namespace irods::http::handler
 	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(data_objects)
 	{
-		if (_req.method() == verb_type::get) {
-			auto url = irods::http::parse_url(_req);
-
-			const auto op_iter = url.query.find("op");
-			if (op_iter == std::end(url.query)) {
-				log::error("{}: Missing [op] parameter.", __func__);
-				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
-			}
-
-			if (const auto iter = handlers_for_get.find(op_iter->second); iter != std::end(handlers_for_get)) {
-				return (iter->second)(_sess_ptr, _req, url.query);
-			}
-
-			return _sess_ptr->send(fail(status_type::bad_request));
-		}
-
-		if (_req.method() == verb_type::post) {
-			query_arguments_type args;
-
-			if (auto content_type = _req.base()["content-type"];
-			    boost::istarts_with(content_type, "multipart/form-data")) {
-				const auto boundary = irods::http::get_multipart_form_data_boundary(content_type);
-
-				if (!boundary) {
-					log::error("{}: Could not extract [boundary] from [Content-Type] header. ", __func__);
-					return _sess_ptr->send(irods::http::fail(status_type::bad_request));
-				}
-
-				args = irods::http::parse_multipart_form_data(*boundary, _req.body());
-			}
-#if 0
-            else if (boost::istarts_with(content_type, "application/x-www-form-urlencoded")) {
-                args = irods::http::to_argument_list(_req.body());
-            }
-            else {
-                log::error("{}: Invalid value for [Content-Type] header.", __func__);
-                return _sess_ptr->send(irods::http::fail(status_type::bad_request));
-            }
-#else
-			else {
-				args = irods::http::to_argument_list(_req.body());
-			}
-#endif
-
-			const auto op_iter = args.find("op");
-			if (op_iter == std::end(args)) {
-				log::error("{}: Missing [op] parameter.", __func__);
-				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
-			}
-
-			if (const auto iter = handlers_for_post.find(op_iter->second); iter != std::end(handlers_for_post)) {
-				return (iter->second)(_sess_ptr, _req, args);
-			}
-
-			return _sess_ptr->send(fail(status_type::bad_request));
-		}
-
-		log::error("{}: Incorrect HTTP method.", __func__);
-		return _sess_ptr->send(irods::http::fail(status_type::method_not_allowed));
+		execute_operation(_sess_ptr, _req, handlers_for_get, handlers_for_post);
 	} // data_objects
 } // namespace irods::http::handler
 

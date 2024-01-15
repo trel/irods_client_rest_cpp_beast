@@ -43,6 +43,8 @@ namespace irods::http
 	using request_handler_map_type = std::unordered_map<std::string_view, request_handler_type>;
 
 	using query_arguments_type = std::unordered_map<std::string, std::string>;
+
+	using handler_type = void (*)(session_pointer_type, request_type&, query_arguments_type&);
 	// clang-format on
 
 	enum class authorization_scheme
@@ -153,6 +155,12 @@ namespace irods::http
 	auto parse_url(const request_type& _req) -> url;
 
 	auto resolve_client_identity(const request_type& _req) -> client_identity_resolution_result;
+
+	auto execute_operation(
+		session_pointer_type _sess_ptr,
+		request_type& _req,
+		const std::unordered_map<std::string, handler_type>& _op_table_get,
+		const std::unordered_map<std::string, handler_type>& _op_table_post) -> void;
 } // namespace irods::http
 
 namespace irods
