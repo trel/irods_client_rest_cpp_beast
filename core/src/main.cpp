@@ -243,6 +243,9 @@ constexpr auto default_jsonschema() -> std::string_view
                                 }},
                                 "redirect_uri": {{
                                     "type": "string"
+                                }},
+                                "irods_user_claim": {{
+                                    "type": "string"
                                 }}
                             }},
                             "required": [
@@ -250,7 +253,8 @@ constexpr auto default_jsonschema() -> std::string_view
                                 "port",
                                 "well_known_uri",
                                 "client_id",
-                                "redirect_uri"
+                                "redirect_uri",
+                                "irods_user_claim"
                             ]
                         }}
                     }},
@@ -461,7 +465,8 @@ auto print_configuration_template() -> void
                 "port": 8080,
                 "well_known_uri": "<string>",
                 "client_id": "<string>",
-                "redirect_uri": "<string>"
+                "redirect_uri": "<string>",
+                "irods_user_claim": "<string>"
             }}
         }},
 
