@@ -367,7 +367,10 @@ namespace irods::http::handler
 					auto decoded_token{jwt::decode<jwt::traits::nlohmann_json>(jwt_token).get_payload_json()};
 
 					// Verify 'irods_username' exists
-					if (!decoded_token.contains("irods_username")) {
+					const auto& irods_claim_name{irods::http::globals::oidc_configuration()
+					                                 .at("irods_user_claim")
+					                                 .get_ref<const std::string&>()};
+					if (!decoded_token.contains(irods_claim_name)) {
 						const auto user{
 							decoded_token.contains("preferred_username")
 								? decoded_token.at("preferred_username").get<const std::string>()
@@ -378,7 +381,7 @@ namespace irods::http::handler
 					}
 
 					// Get irods username
-					const std::string& irods_name{decoded_token.at("irods_username").get_ref<const std::string&>()};
+					const std::string& irods_name{decoded_token.at(irods_claim_name).get_ref<const std::string&>()};
 
 					// Issue token?
 					static const auto seconds =
@@ -590,7 +593,10 @@ namespace irods::http::handler
 					auto decoded_token{jwt::decode<jwt::traits::nlohmann_json>(jwt_token).get_payload_json()};
 
 					// Verify 'irods_username' exists
-					if (!decoded_token.contains("irods_username")) {
+					const auto& irods_claim_name{irods::http::globals::oidc_configuration()
+					                                 .at("irods_user_claim")
+					                                 .get_ref<const std::string&>()};
+					if (!decoded_token.contains(irods_claim_name)) {
 						const auto user{
 							decoded_token.contains("preferred_username")
 								? decoded_token.at("preferred_username").get<const std::string>()
@@ -601,7 +607,7 @@ namespace irods::http::handler
 					}
 
 					// Get irods username
-					const std::string& irods_name{decoded_token.at("irods_username").get_ref<const std::string&>()};
+					const std::string& irods_name{decoded_token.at(irods_claim_name).get_ref<const std::string&>()};
 
 					// Issue token?
 					static const auto seconds =
