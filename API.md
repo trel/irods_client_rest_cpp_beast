@@ -706,11 +706,11 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
     --data-urlencode 'op=copy' \
     --data-urlencode 'src-lpath=<string>' \ # The absolute logical path of the data object to copy.
-    --data-urlencode 'dst-lpath=<string>' \ # The absolute logical path of the new data object.
-    --data-urlencode 'options=<string>' # skip_existing, overwrite_existing, update_existing, none. Defaults to none.
+    --data-urlencode 'dst-lpath=<string>' \ # The absolute logical path of a new or existing data object.
+    --data-urlencode 'src-resource=<string>' \ # The name of the root resource to copy from. Optional.
+    --data-urlencode 'dst-resource=<string>' \ # The name of the root resource to copy to. Optional.
+    --data-urlencode 'overwrite=<integer>' # 0 or 1. Defaults to 0. Optional. Instructs the server to replace the existing data object.
 ```
-
-The `options` parameter may not be implemented.
 
 #### Response
 
@@ -721,8 +721,7 @@ If an HTTP status code of 200 is returned, the body of the response will contain
     "irods_response": {
         "status_code": 0
         "status_message": "string" // Optional
-    },
-    "copied": false
+    }
 }
 ```
 

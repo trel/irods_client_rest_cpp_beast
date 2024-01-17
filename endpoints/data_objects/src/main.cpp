@@ -10,10 +10,12 @@
 #include <irods/client_connection.hpp>
 #include <irods/connection_pool.hpp>
 #include <irods/dataObjChksum.h>
+#include <irods/dataObjCopy.h>
 #include <irods/dataObjRepl.h>
 #include <irods/dataObjTrim.h>
 #include <irods/dataObjUnlink.h>
 #include <irods/filesystem.hpp>
+#include <irods/filesystem/path_utilities.hpp>
 #include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/key_value_proxy.hpp>
@@ -1706,28 +1708,45 @@ namespace
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
-					fs::copy_options opts = fs::copy_options::none;
+					dataObjCopyInp_t input{};
 
-					if (const auto iter = _args.find("option"); iter != std::end(_args)) {
-						if (iter->second == "skip_existing") {
-							opts = fs::copy_options::skip_existing;
-						}
-						else if (iter->second == "overwrite_existing") {
-							opts = fs::copy_options::overwrite_existing;
-						}
-						else if (iter->second == "update_existing") {
-							opts = fs::copy_options::update_existing;
-						}
-						else if (iter->second != "none") {
-							return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
-						}
+					irods::at_scope_exit free_memory{[&input] {
+						clearKeyVal(&input.srcDataObjInp.condInput);
+						clearKeyVal(&input.destDataObjInp.condInput);
+					}};
+
+					if (const auto iter = _args.find("src-resource"); iter != std::end(_args)) {
+						addKeyVal(&input.srcDataObjInp.condInput, RESC_NAME_KW, iter->second.c_str());
 					}
 
-					auto conn = irods::get_connection(client_info.username);
-					const auto copied =
-						fs::client::copy_data_object(conn, src_lpath_iter->second, dst_lpath_iter->second, opts);
+					if (const auto iter = _args.find("dst-resource"); iter != std::end(_args)) {
+						addKeyVal(&input.destDataObjInp.condInput, DEST_RESC_NAME_KW, iter->second.c_str());
+					}
 
-					res.body() = json{{"irods_response", {{"status_code", 0}}}, {"copied", copied}}.dump();
+					if (const auto iter = _args.find("overwrite"); iter != std::end(_args) && iter->second == "1") {
+						addKeyVal(&input.destDataObjInp.condInput, FORCE_FLAG_KW, "");
+					}
+
+					const fs::path from = src_lpath_iter->second;
+					const fs::path to = dst_lpath_iter->second;
+
+					fs::throw_if_path_length_exceeds_limit(from);
+					fs::throw_if_path_length_exceeds_limit(to);
+
+					auto conn = irods::get_connection(client_info.username);
+
+					if (!fs::client::is_data_object(conn, from)) {
+						res.result(http::status::bad_request);
+						res.body() = json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump();
+						return _sess_ptr->send(std::move(res));
+					}
+
+					irods::strncpy_null_terminated(input.srcDataObjInp.objPath, from.c_str());
+					irods::strncpy_null_terminated(input.destDataObjInp.objPath, to.c_str());
+
+					const auto ec = rcDataObjCopy(static_cast<RcComm*>(conn), &input);
+
+					res.body() = json{{"irods_response", {{"status_code", ec}}}}.dump();
 				}
 				catch (const fs::filesystem_error& e) {
 					log::error("{}: {}", fn, e.what());
