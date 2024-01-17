@@ -842,6 +842,266 @@ class test_data_objects_endpoint(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
+    def test_copy_operation_honors_resource_parameters(self):
+        rodsadmin_headers = {'Authorization': f'Bearer {self.rodsadmin_bearer_token}'}
+        rodsuser_headers = {'Authorization': f'Bearer {self.rodsuser_bearer_token}'}
+
+        data_object = f'/{self.zone_name}/home/{self.rodsuser_username}/copy_op_honors_resc_params.txt'
+        data_object_copied = f'{data_object}.copied'
+        resc_name = 'ufs_copy_resc'
+
+        try:
+            # Create an empty data object.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'touch',
+                'lpath': data_object
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show attempting to copy a replica either from or to an invalid resource
+            # results in an error.
+            for resc_property in ['src-resource', 'dst-resource']:
+                with self.subTest(f'Using non-existent resource for [{resc_property}]'):
+                    r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                        'op': 'copy',
+                        'src-lpath': data_object,
+                        'dst-lpath': f'{data_object}.copied',
+                        resc_property: 'does_not_exist'
+                    })
+                    self.logger.debug(r.content)
+                    self.assertEqual(r.status_code, 200)
+                    self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.SYS_RESC_DOES_NOT_EXIST)
+
+            # Create a unixfilesystem resource.
+            r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
+                'op': 'create',
+                'name': resc_name,
+                'type': 'unixfilesystem',
+                'host': self.server_hostname,
+                'vault-path': f'/tmp/{resc_name}_vault'
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show copying a data object using valid resources works as expected.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'copy',
+
+                'src-lpath': data_object,
+                'src-resource': 'demoResc',
+
+                'dst-lpath': data_object_copied,
+                'dst-resource': resc_name
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+        finally:
+            # Remove the data objects.
+            for lpath in [data_object, data_object_copied]:
+                r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                    'op': 'remove',
+                    'lpath': lpath,
+                    'catalog-only': 0,
+                    'no-trash': 1
+                })
+                self.logger.debug(r.content)
+
+            # Remove the resource.
+            r = requests.post(f'{self.url_base}/resources', headers=rodsadmin_headers, data={
+                'op': 'remove',
+                'name': resc_name
+            })
+            self.logger.debug(r.content)
+
+    def test_copy_operation_supports_overwriting_existing_data_objects(self):
+        rodsuser_headers = {'Authorization': f'Bearer {self.rodsuser_bearer_token}'}
+        data_object_a = f'/{self.zone_name}/home/{self.rodsuser_username}/copy_op_overwrite_param.txt.a'
+        data_object_b = f'/{self.zone_name}/home/{self.rodsuser_username}/copy_op_overwrite_param.txt.b'
+
+        try:
+            # Create a non-empty data object.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'write',
+                'lpath': data_object_a,
+                'bytes': 'some data'
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Create a second data object containing different information.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'write',
+                'lpath': data_object_b,
+                'bytes': 'different data'
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Calculate checksums for each data object to show they are different.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'calculate_checksum',
+                'lpath': data_object_a
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(result['checksum'], 'sha2:EweZDmulyhRes16ZGCqb7EZTG8VN32VqYCx4D6AkDe4=')
+            data_object_a_checksum = result['checksum']
+
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'calculate_checksum',
+                'lpath': data_object_b
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(result['checksum'], 'sha2:YIoGizPRi+g4vLB77QHjVSHTCED6JNsJGS5nv9GG5iE=')
+            data_object_b_checksum = result['checksum']
+
+            self.assertNotEqual(data_object_a_checksum, data_object_b_checksum)
+
+            # Show attempting to copy over an existing data object isn't allowed
+            # without the "overwrite" parameter.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'copy',
+                'src-lpath': data_object_a,
+                'dst-lpath': data_object_b
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.OVERWRITE_WITHOUT_FORCE_FLAG)
+
+            # Show copying over an existing data object is possible with the
+            # "overwrite" parameter.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'copy',
+                'src-lpath': data_object_a,
+                'dst-lpath': data_object_b,
+                'overwrite': 1
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show the data objects are now identical.
+            expected_checksum = 'sha2:EweZDmulyhRes16ZGCqb7EZTG8VN32VqYCx4D6AkDe4='
+
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'calculate_checksum',
+                'lpath': data_object_a,
+                'force': 1
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(result['checksum'], expected_checksum)
+
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'calculate_checksum',
+                'lpath': data_object_b,
+                'force': 1
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(result['checksum'], expected_checksum)
+
+        finally:
+            # Remove the data objects.
+            for data_object in [data_object_a, data_object_b]:
+                r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                    'op': 'remove',
+                    'lpath': data_object,
+                    'catalog-only': 0,
+                    'no-trash': 1
+                })
+                self.logger.debug(r.content)
+
+    def test_copy_operation_returns_an_error_when_destination_path_is_a_collection(self):
+        rodsuser_headers = {'Authorization': f'Bearer {self.rodsuser_bearer_token}'}
+        data_object = f'/{self.zone_name}/home/{self.rodsuser_username}/copy_op_invalid_dst.txt'
+        collection = f'/{self.zone_name}/home/{self.rodsuser_username}/copy_col.d'
+
+        try:
+            # Create an empty data object.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'touch',
+                'lpath': data_object
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show attempting to copy a data object to a collection results in an error.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'copy',
+                'src-lpath': data_object,
+                'dst-lpath': f'/{self.zone_name}/home/public'
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.CAT_NO_ACCESS_PERMISSION)
+
+            # Create a collection.
+            r = requests.post(f'{self.url_base}/collections', headers=rodsuser_headers, data={
+                'op': 'create',
+                'lpath': collection
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertTrue(result['created'])
+
+            # Show attempting to copy a replica either from or to an invalid resource
+            # results in an error.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'copy',
+                'src-lpath': data_object,
+                'dst-lpath': collection
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.CAT_NAME_EXISTS_AS_COLLECTION)
+
+        finally:
+            # Remove the collection.
+            r = requests.post(f'{self.url_base}/collections', headers=rodsuser_headers, data={
+                'op': 'remove',
+                'lpath': collection
+            })
+            self.logger.debug(r.content)
+
+            # Remove the data object.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'catalog-only': 0,
+                'no-trash': 1
+            })
+            self.logger.debug(r.content)
+
+    def test_copying_non_existent_data_object_results_in_an_error(self):
+        r = requests.post(self.url_endpoint, headers={'Authorization': f'Bearer {self.rodsuser_bearer_token}'}, data={
+            'op': 'copy',
+            'src-lpath': '/does_not_exist',
+            'dst-lpath': '/ignored'
+        })
+        self.logger.debug(r.content)
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_DATA_OBJECT)
+
     def test_calculating_and_verifying_checksums(self):
         rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
         rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
