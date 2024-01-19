@@ -1218,15 +1218,23 @@ class test_data_objects_endpoint(unittest.TestCase):
     def test_registering_a_new_data_object(self):
         rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
 
-        # Create a local file.
+        # The name of the physical file to create and register.
         filename = 'newly_registered_file.txt'
         physical_path = f'/tmp/{filename}'
-        with open(physical_path, 'w') as f:
-            f.write('data')
+
+        # The logical path of the data object.
+        data_object = f'/{self.zone_name}/home/{self.rodsadmin_username}/{filename}'
+
+        # The name of the resource to register the replica under.
+        resource = 'demoResc'
 
         try:
+            # Create a non-empty local file.
+            content = 'data'
+            with open(physical_path, 'w') as f:
+                f.write(content)
+
             # Show the data object we want to create via registration does not exist.
-            data_object = f'/{self.zone_name}/home/{self.rodsadmin_username}/{filename}'
             r = requests.get(self.url_endpoint, headers=rodsadmin_headers, params={
                 'op': 'stat',
                 'lpath': data_object
@@ -1238,12 +1246,12 @@ class test_data_objects_endpoint(unittest.TestCase):
             # Register the local file into the catalog as a new data object.
             # We know we're registering a new data object because the "as-additional-replica"
             # parameter isn't set to 1.
-            resource = 'demoResc'
             r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
                 'op': 'register',
                 'lpath': data_object,
                 'ppath': physical_path,
-                'resource': resource
+                'resource': resource,
+                'data-size': len(content)
             })
             self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
@@ -1321,6 +1329,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'lpath': data_object,
                 'ppath': physical_path,
                 'resource': other_resource,
+                'data-size': len(content),
                 'as-additional-replica': 1
             })
             self.logger.debug(r.content)
@@ -1328,7 +1337,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
             # Show replica 0 exists with the expected replica information.
-            # Replica 0 must be a good replica, else the call to the trim operation will fail.
+            # Replica 0 will be stale due to the previous registration.
             r = requests.get(f'{self.url_base}/query', headers=rodsadmin_headers, params={
                 'op': 'execute_genquery',
                 'query': 'select DATA_PATH, DATA_REPL_STATUS ' +
@@ -1340,7 +1349,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             self.assertEqual(result['irods_response']['status_code'], 0)
             self.assertEqual(len(result['rows']), 1)
             self.assertNotEqual(result['rows'][0][0], physical_path)
-            self.assertEqual(result['rows'][0][1], '1')
+            self.assertEqual(result['rows'][0][1], '0')
 
             # Show a new replica exists with the expected replica information.
             # Replica 1 must be a good replica since it is the latest replica in the system.
@@ -1357,6 +1366,19 @@ class test_data_objects_endpoint(unittest.TestCase):
             self.assertEqual(result['rows'][0][0], physical_path)
             self.assertEqual(result['rows'][0][1], other_resource)
             self.assertEqual(result['rows'][0][2], '1')
+
+            # Change the replica status of replica 0 so that the replica is good.
+            # This is required so the trim operation succeeds (the trim API is not allowed
+            # to remove the last good replica).
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'modify_replica',
+                'lpath': data_object,
+                'replica-number': 0,
+                'new-data-replica-status': 1
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
             # Unregister replica 1.
             r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
