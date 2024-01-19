@@ -1051,6 +1051,17 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.OVERWRITE_WITHOUT_FORCE_FLAG)
+
+            # Now, try again using the overwrite parameter.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'copy',
+                'src-lpath': data_object,
+                'dst-lpath': f'/{self.zone_name}/home/public',
+                'overwrite': 1
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.CAT_NO_ACCESS_PERMISSION)
 
             # Create a collection.
@@ -1064,12 +1075,22 @@ class test_data_objects_endpoint(unittest.TestCase):
             self.assertEqual(result['irods_response']['status_code'], 0)
             self.assertTrue(result['created'])
 
-            # Show attempting to copy a replica either from or to an invalid resource
-            # results in an error.
+            # Show attempting to copy a data object to a collection results in an error.
             r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
                 'op': 'copy',
                 'src-lpath': data_object,
                 'dst-lpath': collection
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.OVERWRITE_WITHOUT_FORCE_FLAG)
+
+            # Now, try again using the overwrite parameter.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'copy',
+                'src-lpath': data_object,
+                'dst-lpath': collection,
+                'overwrite': 1
             })
             self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
