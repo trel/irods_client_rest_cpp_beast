@@ -1381,10 +1381,9 @@ namespace
 				const auto status = fs::client::status(conn, lpath_iter->second);
 
 				if (!fs::client::is_data_object(status)) {
-					return _sess_ptr->send(irods::http::fail(
-						res,
-						http::status::bad_request,
-						json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump()));
+					res.body() = json{{"irods_response", {{"status_code", NOT_A_DATA_OBJECT}}}}.dump();
+					res.prepare_payload();
+					return _sess_ptr->send(std::move(res));
 				}
 
 				json perms;

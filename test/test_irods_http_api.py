@@ -229,16 +229,19 @@ class test_collections_endpoint(unittest.TestCase):
         r = requests.post(self.url_endpoint, headers=headers, data=data)
         self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Stat the original collection to show that it does not exist.
         params = {'op': 'stat', 'lpath': collection_path}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
-        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_COLLECTION)
 
         # Stat the new collection to show that it does exist.
         params = {'op': 'stat', 'lpath': new_collection_path}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
         self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
 
         # Give another user permission to read the object.
         data = {
@@ -278,7 +281,7 @@ class test_collections_endpoint(unittest.TestCase):
         params = {'op': 'stat', 'lpath': new_collection_path}
         r = requests.get(self.url_endpoint, headers=headers, params=params)
         self.logger.debug(r.content)
-        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.status_code, 200)
 
         stat_info = r.json()
         self.assertEqual(stat_info['irods_response']['status_code'], irods_error_codes.NOT_A_COLLECTION)
@@ -339,7 +342,7 @@ class test_collections_endpoint(unittest.TestCase):
             'lpath': os.path.join('/', self.zone_name, 'home', self.rodsuser_username, 'does_not_exist')
         })
         self.logger.debug(r.content)
-        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_COLLECTION)
 
     def test_list_operation(self):
@@ -632,8 +635,16 @@ class test_collections_endpoint(unittest.TestCase):
             'lpath': f'/{self.zone_name}/home/{self.rodsuser_username}/does_not_exist'
         })
         self.logger.debug(r.content)
-        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_COLLECTION)
+
+        r = requests.get(f'{self.url_base}/data-objects', headers=rodsuser_headers, params={
+            'op': 'stat',
+            'lpath': f'/{self.zone_name}/home/{self.rodsuser_username}/does_not_exist'
+        })
+        self.logger.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_DATA_OBJECT)
 
     def test_enabling_and_disabling_inheritance(self):
         rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
@@ -1261,7 +1272,7 @@ class test_data_objects_endpoint(unittest.TestCase):
                 'lpath': data_object
             })
             self.logger.debug(r.content)
-            self.assertEqual(r.status_code, 400)
+            self.assertEqual(r.status_code, 200)
             self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_DATA_OBJECT)
 
             # Register the local file into the catalog as a new data object.
