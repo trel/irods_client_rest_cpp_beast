@@ -1168,9 +1168,10 @@ If an HTTP status code of 200 is returned, the body of the response will contain
     "build": "string",
     "genquery2_enabled": false,
     "irods_zone": "string",
-    "max_size_of_request_body_in_bytes": 0,
     "max_number_of_parallel_write_streams": 0,
-    "max_number_of_rows_per_catalog_query": 0
+    "max_number_of_rows_per_catalog_query": 0,
+    "max_size_of_request_body_in_bytes": 0,
+    "openid_connect_enabled": false
 }
 ```
 
