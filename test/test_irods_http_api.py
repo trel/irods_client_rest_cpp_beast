@@ -170,7 +170,18 @@ class test_authenticate_endpoint(unittest.TestCase):
     def setUp(self):
         self.assertFalse(self._class_init_error, 'Class initialization failed. Cannot continue.')
 
-    def test_server_does_not_crash_when_incorrect_http_method_is_used_to_authenticate(self):
+    def test_server_does_not_crash_when_incorrect_http_method_is_used_for_basic_authentication(self):
+        # Get some general information about the HTTP API.
+        r = requests.get(f'{self.url_base}/info')
+        self.logger.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+
+        # Skip this test if OpenID Connect is enabled.
+        # When OpenID Connect is enabled, the HTTP status code of the auth request
+        # changes, causing this test to fail. That behavior is expected.
+        if r.json().get('openid_connect_enabled', False) == True:
+            self.skipTest('Test produces incorrect result when OpenID Connect is enabled.')
+
         # Try to authenticate using the HTTP GET method.
         r = requests.get(self.url_endpoint, auth=('rods', 'rods'))
         self.logger.debug(r.content)
@@ -2115,11 +2126,12 @@ class test_information_endpoint(unittest.TestCase):
         info = r.json()
         self.assertIn('api_version', info)
         self.assertIn('build', info)
-        self.assertIn('irods_zone', info)
         self.assertIn('genquery2_enabled', info)
-        self.assertIn('max_size_of_request_body_in_bytes', info)
+        self.assertIn('irods_zone', info)
         self.assertIn('max_number_of_parallel_write_streams', info)
         self.assertIn('max_number_of_rows_per_catalog_query', info)
+        self.assertIn('max_size_of_request_body_in_bytes', info)
+        self.assertIn('openid_connect_enabled', info)
 
     def test_server_reports_error_when_http_method_is_not_supported(self):
         do_test_server_reports_error_when_http_method_is_not_supported(self)
