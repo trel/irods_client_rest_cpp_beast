@@ -424,13 +424,11 @@ Following are a few points of interest.
 
 #### OpenID Provider Requirements and HTTP API Configuration
 The OpenID Provider, at this moment, must support discovery via a well-known endpoint.
-This endpoint must be specified in the `well_known_uri` OIDC configuration parameter.
+The URL to the OpenID Provider must be specified in the `provider_url` OIDC configuration parameter.
 
 One should take care to ensure that `/.well-known/openid-configuration` is not included
 in the configuration parameter, as this is included automatically.
 
-One must also set the OIDC `config_host` and `port` parameter, so that the OpenID configuration
-may be gathered from the well-known endpoint on the HTTP API server's startup.
 The OpenID Provider must be running prior to starting the HTTP API server, otherwise, the HTTP API server
 will not be able to query the required information from the desired OpenID Provider.
 
@@ -438,13 +436,13 @@ Additionally, the OIDC `redirect_uri` parameter must be set to the HTTP API's au
 This is required, as the Authorization Code Grant needs to be redirected back to the HTTP API, to complete
 HTTP API token generation.
 
-#### Add `irods_username` to the claims
-Currently, the server looks for the custom claim `irods_username` in the ID Token.
+#### Add your specified `irods_user_claim` to the user's claims
+Currently, the server looks for the custom claim in the ID Token, which is specified in the `irods_user_claim` parameter.
 This serves as the mapping mechanism for an OIDC User to an iRODS User.
 
-A user who authenticates but does not have a `irods_username` mapped in their account
+A user who authenticates but does not have the claim specified in `irods_user_claim` mapped in their account
 will not have access to the API.
-A HTTP 400 Bad Request status code will be returned if no `irods_username` is found.
+A HTTP 400 Bad Request status code will be returned if the claim specified in `irods_user_claim` is not found.
 
 #### Supported Grants
 Currently, the HTTP API server supports the following two grants:
