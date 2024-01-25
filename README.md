@@ -419,10 +419,12 @@ irods_http_api /path/to/config.json
 To stop the server, you can use **CTRL-C** or send **SIGINT** or **SIGTERM** to the process.
 
 ### OpenID Connect
+
 Some additional configuration is required to run the OpenID Connect portion of the HTTP API.
 Following are a few points of interest.
 
 #### OpenID Provider Requirements and HTTP API Configuration
+
 The OpenID Provider, at this moment, must support discovery via a well-known endpoint.
 The URL to the OpenID Provider must be specified in the `provider_url` OIDC configuration parameter.
 
@@ -437,22 +439,23 @@ This is required, as the Authorization Code Grant needs to be redirected back to
 HTTP API token generation.
 
 #### Add your specified `irods_user_claim` to the user's claims
+
 Currently, the server looks for the custom claim in the ID Token, which is specified in the `irods_user_claim` parameter.
 This serves as the mapping mechanism for an OIDC User to an iRODS User.
 
 A user who authenticates but does not have the claim specified in `irods_user_claim` mapped in their account
-will not have access to the API.
-A HTTP 400 Bad Request status code will be returned if the claim specified in `irods_user_claim` is not found.
+will not have access to the API. A HTTP 400 Bad Request status code will be returned if the claim specified in `irods_user_claim` is not found.
 
 #### Supported Grants
+
 Currently, the HTTP API server supports the following two grants:
 
 - Resource Owner Password Credentials Grant
 - Authorization Code Grant
 
-While we currently support the _Resource Owner Password Credentials Grant_, there are plans to remove
+While we also currently support the _Resource Owner Password Credentials Grant_, there are plans to remove
 support for this in the future.
 
 Reason being, the [OAuth 2.0 Security Best Current Practice](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics) draft,
-as well as the [The OAuth 2.1 Authorizaiton Framework](https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/) draft both deprecate that grant.
+as well as the the [OAuth 2.1 Authorization Framework](https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/) draft both deprecate that grant.
 More information can be found on the reasoning for the deprecation in the links provided above.
