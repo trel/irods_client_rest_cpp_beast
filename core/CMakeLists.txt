@@ -39,7 +39,7 @@ target_compile_definitions(
   # change log levels concurrently across threads.
   SPDLOG_NO_ATOMIC_LEVELS
   # Defines a macro which is used to construct the URL paths to individual
-  # endpoint handlers (e.g. /irods-http-api/0.1.0/collections).
+  # endpoint handlers (e.g. /irods-http-api/0.2.0/collections).
   IRODS_HTTP_API_BASE_URL="/irods-http-api/${IRODS_HTTP_API_VERSION}"
 )
 

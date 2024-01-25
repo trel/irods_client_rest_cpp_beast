@@ -185,7 +185,7 @@ constexpr auto default_jsonschema() -> std::string_view
 	// clang-format on
 	return R"({{
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://schemas.irods.org/http_api/0.1.0/schema.json",
+    "$id": "https://schemas.irods.org/irods-http-api/0.2.0/schema.json",
     "type": "object",
     "properties": {{
         "http_server": {{

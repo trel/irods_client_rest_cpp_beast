@@ -29,10 +29,10 @@ Then, the HTTP API will be available.
 
 ```
 $ curl -X POST -u rods:rods \
- http://localhost:9000/irods-http-api/0.1.0/authenticate
+ http://localhost:9000/irods-http-api/0.2.0/authenticate
 568bbfc2-7d19-4723-b659-bb9325f9b076
 
-$ curl -s http://localhost:9000/irods-http-api/0.1.0/collections \
+$ curl -s http://localhost:9000/irods-http-api/0.2.0/collections \
     -H 'Authorization: Bearer 568bbfc2-7d19-4723-b659-bb9325f9b076' \
     --data-urlencode 'op=stat' \
     --data-urlencode 'lpath=/tempZone/home/rods' -G | jq
@@ -151,7 +151,7 @@ docker build -t irods-http-api-runner \
 If all goes well, you will have a containerized iRODS HTTP API server! You can verify this by checking the version information. Below is an example.
 ```bash
 $ docker run -it --rm irods-http-api-runner -v
-irods_http_api v0.1.0-f6f6411
+irods_http_api v0.2.0-<build_sha>
 ```
 
 ### Launching the Container
@@ -260,7 +260,7 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
                 "client_id": "irods_http_api",
 
                 // URI pointing to the irods HTTP API auth endpoint.
-                "redirect_uri": "https://<domain>/irods-http/0.1.0/authenticate",
+                "redirect_uri": "https://<domain>/irods-http-api/0.2.0/authenticate",
 
                 // The amount of time before the OIDC Authorization Code grant
                 // times out, requiring another attempt at authentication.

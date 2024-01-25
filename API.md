@@ -65,13 +65,13 @@ After running the previous command, you should see output similar to the followi
 ```
 *   Trying [::1]:9000...
 * Connected to localhost (::1) port 9000
-> GET /irods-http-api/0.1.0/authenticate HTTP/1.1
+> GET /irods-http-api/<version>/authenticate HTTP/1.1
 > Host: localhost:9000
 > User-Agent: curl/8.4.0
 > Accept: */*
 > 
 < HTTP/1.1 302 Found
-< Server: irods_http_api/0.1.0 [d6164b7aa421265e0f9f9d5f7eb69bb67d8e4a3c]
+< Server: irods_http_api/<version> (<build_sha>)
 < Location: http://oidc.example.org/realms/example/protocol/openid-connect/auth?...
 < Content-Length: 0
 < 
