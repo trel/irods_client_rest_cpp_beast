@@ -725,7 +725,7 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 		// Build Request
 		constexpr auto version_number{11};
 		beast::http::request<beast::http::string_body> req{beast::http::verb::get, path, version_number};
-		req.set(beast::http::field::host, url.host());
+		req.set(beast::http::field::host, fmt::format("{}:{}", url.host(), *port));
 		req.set(beast::http::field::user_agent, irods::http::version::server_name);
 
 		// Sends and recieves response
