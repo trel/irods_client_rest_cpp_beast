@@ -234,6 +234,10 @@ constexpr auto default_jsonschema() -> std::string_view
                                     "type": "integer",
                                     "minimum": 1
                                 }},
+                                "state_timeout_in_seconds": {{
+                                    "type": "integer",
+                                    "minimum": 1
+                                }},
                                 "provider_url": {{
                                     "type": "string"
                                 }},
@@ -252,6 +256,7 @@ constexpr auto default_jsonschema() -> std::string_view
                             }},
                             "required": [
                                 "timeout_in_seconds",
+                                "state_timeout_in_seconds",
                                 "provider_url",
                                 "client_id",
                                 "redirect_uri",
@@ -464,6 +469,7 @@ auto print_configuration_template() -> void
 
             "openid_connect": {{
                 "timeout_in_seconds": 3600,
+                "state_timeout_in_seconds": 3600,
                 "provider_url": "<string>",
                 "client_id": "<string>",
                 "redirect_uri": "<string>",
