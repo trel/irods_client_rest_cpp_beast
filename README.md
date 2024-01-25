@@ -418,12 +418,12 @@ irods_http_api /path/to/config.json
 
 To stop the server, you can use **CTRL-C** or send **SIGINT** or **SIGTERM** to the process.
 
-### OpenID Connect
+## OpenID Connect
 
 Some additional configuration is required to run the OpenID Connect portion of the HTTP API.
 Following are a few points of interest.
 
-#### OpenID Provider Requirements and HTTP API Configuration
+### OpenID Provider Requirements and HTTP API Configuration
 
 The OpenID Provider, at this moment, must support discovery via a well-known endpoint.
 The URL to the OpenID Provider must be specified in the `provider_url` OIDC configuration parameter.
@@ -438,7 +438,7 @@ Additionally, the OIDC `redirect_uri` parameter must be set to the HTTP API's au
 This is required, as the Authorization Code Grant needs to be redirected back to the HTTP API, to complete
 HTTP API token generation.
 
-#### Add your specified `irods_user_claim` to the user's claims
+### Add your specified `irods_user_claim` to the user's claims
 
 Currently, the server looks for the custom claim in the ID Token, which is specified in the `irods_user_claim` parameter.
 This serves as the mapping mechanism for an OIDC User to an iRODS User.
@@ -446,7 +446,7 @@ This serves as the mapping mechanism for an OIDC User to an iRODS User.
 A user who authenticates but does not have the claim specified in `irods_user_claim` mapped in their account
 will not have access to the API. A HTTP 400 Bad Request status code will be returned if the claim specified in `irods_user_claim` is not found.
 
-#### Supported Grants
+### Supported Grants
 
 Currently, the HTTP API server supports the following two grants:
 
