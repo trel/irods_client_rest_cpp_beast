@@ -9,7 +9,7 @@ import html
 # Search for IRODS_HTTP_API_BASE_URL
 # and IRODS_CLIENT_VERSION
 # TOOD: Consider turning this into a fixture
-AUTH_URL = 'http://127.0.0.1:9000/irods-http-api/0.1.0/authenticate'
+AUTH_URL = 'http://127.0.0.1:9000/irods-http-api/0.2.0/authenticate'
 
 @pytest.mark.parametrize("username, password, expected_result", [('bob', 'bob', requests.codes.ok),
                                                                  ('', '', requests.codes.unauthorized),
