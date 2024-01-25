@@ -23,7 +23,7 @@ namespace irods::http
 		virtual ~transport() = default;
 
 		auto connect(std::string_view _host, std::string_view _port) -> void;
-		auto is_connected() -> bool;
+		auto is_connected() const noexcept -> bool;
 		auto communicate(boost::beast::http::request<boost::beast::http::string_body>& _request)
 			-> boost::beast::http::response<boost::beast::http::string_body>;
 
@@ -36,8 +36,8 @@ namespace irods::http
 		virtual auto do_write(boost::beast::http::request<boost::beast::http::string_body>& _request) -> void = 0;
 		virtual auto do_read() -> boost::beast::http::response<boost::beast::http::string_body> = 0;
 
-		boost::asio::io_context& _io_ctx;
-		bool _did_connect;
+		boost::asio::io_context& io_ctx_;
+		bool did_connect_;
 	}; // class transport
 
 	class tls_transport : public transport
@@ -55,7 +55,7 @@ namespace irods::http
 		auto disconnect() -> void;
 		auto set_sni_hostname(std::string_view _host) -> void;
 
-		boost::beast::ssl_stream<boost::beast::tcp_stream> _stream;
+		boost::beast::ssl_stream<boost::beast::tcp_stream> stream_;
 	}; // class tls_transport
 
 	class plain_transport : public transport
@@ -70,10 +70,11 @@ namespace irods::http
 		auto do_read() -> boost::beast::http::response<boost::beast::http::string_body> override;
 		auto disconnect() -> void;
 
-		boost::beast::tcp_stream _stream;
+		boost::beast::tcp_stream stream_;
 	}; // class plain_transport
 
 	auto transport_factory(const boost::urls::scheme& _scheme, boost::asio::io_context& _ctx)
 		-> std::unique_ptr<transport>;
-} //namespace irods::http
-#endif
+} // namespace irods::http
+
+#endif // IRODS_HTTP_API_TRANSPORT_HPP

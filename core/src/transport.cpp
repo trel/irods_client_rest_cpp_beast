@@ -7,7 +7,7 @@
 namespace irods::http
 {
 	transport::transport(boost::asio::io_context& _ctx)
-		: _io_ctx{_ctx}
+		: io_ctx_{_ctx}
 	{
 	}
 
@@ -15,12 +15,12 @@ namespace irods::http
 	{
 		auto res{resolve(_host, _port)};
 		do_connect(res);
-		_did_connect = true;
+		did_connect_ = true;
 	}
 
-	auto transport::is_connected() -> bool
+	auto transport::is_connected() const noexcept -> bool
 	{
-		return _did_connect;
+		return did_connect_;
 	}
 
 	auto transport::communicate(boost::beast::http::request<boost::beast::http::string_body>& _request)
@@ -33,13 +33,13 @@ namespace irods::http
 	auto transport::resolve(std::string_view _host, std::string_view _port)
 		-> boost::asio::ip::tcp::resolver::results_type
 	{
-		boost::asio::ip::tcp::resolver tcp_res{_io_ctx};
+		boost::asio::ip::tcp::resolver tcp_res{io_ctx_};
 		return tcp_res.resolve(_host, _port);
 	}
 
 	tls_transport::tls_transport(boost::asio::io_context& _ctx, boost::asio::ssl::context& _secure_ctx)
 		: transport{_ctx}
-		, _stream{_ctx, _secure_ctx}
+		, stream_{_ctx, _secure_ctx}
 	{
 	}
 
@@ -59,20 +59,20 @@ namespace irods::http
 
 	auto tls_transport::do_connect(boost::asio::ip::tcp::resolver::results_type& _resolved_host) -> void
 	{
-		boost::beast::get_lowest_layer(_stream).connect(_resolved_host);
-		_stream.handshake(boost::asio::ssl::stream_base::client);
+		boost::beast::get_lowest_layer(stream_).connect(_resolved_host);
+		stream_.handshake(boost::asio::ssl::stream_base::client);
 	}
 
 	auto tls_transport::do_write(boost::beast::http::request<boost::beast::http::string_body>& _request) -> void
 	{
-		boost::beast::http::write(_stream, _request);
+		boost::beast::http::write(stream_, _request);
 	}
 
 	auto tls_transport::do_read() -> boost::beast::http::response<boost::beast::http::string_body>
 	{
 		boost::beast::flat_buffer buffer;
 		boost::beast::http::response<boost::beast::http::string_body> res;
-		boost::beast::http::read(_stream, buffer, res);
+		boost::beast::http::read(stream_, buffer, res);
 
 		return res;
 	}
@@ -80,13 +80,13 @@ namespace irods::http
 	auto tls_transport::disconnect() -> void
 	{
 		boost::beast::error_code ec;
-		_stream.shutdown(ec);
+		stream_.shutdown(ec);
 	}
 
 	auto tls_transport::set_sni_hostname(std::string_view _host) -> void
 	{
 		// Set SNI Hostname (many hosts need this to handshake successfully)
-		if (!SSL_set_tlsext_host_name(_stream.native_handle(), _host.data())) {
+		if (!SSL_set_tlsext_host_name(stream_.native_handle(), _host.data())) {
 			boost::beast::error_code ec{static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category()};
 			throw boost::beast::system_error{ec};
 		}
@@ -94,7 +94,7 @@ namespace irods::http
 
 	plain_transport::plain_transport(boost::asio::io_context& _ctx)
 		: transport{_ctx}
-		, _stream{_ctx}
+		, stream_{_ctx}
 	{
 	}
 
@@ -107,19 +107,19 @@ namespace irods::http
 
 	auto plain_transport::do_connect(boost::asio::ip::tcp::resolver::results_type& _resolved_host) -> void
 	{
-		_stream.connect(_resolved_host);
+		stream_.connect(_resolved_host);
 	}
 
 	auto plain_transport::do_write(boost::beast::http::request<boost::beast::http::string_body>& _request) -> void
 	{
-		boost::beast::http::write(_stream, _request);
+		boost::beast::http::write(stream_, _request);
 	}
 
 	auto plain_transport::do_read() -> boost::beast::http::response<boost::beast::http::string_body>
 	{
 		boost::beast::flat_buffer buffer;
 		boost::beast::http::response<boost::beast::http::string_body> res;
-		boost::beast::http::read(_stream, buffer, res);
+		boost::beast::http::read(stream_, buffer, res);
 
 		return res;
 	}
@@ -127,7 +127,7 @@ namespace irods::http
 	auto plain_transport::disconnect() -> void
 	{
 		boost::beast::error_code ec;
-		_stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+		stream_.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
 	}
 
 	auto make_secure_context() -> boost::asio::ssl::context
