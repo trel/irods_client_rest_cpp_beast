@@ -349,7 +349,8 @@ namespace irods::http::handler
 					// Issue token?
 					static const auto seconds =
 						irods::http::globals::configuration()
-							.at(nlohmann::json::json_pointer{"/http_server/authentication/basic/timeout_in_seconds"})
+							.at(nlohmann::json::json_pointer{
+								"/http_server/authentication/openid_connect/timeout_in_seconds"})
 							.get<int>();
 
 					auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
@@ -575,7 +576,8 @@ namespace irods::http::handler
 					// Issue token?
 					static const auto seconds =
 						irods::http::globals::configuration()
-							.at(nlohmann::json::json_pointer{"/http_server/authentication/basic/timeout_in_seconds"})
+							.at(nlohmann::json::json_pointer{
+								"/http_server/authentication/openid_connect/timeout_in_seconds"})
 							.get<int>();
 					auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
 						.auth_scheme = authorization_scheme::openid_connect,

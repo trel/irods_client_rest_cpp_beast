@@ -243,13 +243,17 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
 
             // Defines options for the "Basic" authentication scheme.
             "basic": {
-                // The amount of time before a user's "Basic" authentication
+                // The amount of time before a user's authentication
                 // token expires.
                 "timeout_in_seconds": 3600
             },
 
             // Defines required OIDC related configuration.
             "openid_connect": {
+                // The amount of time before a user's authentication
+                // token expires.
+                "timeout_in_seconds": 3600,
+
                 // The url of the OIDC provider, with a path leading to
                 // where the .well-known configuration is.
                 // The protocol will determine the default port used if
