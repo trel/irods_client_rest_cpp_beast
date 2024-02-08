@@ -515,11 +515,11 @@ auto print_configuration_template() -> void
         "zone": "<string>",
 
         "tls": {{
-            "client_server_policy": "<string>",
+            "client_server_policy": "CS_NEG_REFUSE",
             "ca_certificate_file": "<string>",
             "certificate_chain_file": "<string>",
             "dh_params_file": "<string>",
-            "verify_server": "<string>",
+            "verify_server": "cert",
             "client_server_negotiation": "request_server_negotiation",
             "encryption_algorithm": "AES-256-CBC",
             "encryption_key_size": 32,
