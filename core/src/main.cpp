@@ -348,12 +348,6 @@ constexpr auto default_jsonschema() -> std::string_view
                         "ca_certificate_file": {{
                             "type": "string"
                         }},
-                        "certificate_chain_file": {{
-                            "type": "string"
-                        }},
-                        "dh_params_file": {{
-                            "type": "string"
-                        }},
                         "verify_server": {{
                             "enum": [
                                 "none",
@@ -380,7 +374,6 @@ constexpr auto default_jsonschema() -> std::string_view
                     "required": [
                         "client_server_policy",
                         "ca_certificate_file",
-                        "dh_params_file",
                         "verify_server",
                         "client_server_negotiation",
                         "encryption_algorithm",
@@ -517,8 +510,6 @@ auto print_configuration_template() -> void
         "tls": {{
             "client_server_policy": "CS_NEG_REFUSE",
             "ca_certificate_file": "<string>",
-            "certificate_chain_file": "<string>",
-            "dh_params_file": "<string>",
             "verify_server": "cert",
             "client_server_negotiation": "request_server_negotiation",
             "encryption_algorithm": "AES-256-CBC",
@@ -706,8 +697,6 @@ auto init_tls(const json& _config) -> void
 	// clang-format off
 	set_env_string("client_server_policy", irods::KW_CFG_IRODS_CLIENT_SERVER_POLICY, "CS_NEG_REFUSE");
 	set_env_string("ca_certificate_file", irods::KW_CFG_IRODS_SSL_CA_CERTIFICATE_FILE);
-	set_env_string("certificate_chain_file", irods::KW_CFG_IRODS_SSL_CERTIFICATE_CHAIN_FILE);
-	set_env_string("dh_params_file", irods::KW_CFG_IRODS_SSL_DH_PARAMS_FILE);
 	set_env_string("verify_server", irods::KW_CFG_IRODS_SSL_VERIFY_SERVER, "cert");
 	set_env_string("client_server_negotiation", irods::KW_CFG_IRODS_CLIENT_SERVER_NEGOTIATION, "request_server_negotiation");
 	set_env_string("encryption_algorithm", irods::KW_CFG_IRODS_ENCRYPTION_ALGORITHM, "AES-256-CBC");
