@@ -86,6 +86,37 @@ namespace irods::http::handler
             return {{"error", "No irods user associated with authenticated user"}};
         }
 
+        // Issuer Verification
+        // todo : retrieve global var
+        const auto expected_issuer = "...";
+        if (decoded_token.get_issuer() != expected_issuer) {
+            log::error("Issuer verification failed.");
+            return {{"error", "Issuer verification failed"}};
+        }
+
+        // Audience Verification
+        // todo : retrieve global var
+        const auto expected_audience = "...";
+        if (decoded_token.get_audience() != expected_audience) {
+            log::error("Audience verification failed.");
+            return {{"error", "Audience verification failed"}};
+        }
+
+        // Token Expiration Verification
+        if (decoded_token.is_expired()) {
+            log::error("Token has expired.");
+            return {{"error", "Token has expired"}};
+        }
+
+        // Signature Verification
+        // todo: check 
+        try {
+            decoded_token.verify_signature(jwt::default_policy());
+        } catch(const std::exception& e) {
+            log::error("Signature verification failed: {}", e.what());
+            return {{"error", "Signature verification failed"}};
+        }
+
         // Get irods username from the token
         const std::string& irods_name{decoded_token.at(irods_claim_name).get_ref<const std::string&>()};
 
