@@ -106,7 +106,7 @@ namespace irods::http::handler
             const auto& auth_header_value = auth_header_iter->value();
 
             // Check if the authorization method is Bearer
-            // static const std::string bearer_prefix = "Bearer ";
+            static const std::string bearer_prefix = "Bearer ";
             // if (auth_header_value.size() <= bearer_prefix.size() ||
             //     !jwt::algorithm::starts_with(auth_header_value, bearer_prefix)) {
             //     log::error("Invalid authorization method.");
