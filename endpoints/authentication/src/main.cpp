@@ -194,7 +194,7 @@ namespace irods::http::handler
 						{"client_id",
 					     irods::http::globals::oidc_configuration().at("client_id").get_ref<const std::string&>()},
 						{"response_type", "code"},
-						{"scope", "openid"},
+						{"scope", "openid profile"},
 						{"redirect_uri",
 					     irods::http::globals::oidc_configuration().at("redirect_uri").get_ref<const std::string&>()},
 						{"state", state}};
@@ -538,7 +538,7 @@ namespace irods::http::handler
 						{"client_id",
 					     irods::http::globals::oidc_configuration().at("client_id").get_ref<const std::string&>()},
 						{"grant_type", "password"},
-						{"scope", "openid"},
+						{"scope", "openid profile"},
 						{"username", username},
 						{"password", password}};
 
