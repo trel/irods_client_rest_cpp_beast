@@ -1,6 +1,6 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
-#include <boost/beast.hpp>
+#include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/url/parse.hpp>
 
@@ -59,57 +59,72 @@ namespace irods::http::handler
                     "/http_server/authentication/openid_connect/timeout_in_seconds"})
                 .get<int>();
 
-        auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
+        auto bearer_token = irods::http::process_stash::insert({
             .auth_scheme = authorization_scheme::basic,
             .username = std::move(irods_name),
             .expires_at = std::chrono::steady_clock::now() + std::chrono::seconds{seconds}});
 
         // Return success response with the unique identifier to be used for the next endpoint fetching
-        return {{"success", true}, {"bearer_token", bearer_token}};
+        return {
+            {
+                "success",
+                true,
+            },
+            {
+                "bearer_token",
+                bearer_token,
+            },
+        };
     }
+
+    class authenticated_client_info
+    {
+    public:
+        authorization_scheme auth_scheme;
+        std::string username;
+        std::chrono::time_point<std::chrono::steady_clock> expires_at;
+    };
 
 
    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(access_token_handler)
-    {
-        log::debug("Handling request to access_token_handler");
-        if (_req.method() == boost::beast::http::verb::post) {
-            // Check for Authorization header
-            const auto auth_header_iter = _req.base().find(boost::beast::http::field::authorization);
-            if (auth_header_iter == _req.base().end()) {
-                log::error("Authorization header missing.");
-                return _sess_ptr->send(fail(status_type::unauthorized));
-            }
-
-            // Extract the authorization value
-            const auto& auth_header_value = auth_header_iter->value();
-
-            // Check if the authorization method is Bearer
-            static const std::string bearer_prefix = "Bearer ";
-            // if (auth_header_value.size() <= bearer_prefix.size() ||
-            //     !jwt::algorithm::starts_with(auth_header_value, bearer_prefix)) {
-            //     log::error("Invalid authorization method.");
-            //     return _sess_ptr->send(fail(status_type::unauthorized));
-            // }
-
-            // Extract the access token
-            const std::string access_token = auth_header_value.substr(bearer_prefix.size());
-
-            // Process the access token
-            const auto response = handle_access_token(access_token);
-
-            // Create and send the response
-            response_type res_rep{status_type::ok, _req.version()};
-            res_rep.set(field_type::server, irods::http::version::server_name);
-            res_rep.set(field_type::content_type, "application/json");
-            res_rep.keep_alive(_req.keep_alive());
-            res_rep.body() = response.dump();
-            res_rep.prepare_payload();
-
-            return _sess_ptr->send(std::move(res_rep));
+{
+    log::debug("Handling request to access_token_handler");
+    if (_req.method() == boost::beast::http::verb::post) {
+        // Check for Authorization header
+        const auto auth_header_iter = _req.base().find(boost::beast::http::field::authorization);
+        if (auth_header_iter == _req.base().end()) {
+            log::error("Authorization header missing.");
+            return _sess_ptr->send(fail(status_type::unauthorized));
         }
-        else {
-            log::error("HTTP method not supported.");
-            return _sess_ptr->send(fail(status_type::method_not_allowed));
+
+        // Extract the authorization value
+        const auto& auth_header_value = auth_header_iter->value();
+
+        // Check if the authorization method is Bearer
+        static const std::string bearer_prefix = "Bearer ";
+        if (auth_header_value.size() <= bearer_prefix.size() ||
+            !jwt::algorithm::starts_with(auth_header_value, bearer_prefix)) {
+            log::error("Invalid authorization method.");
+            return _sess_ptr->send(fail(status_type::unauthorized));
         }
+
+        // Extract the access token
+        const std::string access_token = auth_header_value.substr(bearer_prefix.size());
+
+        // Process the access token
+        const auto response = handle_access_token(access_token);
+
+        // Create and send the response
+        response_type res_rep{status_type::ok, _req.version()};
+        res_rep.set(field_type::server, irods::http::version::server_name);
+        res_rep.set(field_type::content_type, "application/json");
+        res_rep.keep_alive(_req.keep_alive());
+        res_rep.body() = response.dump();
+        res_rep.prepare_payload();
+
+        return _sess_ptr->send(std::move(res_rep));
+    } else {
+        log::error("HTTP method not supported.");
+        return _sess_ptr->send(fail(status_type::method_not_allowed));
     }
 } // namespace irods::http::handler
