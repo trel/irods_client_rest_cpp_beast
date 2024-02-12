@@ -17,8 +17,8 @@ namespace irods::http::handler
 {
     auto handle_access_token(std::string_view _access_token) -> nlohmann::json
     {
-        // Decode and validate the access token
-        jwt::verifier<nlohmann::json, jwt::default_clock, jwt::default_validator<nlohmann::json>> verifier;
+        // Decode and validate the access token using a lambda function
+        auto verifier = [](const auto& jwt) { return jwt::basic::verify(jwt); };
         auto decoded_token = jwt::decode<nlohmann::json>(_access_token, verifier);
 
         // Verify 'irods_username' exists in the token claims
@@ -38,12 +38,6 @@ namespace irods::http::handler
 
         // Get irods username from the token
         const std::string& irods_name{decoded_token.at(irods_claim_name).get_ref<const std::string&>()};
-
-        // static const auto seconds =
-		// 				irods::http::globals::configuration()
-		// 					.at(nlohmann::json::json_pointer{
-		// 						"/http_server/authentication/openid_connect/timeout_in_seconds"})
-		// 					.get<int>();
 
         auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
 							.auth_scheme = authorization_scheme::basic,
@@ -72,7 +66,7 @@ namespace irods::http::handler
             // Check if the authorization method is Bearer
             static const std::string bearer_prefix = "Bearer ";
             if (auth_header_value.size() <= bearer_prefix.size() ||
-                !boost::algorithm::starts_with(auth_header_value, bearer_prefix)) {
+                !jwt::algorithm::starts_with(auth_header_value, bearer_prefix)) {
                 log::error("Invalid authorization method.");
                 return _sess_ptr->send(fail(status_type::unauthorized));
             }
