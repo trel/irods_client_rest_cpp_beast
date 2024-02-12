@@ -111,7 +111,28 @@ make package # Use -j to use more parallelism.
 
 Keep in mind that even though you've compiled the HTTP API with support for GenQuery2, that is half the story. You must also install the GenQuery2 package on the iRODS server which the HTTP API will connect to and the iRODS Catalog Service Provider.
 
-## Docker
+## Automated Docker Setup
+
+This project provides a convenient script to automate the setup and launch of the iRODS HTTP API using Docker. Follow the steps below to quickly set up and run the iRODS HTTP API container on your machine.
+
+Run the setup script:
+`./launch.sh`
+
+This script performs the following tasks:
+
+- Creates a packages directory.
+- Clones the GenQuery2 repository if not already present.
+- Builds the builder Docker image.
+- Generates DEB packages.
+- Builds the runner Docker image.
+- Launches the iRODS HTTP API container.
+
+Before executing the script, you need to provide a configuration file at the correct location. If you do not have a configuration file already, see Configuration for details.
+
+Now, your iRODS HTTP API is up and running, accessible at http://localhost:9000.
+
+
+## Manual Docker Installation
 
 This project provides two Dockerfiles, one for building and one for running the application. GenQuery2 is enabled by default. As mentioned in the previous section, the iRODS server must have GenQuery2 installed before attempting to use the parser.
 
