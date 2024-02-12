@@ -53,7 +53,7 @@ namespace irods::http::handler
         response_type res{status, 11};
         res.set(field_type::server, irods::http::version::server_name);
         res.set(field_type::content_type, "application/json");
-        res.keep_alive(false); // Adjust as needed
+        res.keep_alive(false);
 
         // Set the body of the response to the JSON content
         res.body() = content.dump();
@@ -75,6 +75,7 @@ namespace irods::http::handler
             .at("irods_user_claim")
             .get_ref<const std::string&>()};
 
+        
         if (!decoded_token.contains(irods_claim_name)) {
             const auto user{
                 decoded_token.contains("preferred_username")
@@ -88,12 +89,17 @@ namespace irods::http::handler
         // Get irods username from the token
         const std::string& irods_name{decoded_token.at(irods_claim_name).get_ref<const std::string&>()};
 
+        // Retrieves the timeout duration in seconds for OpenID Connect authentication from the global configuration settings
         static const auto seconds =
             irods::http::globals::configuration()
                 .at(nlohmann::json::json_pointer{
                     "/http_server/authentication/openid_connect/timeout_in_seconds"})
                 .get<int>();
 
+        // Generates a bearer token for an authenticated client to match 
+        // the struct currently used to cast the info extracted from token 
+        // in resolve_client_identity (struct authenticated_client_info)
+        // that is the validation filter for any endpoint fetching at the moment
         auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
             .auth_scheme = authorization_scheme::basic,
             .username = std::move(irods_name),
@@ -118,8 +124,14 @@ namespace irods::http::handler
             // Extract the authorization value
             const auto& auth_header_value = auth_header_iter->value();
 
-            // Check if the authorization method is Bearer
+           // Check if the authorization method is Bearer
             static const std::string bearer_prefix = "Bearer ";
+            if (auth_header_value.size() <= bearer_prefix.size() ||
+                auth_header_value.substr(0, bearer_prefix.size()) != bearer_prefix) {
+                log::error("Incorrect Authorization Method");
+                _sess_ptr->send(make_json_response(status_type::unauthorized, {{"error", "Incorrect authorization method"}}));
+            }
+
             // Extract the access token
             const std::string access_token = auth_header_value.substr(bearer_prefix.size());
 
