@@ -18,7 +18,7 @@ namespace irods::http::handler
     auto handle_access_token(std::string_view _access_token) -> nlohmann::json
     {
         // Decode and validate the access token
-        jwt::verifier<nlohmann::json> verifier([](const auto& jwt) { return jwt::basic::verify(jwt); });
+        jwt::verifier<nlohmann::json, jwt::default_clock, jwt::default_validator<nlohmann::json>> verifier;
         auto decoded_token = jwt::decode<nlohmann::json>(_access_token, verifier);
 
         // Verify 'irods_username' exists in the token claims
