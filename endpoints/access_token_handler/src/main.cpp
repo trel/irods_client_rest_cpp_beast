@@ -1,4 +1,5 @@
 #include "irods/private/http_api/handlers.hpp"
+
 #include "irods/private/http_api/common.hpp"
 #include "irods/private/http_api/globals.hpp"
 #include "irods/private/http_api/log.hpp"
@@ -7,11 +8,45 @@
 #include "irods/private/http_api/transport.hpp"
 #include "irods/private/http_api/version.hpp"
 
-#include <jwt-cpp/jwt.h>
-#include <jwt-cpp/traits/nlohmann-json/traits.h>
+#include <irods/base64.hpp>
+#include <irods/check_auth_credentials.h>
+#include <irods/client_connection.hpp>
+#include <irods/irods_at_scope_exit.hpp>
+#include <irods/irods_exception.hpp>
+#include <irods/rcConnect.h>
+#include <irods/user_administration.hpp>
+
+#include <boost/algorithm/string.hpp>
+#include <boost/asio.hpp>
+#include <boost/beast.hpp>
+#include <boost/beast/http.hpp>
+#include <boost/url/parse.hpp>
+
+#include <iterator>
 #include <nlohmann/json.hpp>
 
-using namespace irods::http;
+#include <jwt-cpp/jwt.h>
+#include <jwt-cpp/traits/nlohmann-json/traits.h>
+
+#include <fmt/core.h>
+
+#include <curl/curl.h>
+#include <curl/urlapi.h>
+
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
+
+// clang-format off
+namespace beast = boost::beast; // from <boost/beast.hpp>
+namespace net   = boost::asio;  // from <boost/asio.hpp>
+// clang-format on
+
+using body_arguments = std::unordered_map<std::string, std::string>;
 
 namespace irods::http::handler
 {
@@ -25,18 +60,18 @@ namespace irods::http::handler
 
         // Verify 'irods_username' exists in the token claims
         const auto& irods_claim_name{irods::http::globals::oidc_configuration()
-                                         .at("irods_user_claim")
-                                         .get_ref<const std::string&>()};
+            .at("irods_user_claim")
+            .get_ref<const std::string&>()};
                                          
         if (!decoded_token.contains(irods_claim_name)) {
 						const auto user{
-							decoded_token.contains("preferred_username")
-								? decoded_token.at("preferred_username").get<const std::string>()
-								: ""};
+                decoded_token.contains("preferred_username")
+                    ? decoded_token.at("preferred_username").get<const std::string>()
+                    : ""};
 
-						log::error("{}: No irods user associated with authenticated user [{}].", fn, user);
-						return _sess_ptr->send(fail(status_type::bad_request));
-					}
+            log::error("{}: No irods user associated with authenticated user [{}].", fn, user);
+            return _sess_ptr->send(fail(status_type::bad_request));
+        }
 
         // Get irods username from the token
 		const std::string& irods_name{decoded_token.at(irods_claim_name).get_ref<const std::string&>()};
