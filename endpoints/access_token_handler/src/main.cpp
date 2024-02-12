@@ -17,33 +17,29 @@ namespace irods::http::handler
 {
     auto handle_access_token(std::string_view _access_token) -> nlohmann::json
     {
-        // Decode and validate the access token using a lambda function
-        auto verifier = [](const auto& jwt) { return jwt::basic::verify(jwt); };
-        auto decoded_token = jwt::decode<nlohmann::json>(_access_token, verifier);
+        // Extract the access token
+        const std::string jwt_token{_access_token};
+
+        // Decode the JWT token
+        auto decoded_token = jwt::decode<nlohmann::json>(jwt_token);
 
         // Verify 'irods_username' exists in the token claims
         const auto& irods_claim_name{irods::http::globals::oidc_configuration()
                                          .at("irods_user_claim")
                                          .get_ref<const std::string&>()};
                                          
-        if (!decoded_token.contains(irods_claim_name)) {
-            const auto user{
-                decoded_token.contains("preferred_username")
-                    ? decoded_token.at("preferred_username").get<const std::string>()
-                    : ""};
-
-            log::error("No irods user associated with authenticated user [{}].", user);
+        if (!decoded_token.payload().contains(irods_claim_name)) {
+            log::error("No irods user associated with the token.");
             return {{"error", "No irods user associated with the token"}};
         }
 
         // Get irods username from the token
-        const std::string& irods_name{decoded_token.at(irods_claim_name).get_ref<const std::string&>()};
+        const std::string& irods_name{decoded_token.payload().at(irods_claim_name).get_ref<const std::string&>()};
 
         auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
 							.auth_scheme = authorization_scheme::basic,
 							.username = std::move(irods_name),
 							.expires_at = std::chrono::steady_clock::now() + std::chrono::seconds{6000}});
-
 
         // Return success response with the unique identifier to be used for next endpoint fetching
         return {{"success", true}, {"bearer_token", bearer_token}};
