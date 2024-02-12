@@ -103,7 +103,7 @@ namespace irods::http::handler
         return {{"success", true}, {"bearer_token", bearer_token}};
     }
 
-    auto access_token_handler(const irods::http::request_type& _req) -> response_type
+    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(access_token_handler)
     {
         log::debug("Handling request to access_token_handler");
         if (_req.method() == boost::beast::http::verb::post) {
