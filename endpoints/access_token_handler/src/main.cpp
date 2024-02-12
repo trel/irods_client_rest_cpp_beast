@@ -1,28 +1,9 @@
-#include "irods/private/http_api/handlers.hpp"
-
-#include "irods/private/http_api/common.hpp"
-#include "irods/private/http_api/globals.hpp"
-#include "irods/private/http_api/log.hpp"
-#include "irods/private/http_api/process_stash.hpp"
-#include "irods/private/http_api/session.hpp"
-#include "irods/private/http_api/transport.hpp"
-#include "irods/private/http_api/version.hpp"
-
-#include <irods/base64.hpp>
-#include <irods/check_auth_credentials.h>
-#include <irods/client_connection.hpp>
-#include <irods/irods_at_scope_exit.hpp>
-#include <irods/irods_exception.hpp>
-#include <irods/rcConnect.h>
-#include <irods/user_administration.hpp>
-
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/url/parse.hpp>
 
-#include <iterator>
 #include <nlohmann/json.hpp>
 
 #include <jwt-cpp/jwt.h>
@@ -30,11 +11,7 @@
 
 #include <fmt/core.h>
 
-#include <curl/curl.h>
-#include <curl/urlapi.h>
-
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <string>
 #include <string_view>
@@ -62,19 +39,19 @@ namespace irods::http::handler
         const auto& irods_claim_name{irods::http::globals::oidc_configuration()
             .at("irods_user_claim")
             .get_ref<const std::string&>()};
-                                         
+
         if (!decoded_token.contains(irods_claim_name)) {
-						const auto user{
+            const auto user{
                 decoded_token.contains("preferred_username")
                     ? decoded_token.at("preferred_username").get<const std::string>()
                     : ""};
 
-            log::error("{}: No irods user associated with authenticated user [{}].", fn, user);
-            return _sess_ptr->send(fail(status_type::bad_request));
+            log::error("No irods user associated with authenticated user [{}].", user);
+            return fail_response(status_type::bad_request);
         }
 
         // Get irods username from the token
-		const std::string& irods_name{decoded_token.at(irods_claim_name).get_ref<const std::string&>()};
+        const std::string& irods_name{decoded_token.at(irods_claim_name).get_ref<const std::string&>()};
 
         static const auto seconds =
             irods::http::globals::configuration()
@@ -87,11 +64,12 @@ namespace irods::http::handler
             .username = std::move(irods_name),
             .expires_at = std::chrono::steady_clock::now() + std::chrono::seconds{seconds}});
 
-        // Return success response with the unique identifier to be used for next endpoint fetching
+        // Return success response with the unique identifier to be used for the next endpoint fetching
         return {{"success", true}, {"bearer_token", bearer_token}};
     }
 
-    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(access_token_handler)
+
+   IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(access_token_handler)
     {
         log::debug("Handling request to access_token_handler");
         if (_req.method() == boost::beast::http::verb::post) {
