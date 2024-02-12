@@ -48,8 +48,21 @@ namespace net   = boost::asio;  // from <boost/asio.hpp>
 
 using body_arguments = std::unordered_map<std::string, std::string>;
 
+
 namespace irods::http::handler
 {
+    auto make_json_response(boost::beast::http::status status, const nlohmann::json& content) -> response_type {
+        response_type res{status, 11};
+        res.set(field_type::server, irods::http::version::server_name);
+        res.set(field_type::content_type, "application/json");
+        res.keep_alive(false); // Adjust as needed
+
+        // Set the body of the response to the JSON content
+        res.body() = content.dump();
+        res.prepare_payload();
+
+        return res;
+    }
     auto handle_access_token(std::string_view _access_token) -> nlohmann::json
     {
         // Extract the access token
@@ -70,7 +83,7 @@ namespace irods::http::handler
                     : ""};
 
             log::error("No irods user associated with authenticated user [{}].", user);
-            return fail_response(status_type::bad_request);
+            return {{"error", "No irods user associated with authenticated user"}};
         }
 
         // Get irods username from the token
@@ -120,19 +133,12 @@ namespace irods::http::handler
             // Process the access token
             const auto response = handle_access_token(access_token);
 
-            // Create and send the response
-            response_type res_rep{status_type::ok, _req.version()};
-            res_rep.set(field_type::server, irods::http::version::server_name);
-            res_rep.set(field_type::content_type, "application/json");
-            res_rep.keep_alive(_req.keep_alive());
-            res_rep.body() = response.dump();
-            res_rep.prepare_payload();
-
-            return _sess_ptr->send(std::move(res_rep));
+            // Construct and return the success JSON object
+            return make_json_response(status_type::ok, response);
         }
         else {
             log::error("HTTP method not supported.");
-            return _sess_ptr->send(fail(status_type::method_not_allowed));
+            return make_json_response(status_type::method_not_allowed, {{"error", "HTTP method not supported"}});
         }
     }
 } // namespace irods::http::handler
