@@ -103,7 +103,7 @@ namespace irods::http::handler
         return {{"success", true}, {"bearer_token", bearer_token}};
     }
 
-    IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(access_token_handler)
+   IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(access_token_handler)
     {
         log::debug("Handling request to access_token_handler");
         if (_req.method() == boost::beast::http::verb::post) {
@@ -111,7 +111,8 @@ namespace irods::http::handler
             const auto auth_header_iter = _req.base().find(boost::beast::http::field::authorization);
             if (auth_header_iter == _req.base().end()) {
                 log::error("Authorization header missing.");
-                return make_json_response(status_type::unauthorized, {{"error", "Authorization header missing"}});
+                _sess_ptr->send(make_json_response(status_type::unauthorized, {{"error", "Authorization header missing"}}));
+                return; // Exit the function after sending the response
             }
 
             // Extract the authorization value
@@ -119,12 +120,6 @@ namespace irods::http::handler
 
             // Check if the authorization method is Bearer
             static const std::string bearer_prefix = "Bearer ";
-            // if (auth_header_value.size() <= bearer_prefix.size() ||
-            //     !jwt::algorithm::starts_with(auth_header_value, bearer_prefix)) {
-            //     log::error("Invalid authorization method.");
-            //     return make_json_response(status_type::unauthorized, {{"error", "Invalid authorization method"}});
-            // }
-
             // Extract the access token
             const std::string access_token = auth_header_value.substr(bearer_prefix.size());
 
@@ -132,11 +127,12 @@ namespace irods::http::handler
             const auto response = handle_access_token(access_token);
 
             // Construct and return the success JSON object
-            return make_json_response(status_type::ok, response);
+            _sess_ptr->send(make_json_response(status_type::ok, response));
         }
         else {
             log::error("HTTP method not supported.");
-            return make_json_response(status_type::method_not_allowed, {{"error", "HTTP method not supported"}});
+            _sess_ptr->send(make_json_response(status_type::method_not_allowed, {{"error", "HTTP method not supported"}}));
         }
     }
+
 } // namespace irods::http::handler
