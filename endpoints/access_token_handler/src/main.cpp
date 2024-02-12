@@ -1,5 +1,4 @@
 #include "irods/private/http_api/handlers.hpp"
-
 #include "irods/private/http_api/common.hpp"
 #include "irods/private/http_api/globals.hpp"
 #include "irods/private/http_api/log.hpp"
@@ -48,7 +47,6 @@ namespace net   = boost::asio;  // from <boost/asio.hpp>
 
 using body_arguments = std::unordered_map<std::string, std::string>;
 
-
 namespace irods::http::handler
 {
     auto make_json_response(boost::beast::http::status status, const nlohmann::json& content) -> response_type {
@@ -63,6 +61,7 @@ namespace irods::http::handler
 
         return res;
     }
+
     auto handle_access_token(std::string_view _access_token) -> nlohmann::json
     {
         // Extract the access token
@@ -104,8 +103,7 @@ namespace irods::http::handler
         return {{"success", true}, {"bearer_token", bearer_token}};
     }
 
-
-   IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(access_token_handler)
+    auto access_token_handler(irods::http::session* _sess_ptr, const irods::http::request_type& _req) -> response_type
     {
         log::debug("Handling request to access_token_handler");
         if (_req.method() == boost::beast::http::verb::post) {
@@ -113,7 +111,7 @@ namespace irods::http::handler
             const auto auth_header_iter = _req.base().find(boost::beast::http::field::authorization);
             if (auth_header_iter == _req.base().end()) {
                 log::error("Authorization header missing.");
-                return _sess_ptr->send(fail(status_type::unauthorized));
+                return make_json_response(status_type::unauthorized, {{"error", "Authorization header missing"}});
             }
 
             // Extract the authorization value
@@ -124,7 +122,7 @@ namespace irods::http::handler
             // if (auth_header_value.size() <= bearer_prefix.size() ||
             //     !jwt::algorithm::starts_with(auth_header_value, bearer_prefix)) {
             //     log::error("Invalid authorization method.");
-            //     return _sess_ptr->send(fail(status_type::unauthorized));
+            //     return make_json_response(status_type::unauthorized, {{"error", "Invalid authorization method"}});
             // }
 
             // Extract the access token
