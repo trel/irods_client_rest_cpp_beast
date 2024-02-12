@@ -21,7 +21,7 @@ namespace irods::http::handler
         const std::string jwt_token{_access_token};
 
         // Decode the JWT token
-        auto decoded_token = jwt::decode<nlohmann::json>(jwt_token);
+        auto decoded_token = jwt::decode(jwt_token);
 
         // Verify 'irods_username' exists in the token claims
         const auto& irods_claim_name{irods::http::globals::oidc_configuration()
@@ -60,12 +60,12 @@ namespace irods::http::handler
             const auto& auth_header_value = auth_header_iter->value();
 
             // Check if the authorization method is Bearer
-            static const std::string bearer_prefix = "Bearer ";
-            if (auth_header_value.size() <= bearer_prefix.size() ||
-                !jwt::algorithm::starts_with(auth_header_value, bearer_prefix)) {
-                log::error("Invalid authorization method.");
-                return _sess_ptr->send(fail(status_type::unauthorized));
-            }
+            // static const std::string bearer_prefix = "Bearer ";
+            // if (auth_header_value.size() <= bearer_prefix.size() ||
+            //     !jwt::algorithm::starts_with(auth_header_value, bearer_prefix)) {
+            //     log::error("Invalid authorization method.");
+            //     return _sess_ptr->send(fail(status_type::unauthorized));
+            // }
 
             // Extract the access token
             const std::string access_token = auth_header_value.substr(bearer_prefix.size());
