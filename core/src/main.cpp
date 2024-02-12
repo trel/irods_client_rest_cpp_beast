@@ -81,6 +81,7 @@ using tcp  = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
 // IRODS_HTTP_API_BASE_URL is a macro defined by the CMakeLists.txt.
 const irods::http::request_handler_map_type req_handlers{
 	{IRODS_HTTP_API_BASE_URL "/authenticate", irods::http::handler::authentication},
+	{IRODS_HTTP_API_BASE_URL "/validate-token", irods::http::handler::access_token_handler},
 	{IRODS_HTTP_API_BASE_URL "/collections",  irods::http::handler::collections},
 	//{IRODS_HTTP_API_BASE_URL "/config",       irods::http::handler::configuration},
 	{IRODS_HTTP_API_BASE_URL "/data-objects", irods::http::handler::data_objects},
