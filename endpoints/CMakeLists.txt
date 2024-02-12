@@ -1,6 +1,7 @@
 add_subdirectory(shared)
 
 add_subdirectory(authentication)
+add_subdirectory(access_token_handler)
 add_subdirectory(collections)
 #add_subdirectory(config)
 add_subdirectory(data_objects)

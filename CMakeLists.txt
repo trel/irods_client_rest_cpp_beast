@@ -16,7 +16,7 @@ set(IRODS_HTTP_API_VERSION "${IRODS_CLIENT_VERSION}")
 set(IRODS_PACKAGE_REVISION "1")
 
 include(IrodsExternals)
-IRODS_MACRO_CHECK_DEPENDENCY_SET_FULLPATH(JWTCPP jwt-cpp0.6.99.0-0)
+IRODS_MACRO_CHECK_DEPENDENCY_SET_FULLPATH(JWTCPP jwt-cpp)
 
 include(IrodsCXXCompiler)
 set(CMAKE_CXX_STANDARD ${IRODS_CXX_STANDARD})
@@ -108,6 +108,7 @@ target_link_objects(
   irods_http_api_core
   irods_http_api_shared_operations
   irods_http_api_endpoint_authentication
+  irods_http_api_endpoint_access_token_handler
   irods_http_api_endpoint_collections
   #irods_http_api_endpoint_config
   irods_http_api_endpoint_data_objects
