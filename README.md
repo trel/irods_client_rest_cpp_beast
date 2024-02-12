@@ -113,10 +113,10 @@ Keep in mind that even though you've compiled the HTTP API with support for GenQ
 
 ## Automated Docker Setup (short way)
 
-This project provides a convenient script to automate the setup and launch of the iRODS HTTP API using Docker. Follow the steps below to quickly set up and run the iRODS HTTP API container on your machine.
+This project provides a script to automate the setup and launch of the iRODS HTTP API using Docker.
 
 Run the setup script:
-`./launch.sh`
+`./launch_docker.sh`
 
 This script performs the following tasks:
 
@@ -127,9 +127,9 @@ This script performs the following tasks:
 - Builds the runner Docker image.
 - Launches the iRODS HTTP API container.
 
-Before executing the script, you need to provide a configuration file at the correct location. If you do not have a configuration file already, see [Configuration](#configuration) for details.
+Before executing the script, you need to provide a configuration file in the root of the project. If you do not have a configuration file already, see [Configuration](#configuration) for details.
 
-Now, your iRODS HTTP API is up and running, accessible at http://localhost:9000.
+Now, your iRODS HTTP API is up and running on port 9000.
 
 
 ## Manual Docker Installation (long way)
@@ -297,6 +297,7 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
 
                 // The path to the TLS certificates directory.
                 // Used for HTTPS connections.
+                // Note: For testing purposes when no certificates are available, set this path to '/etc/ssl/certs'.
                 "tls_certificates_directory": "/path/to/certs"
             }
         },
