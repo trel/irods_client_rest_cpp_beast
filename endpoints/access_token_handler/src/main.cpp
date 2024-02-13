@@ -93,15 +93,15 @@ namespace irods::http::handler
             return {{"error", "No irods user associated with authenticated user"}};
         }
 
-        const auto token_endpoint{
-			irods::http::globals::oidc_endpoint_configuration().at("token_endpoint").get_ref<const std::string&>()};
+        const auto provider_url{
+			irods::http::globals::oidc_endpoint_configuration().at("provider_url").get_ref<const std::string&>()};
 
         // Issuer Verification
-        const auto expected_issuer = token_endpoint;
+        const auto expected_issuer = provider_url;
         const auto& decoded_issuer = decoded_token["iss"];
         log::info("Expected Issuer: {}", expected_issuer);
         log::info("Decoded Issuer: {}", decoded_issuer);
-        if (decoded_issuer != expected_issuer) {
+        if (!decoded_issuer.is_string() || decoded_issuer.get<std::string>() != expected_issuer) {
             log::error("Issuer verification failed.");
             return {{"error", "Issuer verification failed"}};
         }
