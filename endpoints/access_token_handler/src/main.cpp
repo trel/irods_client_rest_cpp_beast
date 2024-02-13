@@ -99,7 +99,9 @@ namespace irods::http::handler
         // Issuer Verification
         const auto expected_issuer = token_endpoint;
         const auto& decoded_issuer = decoded_token["iss"];
-        if (!decoded_issuer.is_string() || decoded_issuer.get<std::string>() != expected_issuer) {
+        log::info("Expected Issuer: {}", expected_issuer);
+        log::info("Decoded Issuer: {}", decoded_issuer);
+        if (decoded_issuer != expected_issuer) {
             log::error("Issuer verification failed.");
             return {{"error", "Issuer verification failed"}};
         }
