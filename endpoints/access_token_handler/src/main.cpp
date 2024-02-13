@@ -61,7 +61,7 @@ namespace irods::http::handler
     }
 
     bool is_token_expired(const nlohmann::json& decoded_token) {
-        auto expiration_time = decoded_token.value("exp", nlohmann::json::null());
+        auto expiration_time = decoded_token.value("exp", nullptr);
         if (!expiration_time.is_null() && expiration_time.is_number()) {
             auto expiration_timestamp = expiration_time.get<int64_t>();
             auto current_time = std::chrono::system_clock::now();
@@ -88,7 +88,7 @@ namespace irods::http::handler
                     : ""};
 
             log::error("No irods user associated with authenticated user [{}].", user);
-            return fail(status_type::bad_request, "No irods user associated with authenticated user");
+            return {{"error", "No irods user associated with authenticated user"}};
         }
 
         const auto token_endpoint{
@@ -96,15 +96,16 @@ namespace irods::http::handler
 
         // Issuer Verification
         const auto expected_issuer = token_endpoint;
-        if (decoded_token.get_issuer() != expected_issuer) {
+        const auto& decoded_issuer = decoded_token["iss"];
+        if (!decoded_issuer.is_string() || decoded_issuer.get<std::string>() != expected_issuer) {
             log::error("Issuer verification failed.");
-            return fail(status_type::bad_request, "Issuer verification failed");
+            return {{"error", "Issuer verification failed"}};
         }
 
         // Token Expiration Verification
         if (is_token_expired(decoded_token)) {
             log::error("Token has expired.");
-            return fail(status_type::bad_request, "Token has expired or its expiration time is missing or invalid");
+            return {{"error", "Token has expired or its expiration time is missing or invalid"}};
         }
 
         // Get irods username from the token
