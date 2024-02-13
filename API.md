@@ -84,6 +84,26 @@ This will open a browser window that will allow you to authenticate in.
 ##### Response
 The bearer token should be returned and viewable in the browser window after authenticating.
 
+#### Access Token Validation
+
+Validates an access token provided in the Authorization header and generates a new bearer token for further authentication. This endpoint is used to ensure the integrity and authenticity of the access token before allowing access to protected resources.
+
+##### Request
+```bash
+curl -X POST -H 'Authorization: Bearer <access_token>' http://localhost:<port>/irods-http-api/<version>/validate-token
+```
+
+##### Response
+
+If the access token is valid, the response will contain a new bearer token, which can be used for subsequent operations.
+```
+{
+    "success": true,
+    "bearer_token": "<new_bearer_token>"
+}
+```
+Note: This endpoint follows the OAuth 2.0 protocol for token validation and issuance
+
 ## Collection Operations
 
 ### create
