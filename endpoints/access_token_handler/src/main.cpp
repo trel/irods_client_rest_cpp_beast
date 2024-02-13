@@ -93,8 +93,10 @@ namespace irods::http::handler
             return {{"error", "No irods user associated with authenticated user"}};
         }
 
-        const auto provider_url{
-			irods::http::globals::oidc_endpoint_configuration().at("provider_url").get_ref<const std::string&>()};
+       
+        const auto token_endpoint{irods::http::globals::oidc_endpoint_configuration().at("token_endpoint").get_ref<const std::string&>()};
+        auto last_slash_pos{token_endpoint.find_last_of('/')};
+        const auto provider_url{token_endpoint.substr(0, last_slash_pos)};
 
         // Issuer Verification
         const auto expected_issuer = provider_url;
