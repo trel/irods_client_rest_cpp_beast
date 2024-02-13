@@ -40,6 +40,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <chrono>
+
 // clang-format off
 namespace beast = boost::beast; // from <boost/beast.hpp>
 namespace net   = boost::asio;  // from <boost/asio.hpp>
@@ -61,9 +63,9 @@ namespace irods::http::handler
     }
 
     bool is_token_expired(const nlohmann::json& decoded_token) {
-        auto expiration_time = decoded_token.value("exp", nullptr);
-        if (!expiration_time.is_null() && expiration_time.is_number()) {
-            auto expiration_timestamp = expiration_time.get<int64_t>();
+        auto it = decoded_token.find("exp");
+        if (it != decoded_token.end() && it.value().is_number()) {
+            auto expiration_timestamp = it.value().get<int64_t>();
             auto current_time = std::chrono::system_clock::now();
             auto current_timestamp = std::chrono::duration_cast<std::chrono::seconds>(current_time.time_since_epoch()).count();
             return current_timestamp >= expiration_timestamp;
