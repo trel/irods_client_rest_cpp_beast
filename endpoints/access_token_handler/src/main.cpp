@@ -60,8 +60,8 @@ namespace irods::http::handler
         return res;
     }
 
-    bool is_token_expired(const json& decoded_token) {
-        auto expiration_time = decoded_token.value("exp", json::null());
+    bool is_token_expired(const nlohmann::json& decoded_token) {
+        auto expiration_time = decoded_token.value("exp", nlohmann::json::null());
         if (!expiration_time.is_null() && expiration_time.is_number()) {
             auto expiration_timestamp = expiration_time.get<int64_t>();
             auto current_time = std::chrono::system_clock::now();
@@ -158,7 +158,8 @@ namespace irods::http::handler
             const auto auth_header_iter = _req.base().find(boost::beast::http::field::authorization);
             if (auth_header_iter == _req.base().end()) {
                 log::error("Authorization header missing.");
-                return fail(status_type::unauthorized, "Authorization header missing");
+                fail(status_type::unauthorized, "Authorization header missing");
+                return; 
             }
 
             const auto& auth_header_value = auth_header_iter->value();
@@ -168,7 +169,8 @@ namespace irods::http::handler
             if (auth_header_value.size() <= bearer_prefix.size() ||
                 auth_header_value.substr(0, bearer_prefix.size()) != bearer_prefix) {
                 log::error("Incorrect Authorization Method");
-                return fail(status_type::unauthorized, "Incorrect authorization method");
+                fail(status_type::unauthorized, "Incorrect authorization method");
+                return;
             }
 
             const std::string access_token = auth_header_value.substr(bearer_prefix.size());
@@ -180,7 +182,7 @@ namespace irods::http::handler
         }
         else {
             log::error("HTTP method not supported.");
-            return fail(status_type::method_not_allowed, "HTTP method not supported");
+            fail(status_type::method_not_allowed, "HTTP method not supported");
         }
     }
 
