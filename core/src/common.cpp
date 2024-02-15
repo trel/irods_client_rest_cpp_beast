@@ -118,17 +118,17 @@ namespace irods::http
 
 	auto get_url_path(const std::string& _url) -> std::optional<std::string>
 	{
-		namespace log = irods::http::log;
+		namespace logging = irods::http::log;
 
 		std::unique_ptr<CURLU, void (*)(CURLU*)> curl{curl_url(), curl_url_cleanup};
 
 		if (!curl) {
-			log::error("{}: Could not initialize libcurl.", __func__);
+			logging::error("{}: Could not initialize libcurl.", __func__);
 			return std::nullopt;
 		}
 
 		if (const auto ec = curl_url_set(curl.get(), CURLUPART_URL, _url.c_str(), 0); ec) {
-			log::error("{}: curl_url_set error: {}", __func__, ec);
+			logging::error("{}: curl_url_set error: {}", __func__, ec);
 			return std::nullopt;
 		}
 
@@ -144,24 +144,24 @@ namespace irods::http
 			return path;
 		}
 
-		log::error("{}: curl_url_get(CURLUPART_PATH) error: {}", __func__, ec);
+		logging::error("{}: curl_url_get(CURLUPART_PATH) error: {}", __func__, ec);
 		return std::nullopt;
 	} // get_url_path
 
 	auto parse_url(const std::string& _url) -> url
 	{
-		namespace log = irods::http::log;
+		namespace logging = irods::http::log;
 
 		std::unique_ptr<CURLU, void (*)(CURLU*)> curl{curl_url(), curl_url_cleanup};
 
 		if (!curl) {
-			log::error("{}: Could not initialize CURLU handle.", __func__);
+			logging::error("{}: Could not initialize CURLU handle.", __func__);
 			THROW(SYS_LIBRARY_ERROR, "curl_url error.");
 		}
 
 		// Include a bogus prefix. We only care about the path and query parts of the URL.
 		if (const auto ec = curl_url_set(curl.get(), CURLUPART_URL, _url.c_str(), 0); ec) {
-			log::error("{}: curl_url_set error: {}", __func__, ec);
+			logging::error("{}: curl_url_set error: {}", __func__, ec);
 			THROW(SYS_LIBRARY_ERROR, "curl_url_set(CURLUPART_URL) error.");
 		}
 
@@ -179,7 +179,7 @@ namespace irods::http
 			}
 		}
 		else {
-			log::error("{}: curl_url_get(CURLUPART_PATH) error: {}", __func__, ec);
+			logging::error("{}: curl_url_get(CURLUPART_PATH) error: {}", __func__, ec);
 			THROW(SYS_LIBRARY_ERROR, "curl_url_get(CURLUPART_PATH) error.");
 		}
 
@@ -195,7 +195,7 @@ namespace irods::http
 			}
 		}
 		else {
-			log::error("{}: curl_url_get(CURLUPART_QUERY) error: {}", __func__, ec);
+			logging::error("{}: curl_url_get(CURLUPART_QUERY) error: {}", __func__, ec);
 			THROW(SYS_LIBRARY_ERROR, "curl_url_get(CURLUPART_QUERY) error.");
 		}
 
@@ -209,7 +209,7 @@ namespace irods::http
 
 	auto resolve_client_identity(const request_type& _req) -> client_identity_resolution_result
 	{
-		namespace log = irods::http::log;
+		namespace logging = irods::http::log;
 
 		//
 		// Extract the Bearer token from the Authorization header.
@@ -218,41 +218,41 @@ namespace irods::http
 		const auto& hdrs = _req.base();
 		const auto iter = hdrs.find("Authorization");
 		if (iter == std::end(hdrs)) {
-			log::error("{}: Missing [Authorization] header.", __func__);
+			logging::error("{}: Missing [Authorization] header.", __func__);
 			return {.response = fail(status_type::bad_request)};
 		}
 
-		log::debug("{}: Authorization value: [{}]", __func__, iter->value());
+		logging::debug("{}: Authorization value: [{}]", __func__, iter->value());
 
 		auto pos = iter->value().find("Bearer ");
 		if (std::string_view::npos == pos) {
-			log::debug("{}: Malformed authorization header.", __func__);
+			logging::debug("{}: Malformed authorization header.", __func__);
 			return {.response = fail(status_type::bad_request)};
 		}
 
 		std::string bearer_token{iter->value().substr(pos + 7)};
 		boost::trim(bearer_token);
-		log::debug("{}: Bearer token: [{}]", __func__, bearer_token);
+		logging::debug("{}: Bearer token: [{}]", __func__, bearer_token);
 
 		// Verify the bearer token is known to the server. If not, return an error.
 		auto mapped_value{irods::http::process_stash::find(bearer_token)};
 		if (!mapped_value.has_value()) {
-			log::error("{}: Could not find bearer token matching [{}].", __func__, bearer_token);
+			logging::error("{}: Could not find bearer token matching [{}].", __func__, bearer_token);
 			return {.response = fail(status_type::unauthorized)};
 		}
 
 		auto* client_info{boost::any_cast<authenticated_client_info>(&*mapped_value)};
 		if (client_info == nullptr) {
-			log::error("{}: Could not find bearer token matching [{}].", __func__, bearer_token);
+			logging::error("{}: Could not find bearer token matching [{}].", __func__, bearer_token);
 			return {.response = fail(status_type::unauthorized)};
 		}
 
 		if (std::chrono::steady_clock::now() >= client_info->expires_at) {
-			log::error("{}: Session for bearer token [{}] has expired.", __func__, bearer_token);
+			logging::error("{}: Session for bearer token [{}] has expired.", __func__, bearer_token);
 			return {.response = fail(status_type::unauthorized)};
 		}
 
-		log::trace("{}: Client is authenticated.", __func__);
+		logging::trace("{}: Client is authenticated.", __func__);
 		return {.client_info = std::move(*client_info)};
 	} // resolve_client_identity
 
@@ -262,9 +262,11 @@ namespace irods::http
 		const std::unordered_map<std::string, handler_type>& _op_table_get,
 		const std::unordered_map<std::string, handler_type>& _op_table_post) -> void
 	{
+		namespace logging = irods::http::log;
+
 		if (_req.method() == verb_type::get) {
 			if (_op_table_get.empty()) {
-				log::error("{}: HTTP method not supported.", __func__);
+				logging::error("{}: HTTP method not supported.", __func__);
 				return _sess_ptr->send(irods::http::fail(status_type::method_not_allowed));
 			}
 
@@ -272,7 +274,7 @@ namespace irods::http
 
 			const auto op_iter = url.query.find("op");
 			if (op_iter == std::end(url.query)) {
-				log::error("{}: Missing [op] parameter.", __func__);
+				logging::error("{}: Missing [op] parameter.", __func__);
 				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
 			}
 
@@ -280,13 +282,13 @@ namespace irods::http
 				return (iter->second)(_sess_ptr, _req, url.query);
 			}
 
-			log::error("{}: Operation [{}] not supported.", __func__, op_iter->second);
+			logging::error("{}: Operation [{}] not supported.", __func__, op_iter->second);
 			return _sess_ptr->send(fail(status_type::bad_request));
 		}
 
 		if (_req.method() == verb_type::post) {
 			if (_op_table_post.empty()) {
-				log::error("{}: HTTP method not supported.", __func__);
+				logging::error("{}: HTTP method not supported.", __func__);
 				return _sess_ptr->send(irods::http::fail(status_type::method_not_allowed));
 			}
 
@@ -297,7 +299,7 @@ namespace irods::http
 				const auto boundary = irods::http::get_multipart_form_data_boundary(content_type);
 
 				if (!boundary) {
-					log::error("{}: Could not extract [boundary] from [Content-Type] header. ", __func__);
+					logging::error("{}: Could not extract [boundary] from [Content-Type] header. ", __func__);
 					return _sess_ptr->send(irods::http::fail(status_type::bad_request));
 				}
 
@@ -307,13 +309,13 @@ namespace irods::http
 				args = irods::http::to_argument_list(_req.body());
 			}
 			else {
-				log::error("{}: Content type [{}] not supported.", __func__, content_type);
+				logging::error("{}: Content type [{}] not supported.", __func__, content_type);
 				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
 			}
 
 			const auto op_iter = args.find("op");
 			if (op_iter == std::end(args)) {
-				log::error("{}: Missing [op] parameter.", __func__);
+				logging::error("{}: Missing [op] parameter.", __func__);
 				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
 			}
 
@@ -321,29 +323,31 @@ namespace irods::http
 				return (iter->second)(_sess_ptr, _req, args);
 			}
 
-			log::error("{}: Operation [{}] not supported.", __func__, op_iter->second);
+			logging::error("{}: Operation [{}] not supported.", __func__, op_iter->second);
 			return _sess_ptr->send(fail(status_type::bad_request));
 		}
 
-		log::error("{}: HTTP method not supported.", __func__);
+		logging::error("{}: HTTP method not supported.", __func__);
 		return _sess_ptr->send(irods::http::fail(status_type::method_not_allowed));
 	} // operation_dispatch
 
 	auto get_port_from_url(boost::urls::url_view _url) -> std::optional<std::string>
 	{
+		namespace logging = irods::http::log;
+
 		if (_url.has_port()) {
 			return _url.port();
 		}
 
 		switch (_url.scheme_id()) {
 			case boost::urls::scheme::https:
-				log::debug("{}: Detected HTTPS scheme, using port 443.", __func__);
+				logging::debug("{}: Detected HTTPS scheme, using port 443.", __func__);
 				return "443";
 			case boost::urls::scheme::http:
-				log::debug("{}: Detected HTTP scheme, using port 80.", __func__);
+				logging::debug("{}: Detected HTTP scheme, using port 80.", __func__);
 				return "80";
 			default:
-				log::error("{}: Cannot deduce port from url [{}].", __func__, _url.data());
+				logging::error("{}: Cannot deduce port from url [{}].", __func__, _url.data());
 				return std::nullopt;
 		}
 	} // get_port_from_url
@@ -432,7 +436,7 @@ namespace irods
 
 	auto get_connection(const std::string& _username) -> irods::http::connection_facade
 	{
-		namespace log = irods::http::log;
+		namespace logging = irods::http::log;
 		using json_pointer = nlohmann::json::json_pointer;
 
 		static const auto& config = irods::http::globals::configuration();
@@ -455,7 +459,7 @@ namespace irods
 			auto* conn_ptr = static_cast<RcComm*>(conn);
 
 			if (const auto ec = clientLoginWithPassword(conn_ptr, rodsadmin_password.data()); ec < 0) {
-				log::error("{}: clientLoginWithPassword error: {}", __func__, ec);
+				logging::error("{}: clientLoginWithPassword error: {}", __func__, ec);
 				THROW(SYS_INTERNAL_ERR, "clientLoginWithPassword error.");
 			}
 
@@ -464,7 +468,7 @@ namespace irods
 
 		auto conn = irods::http::globals::connection_pool().get_connection();
 
-		log::trace("{}: Changing identity associated with connection to [{}].", __func__, _username);
+		logging::trace("{}: Changing identity associated with connection to [{}].", __func__, _username);
 
 		SwitchUserInput input{};
 
@@ -475,11 +479,11 @@ namespace irods
 		addKeyVal(&input.options, KW_CLOSE_OPEN_REPLICAS, "");
 
 		if (const auto ec = rc_switch_user(static_cast<RcComm*>(conn), &input); ec < 0) {
-			log::error("{}: rc_switch_user error: {}", __func__, ec);
+			logging::error("{}: rc_switch_user error: {}", __func__, ec);
 			THROW(ec, "rc_switch_user error.");
 		}
 
-		log::trace("{}: Successfully changed identity associated with connection to [{}].", __func__, _username);
+		logging::trace("{}: Successfully changed identity associated with connection to [{}].", __func__, _username);
 
 		return irods::http::connection_facade{std::move(conn)};
 	} // get_connection

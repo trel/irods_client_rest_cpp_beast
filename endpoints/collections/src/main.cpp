@@ -36,8 +36,8 @@ namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
 namespace net   = boost::asio;      // from <boost/asio.hpp>
 
-namespace fs  = irods::experimental::filesystem;
-namespace log = irods::http::log;
+namespace fs      = irods::experimental::filesystem;
+namespace logging = irods::http::log;
 
 using json = nlohmann::json;
 // clang-format on
@@ -119,7 +119,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -129,7 +129,7 @@ namespace
 			try {
 				const auto lpath_iter = _args.find("lpath");
 				if (lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -172,18 +172,18 @@ namespace
 				res.body() = json{{"irods_response", {{"status_code", 0}}}, {"entries", entries}}.dump();
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -207,7 +207,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -217,7 +217,7 @@ namespace
 			try {
 				const auto lpath_iter = _args.find("lpath");
 				if (lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -266,18 +266,18 @@ namespace
 						.dump();
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -301,7 +301,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -311,7 +311,7 @@ namespace
 			try {
 				const auto lpath_iter = _args.find("lpath");
 				if (lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -361,7 +361,7 @@ namespace
 				// clang-format on
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				// clang-format off
 				res.body() = json{
 					{"irods_response", {
@@ -372,7 +372,7 @@ namespace
 				// clang-format on
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				// clang-format off
 				res.body() = json{
 					{"irods_response", {
@@ -383,7 +383,7 @@ namespace
 				// clang-format on
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -407,7 +407,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -417,7 +417,7 @@ namespace
 			try {
 				const auto lpath_iter = _args.find("lpath");
 				if (lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -448,18 +448,18 @@ namespace
 				res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -483,7 +483,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -493,7 +493,7 @@ namespace
 			try {
 				const auto old_lpath_iter = _args.find("old-lpath");
 				if (old_lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [old-lpath] parameter.", fn);
+					logging::error("{}: Missing [old-lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -508,7 +508,7 @@ namespace
 
 				const auto new_lpath_iter = _args.find("new-lpath");
 				if (new_lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [new-lpath] parameter.", fn);
+					logging::error("{}: Missing [new-lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -518,7 +518,7 @@ namespace
 					res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
 				}
 				catch (const fs::filesystem_error& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::bad_request);
 					res.body() =
 						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
@@ -526,18 +526,18 @@ namespace
 				}
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -561,7 +561,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -571,7 +571,7 @@ namespace
 			try {
 				const auto lpath_iter = _args.find("lpath");
 				if (lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -586,19 +586,19 @@ namespace
 
 				const auto entity_name_iter = _args.find("entity-name");
 				if (entity_name_iter == std::end(_args)) {
-					log::error("{}: Missing [entity-name] parameter.", fn);
+					logging::error("{}: Missing [entity-name] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
 				const auto perm_iter = _args.find("permission");
 				if (perm_iter == std::end(_args)) {
-					log::error("{}: Missing [permission] parameter.", fn);
+					logging::error("{}: Missing [permission] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
 				const auto perm_enum = irods::to_permission_enum(perm_iter->second);
 				if (!perm_enum) {
-					log::error("{}: Invalid value for [permission] parameter.", fn);
+					logging::error("{}: Invalid value for [permission] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -615,25 +615,25 @@ namespace
 					res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
 				}
 				catch (const fs::filesystem_error& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.body() =
 						json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}
 							.dump();
 				}
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -657,7 +657,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -667,13 +667,13 @@ namespace
 			try {
 				const auto lpath_iter = _args.find("lpath");
 				if (lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
 				const auto enable_iter = _args.find("enable");
 				if (enable_iter == std::end(_args)) {
-					log::error("{}: Missing [enable] parameter.", fn);
+					logging::error("{}: Missing [enable] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -697,7 +697,7 @@ namespace
 				res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				// clang-format off
 				res.body() = json{
 					{"irods_response", {
@@ -708,7 +708,7 @@ namespace
 				// clang-format off
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				// clang-format off
 				res.body() = json{
 					{"irods_response", {
@@ -719,7 +719,7 @@ namespace
 				// clang-format off
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -752,7 +752,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -762,7 +762,7 @@ namespace
 				try {
 					const auto lpath_iter = _args.find("lpath");
 					if (lpath_iter == std::end(_args)) {
-						log::error("{}: Missing [lpath] parameter.", fn);
+						logging::error("{}: Missing [lpath] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -775,7 +775,7 @@ namespace
 							options["seconds_since_epoch"] = std::stoi(opt_iter->second);
 						}
 						catch (const std::exception& e) {
-							log::error(
+							logging::error(
 								"{}: Could not convert seconds-since-epoch [{}] into an integer.",
 								fn,
 								opt_iter->second);
@@ -806,7 +806,7 @@ namespace
 					res.body() = json{{"irods_response", {{"status_code", ec}}}}.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -817,7 +817,7 @@ namespace
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 

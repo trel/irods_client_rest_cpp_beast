@@ -21,10 +21,10 @@ namespace irods::http::handler
 	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(zones)
 	{
-		namespace log = irods::http::log;
+		namespace logging = irods::http::log;
 
 		if (_req.method() != boost::beast::http::verb::get) {
-			log::error("{}: HTTP method not supported.", __func__);
+			logging::error("{}: HTTP method not supported.", __func__);
 			return _sess_ptr->send(fail(status_type::method_not_allowed));
 		}
 
@@ -36,18 +36,18 @@ namespace irods::http::handler
 		const auto client_info = result.client_info;
 
 		irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			const auto url = irods::http::parse_url(_req);
 
 			const auto op_iter = url.query.find("op");
 			if (op_iter == std::end(url.query)) {
-				log::error("{}: Missing [op] parameter.", fn);
+				logging::error("{}: Missing [op] parameter.", fn);
 				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
 			}
 
 			if (op_iter->second != "report") {
-				log::error("{}: Operation [{}] not supported.", fn, op_iter->second);
+				logging::error("{}: Operation [{}] not supported.", fn, op_iter->second);
 				return _sess_ptr->send(irods::http::fail(status_type::bad_request));
 			}
 
@@ -58,7 +58,7 @@ namespace irods::http::handler
 				auto conn = irods::get_connection(client_info.username);
 
 				if (const auto ec = rcZoneReport(static_cast<RcComm*>(conn), &bbuf); ec != 0) {
-					log::error("{}: rcZoneReport error: [{}]", fn, ec);
+					logging::error("{}: rcZoneReport error: [{}]", fn, ec);
 					return _sess_ptr->send(irods::http::fail(status_type::bad_request));
 				}
 			}
@@ -74,7 +74,7 @@ namespace irods::http::handler
 					std::string_view(static_cast<char*>(bbuf->buf), bbuf->len));
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(status_type::internal_server_error);
 			}
 

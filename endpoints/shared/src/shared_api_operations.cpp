@@ -25,8 +25,8 @@ namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
 namespace net   = boost::asio;      // from <boost/asio.hpp>
 
-namespace fs  = irods::experimental::filesystem;
-namespace log = irods::http::log;
+namespace fs      = irods::experimental::filesystem;
+namespace logging = irods::http::log;
 
 using json = nlohmann::json;
 // clang-format on
@@ -44,7 +44,7 @@ namespace irods::http::shared_api_operations
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _entity_type, _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				::http::response<::http::string_body> res{::http::status::ok, _req.version()};
 				res.set(::http::field::server, irods::http::version::server_name);
@@ -54,13 +54,13 @@ namespace irods::http::shared_api_operations
 				try {
 					const auto lpath_iter = _args.find("lpath");
 					if (lpath_iter == std::end(_args)) {
-						log::error("{}: Missing [lpath] parameter.", fn);
+						logging::error("{}: Missing [lpath] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, ::http::status::bad_request));
 					}
 
 					const auto operations_iter = _args.find("operations");
 					if (operations_iter == std::end(_args)) {
-						log::error("{}: Missing [operations] parameter.", fn);
+						logging::error("{}: Missing [operations] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, ::http::status::bad_request));
 					}
 
@@ -120,7 +120,7 @@ namespace irods::http::shared_api_operations
 					res.body() = response.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -131,7 +131,7 @@ namespace irods::http::shared_api_operations
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(::http::status::internal_server_error);
 				}
 
@@ -152,7 +152,7 @@ namespace irods::http::shared_api_operations
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _entity_type, _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				::http::response<::http::string_body> res{::http::status::ok, _req.version()};
 				res.set(::http::field::server, irods::http::version::server_name);
@@ -162,7 +162,7 @@ namespace irods::http::shared_api_operations
 				try {
 					const auto operations_iter = _args.find("operations");
 					if (operations_iter == std::end(_args)) {
-						log::error("{}: Missing [operations] parameter.", fn);
+						logging::error("{}: Missing [operations] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, ::http::status::bad_request));
 					}
 
@@ -192,13 +192,13 @@ namespace irods::http::shared_api_operations
 							break;
 
 						default:
-							log::error("{}: Invalid entity type for atomic metadata operations.", fn);
+							logging::error("{}: Invalid entity type for atomic metadata operations.", fn);
 							return _sess_ptr->send(irods::http::fail(res, ::http::status::bad_request));
 					}
 
 					const auto entity_name_iter = _args.find(std::string{ename_param});
 					if (entity_name_iter == std::end(_args)) {
-						log::error("{}: Missing [{}] parameter.", fn, ename_param);
+						logging::error("{}: Missing [{}] parameter.", fn, ename_param);
 						return _sess_ptr->send(irods::http::fail(res, ::http::status::bad_request));
 					}
 
@@ -234,7 +234,7 @@ namespace irods::http::shared_api_operations
 					res.body() = response.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -245,7 +245,7 @@ namespace irods::http::shared_api_operations
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(::http::status::internal_server_error);
 				}
 
