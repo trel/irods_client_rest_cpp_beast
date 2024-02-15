@@ -37,7 +37,7 @@ namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
 namespace net   = boost::asio;      // from <boost/asio.hpp>
 
-namespace log = irods::http::log;
+namespace logging = irods::http::log;
 
 using json = nlohmann::json;
 // clang-format on
@@ -104,7 +104,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -114,7 +114,7 @@ namespace
 			try {
 				const auto rule_text_iter = _args.find("rule-text");
 				if (rule_text_iter == std::end(_args)) {
-					log::error("{}: Missing [rule-text] parameter.", fn);
+					logging::error("{}: Missing [rule-text] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -159,25 +159,28 @@ namespace
 						if (auto* exec_out = static_cast<ExecCmdOut*>(msp->inOutStruct); exec_out) {
 							if (exec_out->stdoutBuf.buf) {
 								stdout_output = static_cast<const char*>(exec_out->stdoutBuf.buf);
-								log::debug("{}: stdout_output = [{}]", fn, stdout_output.get_ref<const std::string&>());
+								logging::debug(
+									"{}: stdout_output = [{}]", fn, stdout_output.get_ref<const std::string&>());
 							}
 
 							if (exec_out->stderrBuf.buf) {
 								stderr_output = static_cast<const char*>(exec_out->stderrBuf.buf);
-								log::debug("{}: stderr_output = [{}]", fn, stderr_output.get_ref<const std::string&>());
+								logging::debug(
+									"{}: stderr_output = [{}]", fn, stderr_output.get_ref<const std::string&>());
 							}
 						}
 					}
 
 					if (auto* msp = getMsParamByLabel(out_param_array, "ruleExecOut"); msp) {
-						log::debug("{}: ruleExecOut = [{}]", fn, static_cast<const char*>(msp->inOutStruct));
+						logging::debug("{}: ruleExecOut = [{}]", fn, static_cast<const char*>(msp->inOutStruct));
 					}
 				}
 
 				// Log messages stored in the RcComm::rError object.
 				if (auto* rerr_info = static_cast<RcComm*>(conn)->rError; rerr_info) {
 					for (auto&& err : std::span(rerr_info->errMsg, rerr_info->len)) {
-						log::info("{}: RcComm::rError info = [status=[{}], message=[{}]]", fn, err->status, err->msg);
+						logging::info(
+							"{}: RcComm::rError info = [status=[{}], message=[{}]]", fn, err->status, err->msg);
 					}
 
 					freeRError(rerr_info);
@@ -189,13 +192,13 @@ namespace
 						.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -216,7 +219,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -226,7 +229,7 @@ namespace
 				try {
 					const auto rule_id_iter = _args.find("rule-id");
 					if (rule_id_iter == std::end(_args)) {
-						log::error("{}: Missing [rule-id] parameter.", fn);
+						logging::error("{}: Missing [rule-id] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -243,13 +246,13 @@ namespace
 						 }}}.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -273,7 +276,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -327,13 +330,13 @@ namespace
 						.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 

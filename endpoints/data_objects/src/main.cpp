@@ -53,9 +53,9 @@ namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
 namespace net   = boost::asio;      // from <boost/asio.hpp>
 
-namespace fs  = irods::experimental::filesystem;
-namespace io  = irods::experimental::io;
-namespace log = irods::http::log;
+namespace fs      = irods::experimental::filesystem;
+namespace io      = irods::experimental::io;
+namespace logging = irods::http::log;
 
 using json = nlohmann::json;
 // clang-format on
@@ -283,16 +283,16 @@ namespace
 
 		auto start() -> void
 		{
-			log::trace("{}: Posting task for asynchronously writing headers.", __func__);
+			logging::trace("{}: Posting task for asynchronously writing headers.", __func__);
 
 			async_write_header(
 				sess_ptr_->stream(),
 				serializer_,
 				[self = shared_from_this(), fn = __func__](const auto& ec, std::size_t _bytes_transferred) mutable {
-					log::trace("{}: Wrote [{}] bytes representing headers.", fn, _bytes_transferred);
+					logging::trace("{}: Wrote [{}] bytes representing headers.", fn, _bytes_transferred);
 
 					if (ec) {
-						log::error("{}: Encountered unexpected error while writing headers.", fn);
+						logging::error("{}: Encountered unexpected error while writing headers.", fn);
 						return;
 					}
 
@@ -310,17 +310,17 @@ namespace
 					std::min<std::streamsize>(self->buffer_.size(), self->remaining_bytes_));
 
 				if (self->in_.fail()) {
-					log::error("{}: Stream is in a bad state.", fn);
+					logging::error("{}: Stream is in a bad state.", fn);
 					return;
 				}
 
 				if (self->in_.eof() || 0 == self->remaining_bytes_) {
-					log::debug("{}: All bytes have been read.", fn);
+					logging::debug("{}: All bytes have been read.", fn);
 					self->res_.body().data = nullptr;
 					self->res_.body().more = false;
 				}
 				else {
-					log::debug("{}: Read [{}] bytes from data object.", fn, self->in_.gcount());
+					logging::debug("{}: Read [{}] bytes from data object.", fn, self->in_.gcount());
 					self->remaining_bytes_ -= self->in_.gcount();
 					self->res_.body().data = self->buffer_.data();
 					self->res_.body().size = self->in_.gcount();
@@ -332,13 +332,13 @@ namespace
 					self->serializer_,
 					[self = self->shared_from_this(), fn = fn](
 						const auto& _ec, std::size_t _bytes_transferred) mutable {
-						log::debug("{}: Wrote [{}] bytes to socket.", fn, _bytes_transferred);
+						logging::debug("{}: Wrote [{}] bytes to socket.", fn, _bytes_transferred);
 
 						if (_ec == http::error::need_buffer) {
 							self->stream_bytes_to_client();
 						}
 						else if (_ec) {
-							log::error("{}: Error writing bytes to socket: {}", fn, _ec.what());
+							logging::error("{}: Error writing bytes to socket: {}", fn, _ec.what());
 						}
 					});
 			});
@@ -374,7 +374,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)]() mutable {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -384,7 +384,7 @@ namespace
 			try {
 				const auto lpath_iter = _args.find("lpath");
 				if (lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -406,7 +406,7 @@ namespace
 				const auto status = fs::client::status(conn, lpath_iter->second);
 
 				if (!fs::client::is_data_object(status)) {
-					log::error(
+					logging::error(
 						"{}: Logical path [{}] does not point to a data object or does not exist.",
 						fn,
 						lpath_iter->second);
@@ -421,14 +421,14 @@ namespace
 						offset = std::stoll(iter->second);
 					}
 					catch (const std::exception& e) {
-						log::error("{}: Invalid value for [offset] parameter. Received [{}].", fn, iter->second);
+						logging::error("{}: Invalid value for [offset] parameter. Received [{}].", fn, iter->second);
 						res.result(http::status::bad_request);
 						res.prepare_payload();
 						return _sess_ptr->send(std::move(res));
 					}
 
 					if (std::cmp_less(offset, 0)) {
-						log::error(
+						logging::error(
 							"{}: Invalid value for [offset] parameter. Must be non-negative. Received [{}].",
 							fn,
 							iter->second);
@@ -446,14 +446,14 @@ namespace
 						count = std::stoll(iter->second);
 					}
 					catch (const std::exception& e) {
-						log::error("{}: Invalid value for [count] parameter. Received [{}].", fn, iter->second);
+						logging::error("{}: Invalid value for [count] parameter. Received [{}].", fn, iter->second);
 						res.result(http::status::bad_request);
 						res.prepare_payload();
 						return _sess_ptr->send(std::move(res));
 					}
 
 					if (std::cmp_less(count, 0)) {
-						log::error(
+						logging::error(
 							"{}: Invalid value for [count] parameter. Must be non-negative. Received [{}].",
 							fn,
 							iter->second);
@@ -487,7 +487,7 @@ namespace
 					irods::experimental::client_connection dedicated_conn{irods::experimental::defer_connection};
 
 					if (enable_4_2_compat) {
-						log::trace("{}: 4.2 compatibility enabled. Using existing iRODS connection.", fn);
+						logging::trace("{}: 4.2 compatibility enabled. Using existing iRODS connection.", fn);
 
 						// get_connection() always returns connections to the iRODS server when 4.2
 						// compatibility is enabled. Therefore, we can continue to use the existing
@@ -495,7 +495,7 @@ namespace
 						dedicated_conn = std::move(conn.get_ref<irods::experimental::client_connection>());
 					}
 					else {
-						log::trace(
+						logging::trace(
 							"{}: 4.2 compatibility disabled. Internal buffer size exceeded. Using dedicated iRODS "
 							"connection.",
 							fn);
@@ -513,7 +513,7 @@ namespace
 							config.at(json::json_pointer{"/irods_client/proxy_admin_account/password"})
 								.get<std::string>();
 
-						log::trace("{}: Connecting to iRODS server as [{}].", fn, client_info.username);
+						logging::trace("{}: Connecting to iRODS server as [{}].", fn, client_info.username);
 						dedicated_conn.connect(
 							irods::experimental::defer_authentication,
 							host,
@@ -524,7 +524,7 @@ namespace
 						const auto ec =
 							clientLoginWithPassword(static_cast<RcComm*>(dedicated_conn), rodsadmin_password.data());
 						if (ec < 0) {
-							log::error("{}: Could not create dedicated connection for read operation.", fn);
+							logging::error("{}: Could not create dedicated connection for read operation.", fn);
 							return _sess_ptr->send(irods::http::fail(
 								res,
 								http::status::internal_server_error,
@@ -532,20 +532,20 @@ namespace
 						}
 					}
 
-					log::trace("{}: Opening stream for reading to data object [{}].", fn, lpath_iter->second);
+					logging::trace("{}: Opening stream for reading to data object [{}].", fn, lpath_iter->second);
 					auto tp = std::make_unique<io::client::native_transport>(dedicated_conn);
 					io::idstream in{*tp, lpath_iter->second};
 
 					if (!in) {
-						log::error("{}: Could not open data object [{}] for read.", fn, lpath_iter->second);
+						logging::error("{}: Could not open data object [{}] for read.", fn, lpath_iter->second);
 						res.result(http::status::internal_server_error);
 						res.prepare_payload();
 						return _sess_ptr->send(std::move(res));
 					}
 
-					log::trace("{}: Seeking to offset [{}] in data object [{}].", fn, offset, lpath_iter->second);
+					logging::trace("{}: Seeking to offset [{}] in data object [{}].", fn, offset, lpath_iter->second);
 					if (offset > 0 && !in.seekg(offset)) {
-						log::error(
+						logging::error(
 							"{}: Could not seek to position [{}] in data object [{}].", fn, offset, lpath_iter->second);
 						res.result(http::status::internal_server_error);
 						res.prepare_payload();
@@ -566,7 +566,7 @@ namespace
 				// the buffer used for reading data object (i.e. the size defined in the config file).
 				//
 
-				log::trace(
+				logging::trace(
 					"{}: Requested number of bytes fits into internal buffer. Using existing connection.",
 					fn,
 					lpath_iter->second);
@@ -575,14 +575,14 @@ namespace
 				io::idstream in{tp, lpath_iter->second};
 
 				if (!in) {
-					log::error("{}: Could not open data object [{}] for read.", fn, lpath_iter->second);
+					logging::error("{}: Could not open data object [{}] for read.", fn, lpath_iter->second);
 					res.result(http::status::internal_server_error);
 					res.prepare_payload();
 					return _sess_ptr->send(std::move(res));
 				}
 
 				if (offset > 0 && !in.seekg(offset)) {
-					log::error(
+					logging::error(
 						"{}: Could not seek to position [{}] in data object [{}].", fn, offset, lpath_iter->second);
 					res.result(http::status::internal_server_error);
 					res.prepare_payload();
@@ -592,7 +592,7 @@ namespace
 				std::vector<char> buffer(count);
 
 				if (!in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()))) {
-					log::error("{}: Could not read bytes from data object [{}].", fn, lpath_iter->second);
+					logging::error("{}: Could not read bytes from data object [{}].", fn, lpath_iter->second);
 					res.result(http::status::internal_server_error);
 					res.prepare_payload();
 					return _sess_ptr->send(std::move(res));
@@ -601,15 +601,15 @@ namespace
 				res.body() = std::string_view(buffer.data(), in.gcount());
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.result(http::status::internal_server_error);
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -633,7 +633,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -657,7 +657,7 @@ namespace
 				std::unique_ptr<at_scope_exit_type> mark_pw_stream_as_usable;
 
 				if (parallel_write_handle_iter != std::end(_args)) {
-					log::debug("{}: (write) Parallel Write Handle = [{}].", fn, parallel_write_handle_iter->second);
+					logging::debug("{}: (write) Parallel Write Handle = [{}].", fn, parallel_write_handle_iter->second);
 
 					decltype(parallel_write_contexts)::iterator iter;
 
@@ -666,7 +666,7 @@ namespace
 
 						iter = parallel_write_contexts.find(parallel_write_handle_iter->second);
 						if (iter == std::end(parallel_write_contexts)) {
-							log::error("{}: Invalid handle for parallel write.", fn);
+							logging::error("{}: Invalid handle for parallel write.", fn);
 							return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 						}
 					}
@@ -679,7 +679,7 @@ namespace
 
 					if (const auto stream_index_iter = _args.find("stream-index"); stream_index_iter != std::end(_args))
 					{
-						log::debug(
+						logging::debug(
 							"{}: Client selected [{}] for [stream-index] parameter.", fn, stream_index_iter->second);
 
 						try {
@@ -687,14 +687,14 @@ namespace
 							out_ptr = &iter->second.streams.at(sindex)->stream();
 						}
 						catch (const std::exception& e) {
-							log::error("{}: Invalid argument for [stream-index] parameter.");
+							logging::error("{}: Invalid argument for [stream-index] parameter.");
 							return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 						}
 					}
 					else {
 						auto* pw_stream = iter->second.find_available_parallel_write_stream();
 						if (!pw_stream) {
-							log::error(
+							logging::error(
 								"{}: Parallel write streams are busy. Client must wait for one to become available.",
 								fn);
 							return _sess_ptr->send(irods::http::fail(res, http::status::too_many_requests));
@@ -706,12 +706,12 @@ namespace
 						out_ptr = &pw_stream->stream();
 					}
 
-					log::debug("{}: (write) Parallel Write - stream memory address = [{}].", fn, fmt::ptr(out_ptr));
+					logging::debug("{}: (write) Parallel Write - stream memory address = [{}].", fn, fmt::ptr(out_ptr));
 				}
 				else {
 					const auto lpath_iter = _args.find("lpath");
 					if (lpath_iter == std::end(_args)) {
-						log::error("{}: Missing [lpath] parameter.", fn);
+						logging::error("{}: Missing [lpath] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -725,8 +725,8 @@ namespace
 						openmode |= std::ios_base::app;
 					}
 
-					log::trace("{}: Opening data object [{}] for write.", fn, lpath_iter->second);
-					log::trace("{}: (write) Initializing for single buffer write.", fn);
+					logging::trace("{}: Opening data object [{}] for write.", fn, lpath_iter->second);
+					logging::trace("{}: (write) Initializing for single buffer write.", fn);
 
 					conn = irods::get_connection(client_info.username);
 
@@ -757,7 +757,7 @@ namespace
 				}
 
 				if (!*out_ptr) {
-					log::error("{}: Could not open data object for write.", fn);
+					logging::error("{}: Could not open data object for write.", fn);
 					res.result(http::status::internal_server_error);
 					res.prepare_payload();
 					return _sess_ptr->send(std::move(res));
@@ -765,12 +765,12 @@ namespace
 
 				auto iter = _args.find("offset");
 				if (iter != std::end(_args)) {
-					log::trace("{}: Setting offset for write.", fn);
+					logging::trace("{}: Setting offset for write.", fn);
 					try {
 						out_ptr->seekp(std::stoll(iter->second));
 					}
 					catch (const std::exception& e) {
-						log::error("{}: Could not seek to position [{}] in data object.", fn, iter->second);
+						logging::error("{}: Could not seek to position [{}] in data object.", fn, iter->second);
 						res.result(http::status::bad_request);
 						res.prepare_payload();
 						return _sess_ptr->send(std::move(res));
@@ -779,14 +779,14 @@ namespace
 
 				iter = _args.find("bytes");
 				if (iter == std::end(_args)) {
-					log::error("{}: Missing [bytes] parameter.", fn);
+					logging::error("{}: Missing [bytes] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
 				auto remaining_bytes = iter->second.size();
 
 				if (!std::cmp_equal(remaining_bytes, iter->second.size())) {
-					log::error("{}: Requirement violated: [count] and size of [bytes] do not match.", fn);
+					logging::error("{}: Requirement violated: [count] and size of [bytes] do not match.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -798,13 +798,13 @@ namespace
 
 				while (remaining_bytes > 0) {
 					if (!*out_ptr) {
-						log::error(
+						logging::error(
 							"{}: Output stream is in a bad state. Client should restart the entire transfer.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::internal_server_error));
 					}
 
 					const auto to_send = std::min<std::streamsize>(remaining_bytes, buffer_size);
-					log::debug("{}: Write buffer: remaining=[{}], sending=[{}].", fn, remaining_bytes, to_send);
+					logging::debug("{}: Write buffer: remaining=[{}], sending=[{}].", fn, remaining_bytes, to_send);
 					out_ptr->write(p, to_send);
 					p += to_send;
 					remaining_bytes -= to_send;
@@ -820,18 +820,18 @@ namespace
 				res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -855,7 +855,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -865,13 +865,13 @@ namespace
 			try {
 				const auto lpath_iter = _args.find("lpath");
 				if (lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
 				const auto stream_count_iter = _args.find("stream-count");
 				if (stream_count_iter == std::end(_args)) {
-					log::error("{}: Missing [stream-count] parameter.", fn);
+					logging::error("{}: Missing [stream-count] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -880,7 +880,7 @@ namespace
 				                       .at(json::json_pointer{"/irods_client/max_number_of_parallel_write_streams"})
 				                       .get<int>())
 				{
-					log::error(
+					logging::error(
 						"{}: Argument for [stream-count] parameter exceeds maximum number of streams allowed.",
 						fn,
 						stream_count_iter->second);
@@ -891,7 +891,7 @@ namespace
 
 				namespace io = irods::experimental::io;
 
-				log::trace("{}: Opening initial output stream to [{}].", fn, lpath_iter->second);
+				logging::trace("{}: Opening initial output stream to [{}].", fn, lpath_iter->second);
 
 				std::vector<std::shared_ptr<parallel_write_stream>> pw_streams;
 				pw_streams.reserve(stream_count);
@@ -917,7 +917,7 @@ namespace
 						client_info.username, lpath_iter->second, openmode, ticket));
 
 					auto& first_stream = pw_streams.front()->stream();
-					log::debug(
+					logging::debug(
 						"{}: replica token=[{}], replica number=[{}], leaf resource name=[{}]",
 						fn,
 						first_stream.replica_token().value,
@@ -931,8 +931,8 @@ namespace
 					}
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
-					log::error("{}: Could not open one or more output streams to [{}].", fn, lpath_iter->second);
+					logging::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: Could not open one or more output streams to [{}].", fn, lpath_iter->second);
 					res.result(http::status::internal_server_error);
 					res.prepare_payload();
 					return _sess_ptr->send(std::move(res));
@@ -945,12 +945,13 @@ namespace
 					std::scoped_lock lk{pwc_mtx};
 
 					transfer_handle = irods::generate_uuid(parallel_write_contexts);
-					log::debug("{}: (init) Parallel Write Handle = [{}].", fn, transfer_handle);
+					logging::debug("{}: (init) Parallel Write Handle = [{}].", fn, transfer_handle);
 
 					auto [iter, insertion_result] =
 						parallel_write_contexts.emplace(transfer_handle, parallel_write_context{});
 					if (!insertion_result) {
-						log::error("{}: Could not initialize parallel write context for [{}].", fn, lpath_iter->second);
+						logging::error(
+							"{}: Could not initialize parallel write context for [{}].", fn, lpath_iter->second);
 						res.result(http::status::internal_server_error);
 						res.prepare_payload();
 						return _sess_ptr->send(std::move(res));
@@ -973,18 +974,18 @@ namespace
 						.dump();
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -1008,7 +1009,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -1023,11 +1024,11 @@ namespace
 
 				const auto parallel_write_handle_iter = _args.find("parallel-write-handle");
 				if (parallel_write_handle_iter == std::end(_args)) {
-					log::error("{}: Missing [parallel-write-handle] parameter.", fn);
+					logging::error("{}: Missing [parallel-write-handle] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(http::status::bad_request));
 				}
 
-				log::debug("{}: (shutdown) Parallel Write Handle = [{}].", fn, parallel_write_handle_iter->second);
+				logging::debug("{}: (shutdown) Parallel Write Handle = [{}].", fn, parallel_write_handle_iter->second);
 
 				{
 					std::scoped_lock lk{pwc_mtx};
@@ -1059,18 +1060,18 @@ namespace
 				res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -1091,7 +1092,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -1106,7 +1107,7 @@ namespace
 						irods::strncpy_null_terminated(input.objPath, iter->second.c_str());
 					}
 					else {
-						log::error("{}: Missing [lpath] parameter.", fn);
+						logging::error("{}: Missing [lpath] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -1114,7 +1115,7 @@ namespace
 						addKeyVal(&input.condInput, DEST_RESC_NAME_KW, iter->second.c_str());
 					}
 					else {
-						log::error("{}: Missing [dst-resource] parameter.", fn);
+						logging::error("{}: Missing [dst-resource] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(http::status::bad_request));
 					}
 
@@ -1138,7 +1139,7 @@ namespace
 					// clang-format on
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -1149,7 +1150,7 @@ namespace
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -1170,7 +1171,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -1185,7 +1186,7 @@ namespace
 						irods::strncpy_null_terminated(input.objPath, iter->second.c_str());
 					}
 					else {
-						log::error("{}: Missing [lpath] parameter.", fn);
+						logging::error("{}: Missing [lpath] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -1193,7 +1194,7 @@ namespace
 						addKeyVal(&input.condInput, REPL_NUM_KW, iter->second.c_str());
 					}
 					else {
-						log::error("{}: Missing [replica-number] parameter.", fn);
+						logging::error("{}: Missing [replica-number] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -1213,7 +1214,7 @@ namespace
 					res.body() = json{{"irods_response", {{"status_code", ec < 0 ? ec : 0}}}}.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -1224,7 +1225,7 @@ namespace
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -1248,7 +1249,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -1258,7 +1259,7 @@ namespace
 			try {
 				const auto lpath_iter = _args.find("lpath");
 				if (lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -1273,19 +1274,19 @@ namespace
 
 				const auto entity_name_iter = _args.find("entity-name");
 				if (entity_name_iter == std::end(_args)) {
-					log::error("{}: Missing [entity-name] parameter.", fn);
+					logging::error("{}: Missing [entity-name] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
 				const auto perm_iter = _args.find("permission");
 				if (perm_iter == std::end(_args)) {
-					log::error("{}: Missing [permission] parameter.", fn);
+					logging::error("{}: Missing [permission] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
 				const auto perm_enum = irods::to_permission_enum(perm_iter->second);
 				if (!perm_enum) {
-					log::error("{}: Invalid value for [permission] parameter.", fn);
+					logging::error("{}: Invalid value for [permission] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -1304,18 +1305,18 @@ namespace
 					 }}}.dump();
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -1345,7 +1346,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -1355,7 +1356,7 @@ namespace
 			try {
 				const auto lpath_iter = _args.find("lpath");
 				if (lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -1409,18 +1410,18 @@ namespace
 						.dump();
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -1441,7 +1442,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -1455,7 +1456,7 @@ namespace
 						irods::strncpy_null_terminated(input.objPath, lpath_iter->second.c_str());
 					}
 					else {
-						log::error("{}: Missing [lpath] parameter.", fn);
+						logging::error("{}: Missing [lpath] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -1463,7 +1464,7 @@ namespace
 						addKeyVal(&input.condInput, FILE_PATH_KW, iter->second.c_str());
 					}
 					else {
-						log::error("{}: Missing [ppath] parameter.", fn);
+						logging::error("{}: Missing [ppath] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -1471,7 +1472,7 @@ namespace
 						addKeyVal(&input.condInput, DEST_RESC_NAME_KW, iter->second.c_str());
 					}
 					else {
-						log::error("{}: Missing [resource] parameter.", fn);
+						logging::error("{}: Missing [resource] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -1504,7 +1505,7 @@ namespace
 					res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -1515,7 +1516,7 @@ namespace
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -1539,7 +1540,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -1549,13 +1550,13 @@ namespace
 			try {
 				const auto lpath_iter = _args.find("lpath");
 				if (lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
 				const auto catalog_only_iter = _args.find("catalog-only");
 				if (catalog_only_iter == std::end(_args)) {
-					log::error("{}: Missing [catalog-only] parameter.", fn);
+					logging::error("{}: Missing [catalog-only] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -1568,7 +1569,7 @@ namespace
 					input.oprType = UNREG_OPR;
 
 					if (const auto iter = _args.find("no-trash"); iter != std::end(_args) && iter->second == "1") {
-						log::error("{}: [catalog-only] and [no-trash] parameters are incompatible.", fn);
+						logging::error("{}: [catalog-only] and [no-trash] parameters are incompatible.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 				}
@@ -1586,7 +1587,7 @@ namespace
 				res.body() = json{{"irods_response", {{"status_code", ec}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				// clang-format off
 				res.body() = json{
 					{"irods_response", {
@@ -1597,7 +1598,7 @@ namespace
 				// clang-format on
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -1621,7 +1622,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -1631,7 +1632,7 @@ namespace
 			try {
 				const auto old_lpath_iter = _args.find("old-lpath");
 				if (old_lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [old-lpath] parameter.", fn);
+					logging::error("{}: Missing [old-lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -1646,7 +1647,7 @@ namespace
 
 				const auto new_lpath_iter = _args.find("new-lpath");
 				if (new_lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [new-lpath] parameter.", fn);
+					logging::error("{}: Missing [new-lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -1655,18 +1656,18 @@ namespace
 				res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
 			}
 			catch (const fs::filesystem_error& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code().value()}, {"status_message", e.what()}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -1687,7 +1688,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -1697,13 +1698,13 @@ namespace
 				try {
 					const auto src_lpath_iter = _args.find("src-lpath");
 					if (src_lpath_iter == std::end(_args)) {
-						log::error("{}: Missing [src-lpath] parameter.", fn);
+						logging::error("{}: Missing [src-lpath] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto dst_lpath_iter = _args.find("dst-lpath");
 					if (dst_lpath_iter == std::end(_args)) {
-						log::error("{}: Missing [dst-lpath] parameter.", fn);
+						logging::error("{}: Missing [dst-lpath] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -1748,7 +1749,7 @@ namespace
 					res.body() = json{{"irods_response", {{"status_code", ec}}}}.dump();
 				}
 				catch (const fs::filesystem_error& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					const auto ec = e.code().value();
 					// clang-format off
 					res.body() = json{
@@ -1760,7 +1761,7 @@ namespace
 					// clang-format on
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -1771,7 +1772,7 @@ namespace
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -1795,7 +1796,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info.username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -1805,7 +1806,7 @@ namespace
 			try {
 				const auto lpath_iter = _args.find("lpath");
 				if (lpath_iter == std::end(_args)) {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -1822,7 +1823,8 @@ namespace
 						options["replica_number"] = std::stoi(opt_iter->second);
 					}
 					catch (const std::exception& e) {
-						log::error("{}: Could not convert replica number [{}] into an integer.", fn, opt_iter->second);
+						logging::error(
+							"{}: Could not convert replica number [{}] into an integer.", fn, opt_iter->second);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 				}
@@ -1838,7 +1840,7 @@ namespace
 						options["seconds_since_epoch"] = std::stoi(opt_iter->second);
 					}
 					catch (const std::exception& e) {
-						log::error(
+						logging::error(
 							"{}: Could not convert seconds-since-epoch [{}] into an integer.", fn, opt_iter->second);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
@@ -1867,13 +1869,13 @@ namespace
 				res.body() = json{{"irods_response", {{"status_code", ec}}}}.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				res.body() =
 					json{{"irods_response", {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 						.dump();
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 
@@ -1894,7 +1896,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -1909,7 +1911,7 @@ namespace
 						irods::strncpy_null_terminated(input.objPath, iter->second.c_str());
 					}
 					else {
-						log::error("{}: Missing [lpath] parameter.", fn);
+						logging::error("{}: Missing [lpath] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -1948,7 +1950,7 @@ namespace
 					res.body() = json{{"irods_response", {{"status_code", ec}}}, {"checksum", checksum}}.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -1959,7 +1961,7 @@ namespace
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -1980,7 +1982,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -1995,7 +1997,7 @@ namespace
 						irods::strncpy_null_terminated(input.objPath, iter->second.c_str());
 					}
 					else {
-						log::error("{}: Missing [lpath] parameter.", fn);
+						logging::error("{}: Missing [lpath] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -2053,13 +2055,13 @@ namespace
 					res.body() = response.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -2087,7 +2089,7 @@ namespace
 		                                       _sess_ptr,
 		                                       _req = std::move(_req),
 		                                       _args = std::move(_args)] {
-			log::info("{}: client_info->username = [{}]", fn, client_info.username);
+			logging::info("{}: client_info->username = [{}]", fn, client_info.username);
 
 			http::response<http::string_body> res{http::status::ok, _req.version()};
 			res.set(http::field::server, irods::http::version::server_name);
@@ -2102,7 +2104,7 @@ namespace
 					irods::strncpy_null_terminated(info.objPath, iter->second.c_str());
 				}
 				else {
-					log::error("{}: Missing [lpath] parameter.", fn);
+					logging::error("{}: Missing [lpath] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -2113,7 +2115,7 @@ namespace
 					info.replNum = std::stoi(iter->second);
 				}
 				else {
-					log::error("{}: Missing [resource-hierarchy] or [replica-number] parameter.", fn);
+					logging::error("{}: Missing [resource-hierarchy] or [replica-number] parameter.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -2149,7 +2151,7 @@ namespace
 				}
 
 				if (kvp.empty()) {
-					log::error("{}: No properties provided.", fn);
+					logging::error("{}: No properties provided.", fn);
 					return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 				}
 
@@ -2169,7 +2171,7 @@ namespace
 				res.body() = response.dump();
 			}
 			catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
 				// clang-format off
 				res.body() = json{
 					{"irods_response", {
@@ -2180,7 +2182,7 @@ namespace
 				// clang-format on
 			}
 			catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
 				res.result(http::status::internal_server_error);
 			}
 

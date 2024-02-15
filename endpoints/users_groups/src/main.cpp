@@ -29,8 +29,8 @@ namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http  = beast::http;      // from <boost/beast/http.hpp>
 namespace net   = boost::asio;      // from <boost/asio.hpp>
 
-namespace adm = irods::experimental::administration;
-namespace log = irods::http::log;
+namespace adm     = irods::experimental::administration;
+namespace logging = irods::http::log;
 
 using json = nlohmann::json;
 // clang-format on
@@ -122,7 +122,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -132,13 +132,13 @@ namespace
 				try {
 					const auto name_iter = _args.find("name");
 					if (name_iter == std::end(_args)) {
-						log::error("{}: Missing [name] parameter.", fn);
+						logging::error("{}: Missing [name] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto zone_iter = _args.find("zone");
 					if (zone_iter == std::end(_args)) {
-						log::error("{}: Missing [zone] parameter.", fn);
+						logging::error("{}: Missing [zone] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -152,7 +152,7 @@ namespace
 							user_type = adm::user_type::groupadmin;
 						}
 						else {
-							log::error("{}: Invalid value for [user-type] parameter.", fn);
+							logging::error("{}: Invalid value for [user-type] parameter.", fn);
 							return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 						}
 					}
@@ -175,7 +175,7 @@ namespace
 					// clang-format on
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -186,7 +186,7 @@ namespace
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -207,7 +207,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -217,13 +217,13 @@ namespace
 				try {
 					const auto name_iter = _args.find("name");
 					if (name_iter == std::end(_args)) {
-						log::error("{}: Missing [name] parameter.", fn);
+						logging::error("{}: Missing [name] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto zone_iter = _args.find("zone");
 					if (zone_iter == std::end(_args)) {
-						log::error("{}: Missing [zone] parameter.", fn);
+						logging::error("{}: Missing [zone] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -239,7 +239,7 @@ namespace
 					// clang-format on
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -250,7 +250,7 @@ namespace
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -271,7 +271,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -281,19 +281,19 @@ namespace
 				try {
 					const auto name_iter = _args.find("name");
 					if (name_iter == std::end(_args)) {
-						log::error("{}: Missing [name] parameter.", fn);
+						logging::error("{}: Missing [name] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto zone_iter = _args.find("zone");
 					if (zone_iter == std::end(_args)) {
-						log::error("{}: Missing [zone] parameter.", fn);
+						logging::error("{}: Missing [zone] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto new_password_iter = _args.find("new-password");
 					if (new_password_iter == std::end(_args)) {
-						log::error("{}: Missing [new-password] parameter.", fn);
+						logging::error("{}: Missing [new-password] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -309,7 +309,7 @@ namespace
 					res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -320,7 +320,7 @@ namespace
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -341,7 +341,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -351,19 +351,19 @@ namespace
 				try {
 					const auto name_iter = _args.find("name");
 					if (name_iter == std::end(_args)) {
-						log::error("{}: Missing [name] parameter.", fn);
+						logging::error("{}: Missing [name] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto zone_iter = _args.find("zone");
 					if (zone_iter == std::end(_args)) {
-						log::error("{}: Missing [zone] parameter.", fn);
+						logging::error("{}: Missing [zone] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto new_user_type_iter = _args.find("new-user-type");
 					if (new_user_type_iter == std::end(_args)) {
-						log::error("{}: Missing [new-user-type] parameter.", fn);
+						logging::error("{}: Missing [new-user-type] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -381,7 +381,7 @@ namespace
 					// clang-format on
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -392,7 +392,7 @@ namespace
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -413,7 +413,7 @@ namespace
         const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info.username = [{}]", fn, client_info.username);
+            logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -423,7 +423,7 @@ namespace
             try {
             }
             catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
                 res.result(http::status::bad_request);
                 res.body() = json{
                     {"irods_response", {
@@ -433,7 +433,7 @@ namespace
                 }.dump();
             }
             catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
                 res.result(http::status::internal_server_error);
             }
 
@@ -444,7 +444,7 @@ namespace
 #else
 		(void) _req;
 		(void) _args;
-		log::error("{}: Operation not implemented.", __func__);
+		logging::error("{}: Operation not implemented.", __func__);
 		return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
 	} // op_add_user_auth
@@ -460,7 +460,7 @@ namespace
         const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info.username = [{}]", fn, client_info.username);
+            logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -470,7 +470,7 @@ namespace
             try {
             }
             catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
                 res.result(http::status::bad_request);
                 res.body() = json{
                     {"irods_response", {
@@ -480,7 +480,7 @@ namespace
                 }.dump();
             }
             catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
                 res.result(http::status::internal_server_error);
             }
 
@@ -491,7 +491,7 @@ namespace
 #else
 		(void) _req;
 		(void) _args;
-		log::error("{}: Operation not implemented.", __func__);
+		logging::error("{}: Operation not implemented.", __func__);
 		return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
 	} // op_remove_user_auth
@@ -507,7 +507,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -517,7 +517,7 @@ namespace
 				try {
 					const auto name_iter = _args.find("name");
 					if (name_iter == std::end(_args)) {
-						log::error("{}: Missing [name] parameter.", fn);
+						logging::error("{}: Missing [name] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -533,7 +533,7 @@ namespace
 					// clang-format on
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -544,7 +544,7 @@ namespace
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -565,7 +565,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -575,7 +575,7 @@ namespace
 				try {
 					const auto name_iter = _args.find("name");
 					if (name_iter == std::end(_args)) {
-						log::error("{}: Missing [name] parameter.", fn);
+						logging::error("{}: Missing [name] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -591,7 +591,7 @@ namespace
 					// clang-format on
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					// clang-format off
 					res.body() = json{
 						{"irods_response", {
@@ -602,7 +602,7 @@ namespace
 					// clang-format on
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -623,7 +623,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -633,19 +633,19 @@ namespace
 				try {
 					const auto user_iter = _args.find("user");
 					if (user_iter == std::end(_args)) {
-						log::error("{}: Missing [user] parameter.", fn);
+						logging::error("{}: Missing [user] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto zone_iter = _args.find("zone");
 					if (zone_iter == std::end(_args)) {
-						log::error("{}: Missing [zone] parameter.", fn);
+						logging::error("{}: Missing [zone] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto group_iter = _args.find("group");
 					if (group_iter == std::end(_args)) {
-						log::error("{}: Missing [group] parameter.", fn);
+						logging::error("{}: Missing [group] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -660,13 +660,13 @@ namespace
 						 }}}.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -687,7 +687,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -697,19 +697,19 @@ namespace
 				try {
 					const auto user_iter = _args.find("user");
 					if (user_iter == std::end(_args)) {
-						log::error("{}: Missing [user] parameter.", fn);
+						logging::error("{}: Missing [user] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto zone_iter = _args.find("zone");
 					if (zone_iter == std::end(_args)) {
-						log::error("{}: Missing [zone] parameter.", fn);
+						logging::error("{}: Missing [zone] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto group_iter = _args.find("group");
 					if (group_iter == std::end(_args)) {
-						log::error("{}: Missing [group] parameter.", fn);
+						logging::error("{}: Missing [group] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -724,13 +724,13 @@ namespace
 						 }}}.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -751,7 +751,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -772,13 +772,13 @@ namespace
 					res.body() = json{{"irods_response", {{"status_code", 0}}}, {"users", v}}.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -799,7 +799,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -820,13 +820,13 @@ namespace
 					res.body() = json{{"irods_response", {{"status_code", 0}}}, {"groups", v}}.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -847,7 +847,7 @@ namespace
         const auto client_info = result.client_info;
 
         irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            log::info("{}: client_info.username = [{}]", fn, client_info.username);
+            logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
             http::response<http::string_body> res{http::status::ok, _req.version()};
             res.set(http::field::server, irods::http::version::server_name);
@@ -857,7 +857,7 @@ namespace
             try {
             }
             catch (const irods::exception& e) {
-				log::error("{}: {}", fn, e.client_display_what());
+				logging::error("{}: {}", fn, e.client_display_what());
                 res.result(http::status::bad_request);
                 res.body() = json{
                     {"irods_response", {
@@ -867,7 +867,7 @@ namespace
                 }.dump();
             }
             catch (const std::exception& e) {
-				log::error("{}: {}", fn, e.what());
+				logging::error("{}: {}", fn, e.what());
                 res.result(http::status::internal_server_error);
             }
 
@@ -878,7 +878,7 @@ namespace
 #else
 		(void) _req;
 		(void) _args;
-		log::error("{}: Operation not implemented.", __func__);
+		logging::error("{}: Operation not implemented.", __func__);
 		return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
 #endif
 	} // op_members
@@ -894,7 +894,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -904,19 +904,19 @@ namespace
 				try {
 					const auto group_iter = _args.find("group");
 					if (group_iter == std::end(_args)) {
-						log::error("{}: Missing [group] parameter.", fn);
+						logging::error("{}: Missing [group] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto user_iter = _args.find("user");
 					if (user_iter == std::end(_args)) {
-						log::error("{}: Missing [user] parameter.", fn);
+						logging::error("{}: Missing [user] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
 					const auto zone_iter = _args.find("zone");
 					if (zone_iter == std::end(_args)) {
-						log::error("{}: Missing [zone] parameter.", fn);
+						logging::error("{}: Missing [zone] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -932,13 +932,13 @@ namespace
 							.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 
@@ -959,7 +959,7 @@ namespace
 
 		irods::http::globals::background_task(
 			[fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-				log::info("{}: client_info.username = [{}]", fn, client_info.username);
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
 				http::response<http::string_body> res{http::status::ok, _req.version()};
 				res.set(http::field::server, irods::http::version::server_name);
@@ -969,7 +969,7 @@ namespace
 				try {
 					const auto name_iter = _args.find("name");
 					if (name_iter == std::end(_args)) {
-						log::error("{}: Missing [name] parameter.", fn);
+						logging::error("{}: Missing [name] parameter.", fn);
 						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 					}
 
@@ -1021,13 +1021,13 @@ namespace
 					res.body() = info.dump();
 				}
 				catch (const irods::exception& e) {
-					log::error("{}: {}", fn, e.client_display_what());
+					logging::error("{}: {}", fn, e.client_display_what());
 					res.body() = json{{"irods_response",
 				                       {{"status_code", e.code()}, {"status_message", e.client_display_what()}}}}
 				                     .dump();
 				}
 				catch (const std::exception& e) {
-					log::error("{}: {}", fn, e.what());
+					logging::error("{}: {}", fn, e.what());
 					res.result(http::status::internal_server_error);
 				}
 

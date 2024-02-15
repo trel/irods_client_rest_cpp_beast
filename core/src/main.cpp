@@ -70,10 +70,10 @@ extern "C" const char* __asan_default_options()
 #endif
 
 // clang-format off
-namespace beast = boost::beast; // from <boost/beast.hpp>
-namespace net   = boost::asio;  // from <boost/asio.hpp>
-namespace po    = boost::program_options;
-namespace log   = irods::http::log;
+namespace beast   = boost::beast; // from <boost/beast.hpp>
+namespace net     = boost::asio;  // from <boost/asio.hpp>
+namespace po      = boost::program_options;
+namespace logging = irods::http::log;
 
 using json = nlohmann::json;
 using tcp  = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
@@ -659,7 +659,7 @@ auto set_log_level(const json& _config) -> void
 	else if (lvl_string == "warn")     { lvl_enum = spdlog::level::warn; }
 	else if (lvl_string == "error")    { lvl_enum = spdlog::level::err; }
 	else if (lvl_string == "critical") { lvl_enum = spdlog::level::critical; }
-	else                               { log::warn("Invalid log_level. Setting to [info]."); }
+	else                               { logging::warn("Invalid log_level. Setting to [info]."); }
 	// clang-format on
 
 	spdlog::set_level(lvl_enum);
@@ -679,7 +679,7 @@ auto init_tls(const json& _config) -> void
 
 		if (!v.empty()) {
 			const auto env_var_upper = boost::to_upper_copy<std::string>(_env_var);
-			log::trace("Setting environment variable [{}] to [{}].", env_var_upper, v);
+			logging::trace("Setting environment variable [{}] to [{}].", env_var_upper, v);
 			setenv(env_var_upper.c_str(), v.c_str(), 1); // NOLINT(concurrency-mt-unsafe)
 		}
 	};
@@ -689,7 +689,7 @@ auto init_tls(const json& _config) -> void
 		const auto v = _config.value(json::json_pointer{element_path}, _default_value);
 
 		const auto env_var_upper = boost::to_upper_copy<std::string>(_env_var);
-		log::trace("Setting environment variable [{}] to [{}].", env_var_upper, v);
+		logging::trace("Setting environment variable [{}] to [{}].", env_var_upper, v);
 		const auto v_str = std::to_string(v);
 		setenv(env_var_upper.c_str(), v_str.c_str(), 1); // NOLINT(concurrency-mt-unsafe)
 	};
@@ -760,7 +760,7 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 		const auto parsed_uri{boost::urls::parse_uri(provider)};
 
 		if (parsed_uri.has_error()) {
-			log::error("Error trying to parse provider_url [{}]. Please check configuration.", provider);
+			logging::error("Error trying to parse provider_url [{}]. Please check configuration.", provider);
 			return false;
 		}
 
@@ -788,14 +788,14 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 		auto res{tcp_stream->communicate(req)};
 
 		// TODO: Check resposnse code...
-		log::debug("Got the following back: {}", res.body());
+		logging::debug("Got the following back: {}", res.body());
 
 		// Convert http json response to nlomman json response
 		_endpoint_config = json::parse(res.body());
 		irods::http::globals::set_oidc_endpoint_configuration(_endpoint_config);
 	}
 	catch (const json::out_of_range& e) {
-		log::trace("Invalid OIDC configuration, ignoring. Reason: {}", e.what());
+		logging::trace("Invalid OIDC configuration, ignoring. Reason: {}", e.what());
 		return false;
 	}
 
@@ -824,7 +824,7 @@ class process_stash_eviction_manager
 				return;
 			}
 
-			log::trace("Evicting expired items...");
+			logging::trace("Evicting expired items...");
 			irods::http::process_stash::erase_if([](const auto& _k, const auto& _v) {
 				// Check for client bearer token
 				const auto* client_info{boost::any_cast<const irods::http::authenticated_client_info>(&_v)};
@@ -838,10 +838,10 @@ class process_stash_eviction_manager
 				const auto erase_value{erase_token || erase_state};
 
 				if (erase_token) {
-					log::debug("Evicted bearer token [{}].", _k);
+					logging::debug("Evicted bearer token [{}].", _k);
 				}
 				else if (erase_state) {
-					log::debug("Evicted state [{}].", _k);
+					logging::debug("Evicted state [{}].", _k);
 				}
 
 				return erase_value;
@@ -915,10 +915,10 @@ auto main(int _argc, char* _argv[]) -> int
 		set_log_level(http_server_config);
 		spdlog::set_pattern("[%Y-%m-%d %T.%e] [P:%P] [%^%l%$] [T:%t] %v");
 
-		log::info("Initializing server.");
+		logging::info("Initializing server.");
 
 		// Confirm OIDC endpoint is valid (Assume all provide endpoint)
-		log::trace("Verifying OIDC endpoint configuration");
+		logging::trace("Verifying OIDC endpoint configuration");
 
 		// JSON configs needs to be in main scope to last the entire duration of the program
 		nlohmann::json oi_config;
@@ -927,12 +927,12 @@ auto main(int _argc, char* _argv[]) -> int
 		// Check if OIDC config exists, skip setup if missing.
 		if (http_server_config.contains(json::json_pointer{"/authentication/openid_connect"})) {
 			if (!load_oidc_configuration(http_server_config, oi_config, endpoint_config)) {
-				log::error("Invalid OIDC configuration, server not starting.");
+				logging::error("Invalid OIDC configuration, server not starting.");
 				return 1;
 			}
 		}
 		else {
-			log::info("No OIDC configuration detected, running without OIDC features.");
+			logging::info("No OIDC configuration detected, running without OIDC features.");
 		}
 		// TODO For LONG running tasks, see the following:
 		//
@@ -940,7 +940,7 @@ auto main(int _argc, char* _argv[]) -> int
 		//   - https://www.open-std.org/JTC1/SC22/WG21/docs/papers/2012/n3388.pdf
 		//
 
-		log::trace("Loading API plugins.");
+		logging::trace("Loading API plugins.");
 		load_client_api_plugins();
 
 		const auto address = net::ip::make_address(http_server_config.at("host").get_ref<const std::string&>());
@@ -948,29 +948,29 @@ auto main(int _argc, char* _argv[]) -> int
 		const auto request_thread_count =
 			std::max(http_server_config.at(json::json_pointer{"/requests/threads"}).get<int>(), 1);
 
-		log::trace("Initializing TLS.");
+		logging::trace("Initializing TLS.");
 		init_tls(config);
 
 		std::unique_ptr<irods::connection_pool> conn_pool;
 
 		if (!config.at(json::json_pointer{"/irods_client/enable_4_2_compatibility"}).get<bool>()) {
-			log::trace("Initializing iRODS connection pool.");
+			logging::trace("Initializing iRODS connection pool.");
 			conn_pool = init_irods_connection_pool(config);
 			irods::http::globals::set_connection_pool(*conn_pool);
 		}
 
 		// The io_context is required for all I/O.
-		log::trace("Initializing HTTP components.");
+		logging::trace("Initializing HTTP components.");
 		net::io_context ioc{request_thread_count};
 		irods::http::globals::set_request_handler_io_context(ioc);
 
 		// Create and launch a listening port.
-		log::trace("Initializing listening socket (host=[{}], port=[{}]).", address.to_string(), port);
+		logging::trace("Initializing listening socket (host=[{}], port=[{}]).", address.to_string(), port);
 		std::make_shared<listener>(ioc, tcp::endpoint{address, port}, config)->run();
 
 		// SIGINT and SIGTERM instruct the server to shut down.
 		// Ignore SIGPIPE. The iRODS networking code assumes SIGPIPE is ignored or caught.
-		log::trace("Initializing signal handlers.");
+		logging::trace("Initializing signal handlers.");
 		net::signal_set signals{ioc, SIGINT, SIGTERM, SIGPIPE};
 
 		const std::function<void(const beast::error_code&, int)> process_signals =
@@ -982,7 +982,7 @@ auto main(int _argc, char* _argv[]) -> int
 
 				// Stop the io_context. This will cause run() to return immediately, eventually destroying
 			    // the io_context and all of the sockets in it.
-				log::warn("Received signal [{}]. Shutting down.", _signal);
+				logging::warn("Received signal [{}]. Shutting down.", _signal);
 				ioc.stop();
 			};
 
@@ -990,13 +990,13 @@ auto main(int _argc, char* _argv[]) -> int
 
 		// Launch the requested number of dedicated backgroup I/O threads.
 		// These threads are used for long running tasks (e.g. reading/writing bytes, database, etc.)
-		log::trace("Initializing thread pool for long running I/O tasks.");
+		logging::trace("Initializing thread pool for long running I/O tasks.");
 		net::thread_pool io_threads(
 			std::max(http_server_config.at(json::json_pointer{"/background_io/threads"}).get<int>(), 1));
 		irods::http::globals::set_background_thread_pool(io_threads);
 
 		// Run the I/O service on the requested number of threads.
-		log::trace("Initializing thread pool for HTTP requests.");
+		logging::trace("Initializing thread pool for HTTP requests.");
 		net::thread_pool request_handler_threads(request_thread_count);
 		for (auto i = request_thread_count - 1; i > 0; --i) {
 			net::post(request_handler_threads, [&ioc] { ioc.run(); });
@@ -1007,19 +1007,19 @@ auto main(int _argc, char* _argv[]) -> int
 			http_server_config.at(json::json_pointer{"/authentication/eviction_check_interval_in_seconds"}).get<int>();
 		process_stash_eviction_manager eviction_mgr{ioc, std::chrono::seconds{eviction_check_interval}};
 
-		log::info("Server is ready.");
+		logging::info("Server is ready.");
 		ioc.run();
 
 		request_handler_threads.stop();
 		io_threads.stop();
 
-		log::trace("Waiting for HTTP requests thread pool to shut down.");
+		logging::trace("Waiting for HTTP requests thread pool to shut down.");
 		request_handler_threads.join();
 
-		log::trace("Waiting for I/O thread pool to shut down.");
+		logging::trace("Waiting for I/O thread pool to shut down.");
 		io_threads.join();
 
-		log::info("Shutdown complete.");
+		logging::info("Shutdown complete.");
 
 		return 0;
 	}
