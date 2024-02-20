@@ -23,6 +23,7 @@ target_link_libraries(
   irods_http_api_core
   PUBLIC
   fmt::fmt
+  spdlog::spdlog_header_only
   PRIVATE
   irods_client
   "${IRODS_EXTERNALS_FULLPATH_BOOST}/lib/libboost_filesystem.so"
@@ -51,7 +52,6 @@ target_include_directories(
   "${CMAKE_CURRENT_BINARY_DIR}/include"
   "${IRODS_HTTP_PROJECT_SOURCE_DIR}/endpoints/shared/include"
   "${IRODS_EXTERNALS_FULLPATH_BOOST}/include"
-  "${IRODS_EXTERNALS_FULLPATH_SPDLOG}/include"
 )
 
 set_target_properties(irods_http_api_core PROPERTIES EXCLUDE_FROM_ALL TRUE)
