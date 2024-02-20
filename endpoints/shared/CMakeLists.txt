@@ -26,7 +26,6 @@ target_include_directories(
   "${IRODS_HTTP_PROJECT_SOURCE_DIR}/core/include"
   "${IRODS_HTTP_PROJECT_BINARY_DIR}/core/include"
   "${IRODS_EXTERNALS_FULLPATH_BOOST}/include"
-  "${IRODS_EXTERNALS_FULLPATH_FMT}/include"
   "${IRODS_EXTERNALS_FULLPATH_SPDLOG}/include"
 )
 
