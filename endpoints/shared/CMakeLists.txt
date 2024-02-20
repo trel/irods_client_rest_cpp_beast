@@ -26,7 +26,6 @@ target_include_directories(
   "${IRODS_HTTP_PROJECT_SOURCE_DIR}/core/include"
   "${IRODS_HTTP_PROJECT_BINARY_DIR}/core/include"
   "${IRODS_EXTERNALS_FULLPATH_BOOST}/include"
-  "${IRODS_EXTERNALS_FULLPATH_SPDLOG}/include"
 )
 
 set_target_properties(irods_http_api_shared_operations PROPERTIES EXCLUDE_FROM_ALL TRUE)
