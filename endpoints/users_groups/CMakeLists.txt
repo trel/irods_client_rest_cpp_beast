@@ -13,6 +13,8 @@ target_compile_definitions(
 
 target_link_libraries(
   irods_http_api_endpoint_users_groups
+  PUBLIC
+  fmt::fmt
   PRIVATE
   irods_client
   CURL::libcurl
@@ -26,7 +28,6 @@ target_include_directories(
   "${IRODS_HTTP_PROJECT_BINARY_DIR}/core/include"
   "${IRODS_HTTP_PROJECT_SOURCE_DIR}/endpoints/shared/include"
   "${IRODS_EXTERNALS_FULLPATH_BOOST}/include"
-  "${IRODS_EXTERNALS_FULLPATH_FMT}/include"
   "${IRODS_EXTERNALS_FULLPATH_SPDLOG}/include"
 )
 

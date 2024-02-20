@@ -21,12 +21,13 @@ add_library(
 
 target_link_libraries(
   irods_http_api_core
+  PUBLIC
+  fmt::fmt
   PRIVATE
   irods_client
   "${IRODS_EXTERNALS_FULLPATH_BOOST}/lib/libboost_filesystem.so"
   "${IRODS_EXTERNALS_FULLPATH_BOOST}/lib/libboost_program_options.so"
   "${IRODS_EXTERNALS_FULLPATH_BOOST}/lib/libboost_url.so"
-  "${IRODS_EXTERNALS_FULLPATH_FMT}/lib/libfmt.so"
   CURL::libcurl
 )
 
@@ -50,7 +51,6 @@ target_include_directories(
   "${CMAKE_CURRENT_BINARY_DIR}/include"
   "${IRODS_HTTP_PROJECT_SOURCE_DIR}/endpoints/shared/include"
   "${IRODS_EXTERNALS_FULLPATH_BOOST}/include"
-  "${IRODS_EXTERNALS_FULLPATH_FMT}/include"
   "${IRODS_EXTERNALS_FULLPATH_SPDLOG}/include"
 )
 

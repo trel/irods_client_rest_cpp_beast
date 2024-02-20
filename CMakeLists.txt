@@ -90,6 +90,8 @@ set(IRODS_HTTP_PROJECT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
 find_package(CURL REQUIRED)
 find_package(nlohmann_json "3.6.1" REQUIRED)
+find_package(fmt "8.1.1"
+  HINTS "${IRODS_EXTERNALS_FULLPATH_FMT}")
 find_package(OpenSSL REQUIRED COMPONENTS Crypto SSL)
 
 # jwt library to handle OIDC JWT responses containing user information
