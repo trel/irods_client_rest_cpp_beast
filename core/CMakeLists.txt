@@ -56,7 +56,7 @@ if (${IRODS_VERSION} VERSION_GREATER "4.3.1")
     irods_http_api_core
     PUBLIC
     fmt::fmt
-    spdlog::spdlog_header_only
+    spdlog::spdlog
   )
 else()
   target_link_libraries(
