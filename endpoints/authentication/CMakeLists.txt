@@ -13,8 +13,6 @@ target_compile_definitions(
 
 target_link_libraries(
   irods_http_api_endpoint_authentication
-  PUBLIC
-  fmt::fmt
   PRIVATE
   irods_client
   CURL::libcurl
@@ -30,5 +28,20 @@ target_include_directories(
   "${IRODS_HTTP_PROJECT_SOURCE_DIR}/endpoints/shared/include"
   "${IRODS_EXTERNALS_FULLPATH_BOOST}/include"
 )
+
+if (${IRODS_VERSION} VERSION_GREATER "4.3.1")
+  target_link_libraries(
+    irods_http_api_endpoint_authentication
+    PUBLIC
+    fmt::fmt
+  )
+else()
+  target_include_directories(
+    irods_http_api_endpoint_authentication
+    PRIVATE
+    "${IRODS_EXTERNALS_FULLPATH_FMT}/include"
+    "${IRODS_EXTERNALS_FULLPATH_SPDLOG}/include"
+  )
+endif()
 
 set_target_properties(irods_http_api_endpoint_authentication PROPERTIES EXCLUDE_FROM_ALL TRUE)
