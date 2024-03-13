@@ -23,6 +23,7 @@ set(CMAKE_CXX_STANDARD ${IRODS_CXX_STANDARD})
 set(CMAKE_CXX_EXTENSIONS OFF)
 # export-dynamic so stacktrace entries from executables have function names.
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-Wl,--export-dynamic -Wl,--enable-new-dtags -Wl,--as-needed")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE_INIT "-Wl,--gc-sections -Wl,-z,combreloc")
 include(IrodsRunpathDefaults)
 
 project(${IRODS_HTTP_API_BINARY_NAME} VERSION "${IRODS_HTTP_API_VERSION}" LANGUAGES CXX)
