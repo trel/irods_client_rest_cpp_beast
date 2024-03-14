@@ -46,10 +46,19 @@ namespace beast = boost::beast; // from <boost/beast.hpp>
 namespace net   = boost::asio;  // from <boost/asio.hpp>
 // clang-format on
 
-using body_arguments = std::unordered_map<std::string, std::string>;
-
 namespace irods::http::handler
 {
+	auto remove_client_from_body_if_confidential_client(body_arguments _body) -> body_arguments
+	{
+		const static bool has_client_secret{irods::http::globals::oidc_configuration().contains("client_secret")};
+
+		if (has_client_secret) {
+			_body.erase("client_id");
+		}
+
+		return _body;
+	}
+
 	auto hit_token_endpoint(std::string _encoded_body) -> nlohmann::json
 	{
 		const auto token_endpoint{
@@ -68,22 +77,15 @@ namespace irods::http::handler
 
 		const auto url{*parsed_uri};
 		const auto port{irods::http::get_port_from_url(url)};
+		auto req{irods::http::create_oidc_request(url)};
 
-		// TCP thing
-		auto tcp_stream{irods::http::transport_factory(url.scheme_id(), io_ctx)};
-		tcp_stream->connect(url.host(), *port);
-
-		// Build Request
-		constexpr auto version_number{11};
-		beast::http::request<beast::http::string_body> req{beast::http::verb::post, url.path(), version_number};
-		req.set(beast::http::field::host, url.host());
-		req.set(beast::http::field::user_agent, irods::http::version::server_name);
-		req.set(beast::http::field::content_type,
-		        "application/x-www-form-urlencoded"); // Possibly set a diff way?
-
-		// Send
+		// Attach body to request
 		req.body() = std::move(_encoded_body);
 		req.prepare_payload();
+
+		// Connect to remote
+		auto tcp_stream{irods::http::transport_factory(url.scheme_id(), io_ctx)};
+		tcp_stream->connect(url.host(), *port);
 
 		// Send request and Read back response
 		auto res{tcp_stream->communicate(req)};
@@ -91,20 +93,6 @@ namespace irods::http::handler
 
 		// JSONize response
 		return nlohmann::json::parse(res.body());
-	}
-
-	auto encode_body(const body_arguments& _args) -> std::string
-	{
-		auto encode_pair{[](const body_arguments::value_type& i) {
-			return fmt::format("{}={}", irods::http::encode(i.first), irods::http::encode(i.second));
-		}};
-
-		return std::transform_reduce(
-			std::next(std::cbegin(_args)),
-			std::cend(_args),
-			encode_pair(*std::cbegin(_args)),
-			[](const auto& a, const auto& b) { return fmt::format("{}&{}", a, b); },
-			encode_pair);
 	}
 
 	auto is_error_response(const nlohmann::json& _response_to_check) -> bool
@@ -163,13 +151,24 @@ namespace irods::http::handler
 		return {std::move(username), std::move(password)};
 	}
 
+	auto is_oidc_running_as_client() -> bool
+	{
+		static const auto oidc_stanza_exists = irods::http::globals::configuration().contains(
+			nlohmann::json::json_pointer{"/http_server/authentication/openid_connect"});
+
+		if (oidc_stanza_exists) {
+			static const auto is_client{
+				irods::http::globals::oidc_configuration().at("mode").get_ref<const std::string&>() == "client"};
+			return is_client;
+		}
+
+		return false;
+	}
+
 	IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(authentication)
 	{
 		if (_req.method() == boost::beast::http::verb::get) {
-			static const auto oidc_stanza_exists = irods::http::globals::configuration().contains(
-				nlohmann::json::json_pointer{"/http_server/authentication/openid_connect"});
-
-			if (!oidc_stanza_exists) {
+			if (!is_oidc_running_as_client()) {
 				log::error("{}: HTTP GET method cannot be used for Basic authentication.", __func__);
 				return _sess_ptr->send(fail(status_type::method_not_allowed));
 			}
@@ -202,7 +201,7 @@ namespace irods::http::handler
 					const auto auth_endpoint{irods::http::globals::oidc_endpoint_configuration()
 					                             .at("authorization_endpoint")
 					                             .get_ref<const std::string&>()};
-					const auto encoded_url{fmt::format("{}?{}", auth_endpoint, encode_body(args))};
+					const auto encoded_url{fmt::format("{}?{}", auth_endpoint, irods::http::url_encode_body(args))};
 
 					log::debug("{}: Proper redirect to [{}]", fn, encoded_url);
 
@@ -314,7 +313,8 @@ namespace irods::http::handler
 					     irods::http::globals::oidc_configuration().at("redirect_uri").get_ref<const std::string&>()}};
 
 					// Encode the string, hit endpoint, get res
-					nlohmann::json oidc_response{hit_token_endpoint(encode_body(args))};
+					nlohmann::json oidc_response{hit_token_endpoint(
+						irods::http::url_encode_body(remove_client_from_body_if_confidential_client(args)))};
 
 					// Determine if we have an "error" json...
 					if (is_error_response(oidc_response)) {
@@ -329,11 +329,9 @@ namespace irods::http::handler
 					// TODO: Handle case where we throw!!!
 					auto decoded_token{jwt::decode<jwt::traits::nlohmann_json>(jwt_token).get_payload_json()};
 
-					// Verify 'irods_username' exists
-					const auto& irods_claim_name{irods::http::globals::oidc_configuration()
-					                                 .at("irods_user_claim")
-					                                 .get_ref<const std::string&>()};
-					if (!decoded_token.contains(irods_claim_name)) {
+					auto irods_username{irods::http::map_json_to_user(decoded_token)};
+
+					if (!irods_username) {
 						const auto user{
 							decoded_token.contains("preferred_username")
 								? decoded_token.at("preferred_username").get<const std::string>()
@@ -342,9 +340,6 @@ namespace irods::http::handler
 						log::error("{}: No irods user associated with authenticated user [{}].", fn, user);
 						return _sess_ptr->send(fail(status_type::bad_request));
 					}
-
-					// Get irods username
-					const std::string& irods_name{decoded_token.at(irods_claim_name).get_ref<const std::string&>()};
 
 					// Issue token?
 					static const auto seconds =
@@ -355,7 +350,7 @@ namespace irods::http::handler
 
 					auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
 						.auth_scheme = authorization_scheme::openid_connect,
-						.username = std::move(irods_name),
+						.username = *std::move(irods_username),
 						.expires_at = std::chrono::steady_clock::now() + std::chrono::seconds{seconds}});
 
 					response_type res_rep{status_type::ok, _req.version()};
@@ -523,7 +518,9 @@ namespace irods::http::handler
 					return _sess_ptr->send(std::move(res));
 				}
 				// OAuth 2.0 Resource Owner Password Credentials Grant
-				else if (const auto alt_method{iter->value().find("iRODS ")}; alt_method != std::string_view::npos) {
+				else if (const auto alt_method{iter->value().find("iRODS ")};
+				         is_oidc_running_as_client() && alt_method != std::string_view::npos)
+				{
 					// Decode username and password here!!!!!
 					constexpr auto basic_auth_scheme_prefix_size = 6;
 					const auto [username, password]{
@@ -543,7 +540,8 @@ namespace irods::http::handler
 						{"password", password}};
 
 					// Query endpoint
-					nlohmann::json oidc_response{hit_token_endpoint(encode_body(args))};
+					nlohmann::json oidc_response{hit_token_endpoint(
+						irods::http::url_encode_body(remove_client_from_body_if_confidential_client(args)))};
 
 					// Determine if we have an "error" json...
 					if (is_error_response(oidc_response)) {
@@ -555,12 +553,9 @@ namespace irods::http::handler
 
 					// Feed to JWT parser
 					auto decoded_token{jwt::decode<jwt::traits::nlohmann_json>(jwt_token).get_payload_json()};
+					auto irods_username{irods::http::map_json_to_user(decoded_token)};
 
-					// Verify 'irods_username' exists
-					const auto& irods_claim_name{irods::http::globals::oidc_configuration()
-					                                 .at("irods_user_claim")
-					                                 .get_ref<const std::string&>()};
-					if (!decoded_token.contains(irods_claim_name)) {
+					if (!irods_username) {
 						const auto user{
 							decoded_token.contains("preferred_username")
 								? decoded_token.at("preferred_username").get<const std::string>()
@@ -570,9 +565,6 @@ namespace irods::http::handler
 						return _sess_ptr->send(fail(status_type::bad_request));
 					}
 
-					// Get irods username
-					const std::string& irods_name{decoded_token.at(irods_claim_name).get_ref<const std::string&>()};
-
 					// Issue token?
 					static const auto seconds =
 						irods::http::globals::configuration()
@@ -581,7 +573,7 @@ namespace irods::http::handler
 							.get<int>();
 					auto bearer_token = irods::http::process_stash::insert(authenticated_client_info{
 						.auth_scheme = authorization_scheme::openid_connect,
-						.username = std::move(irods_name),
+						.username = *std::move(irods_username),
 						.expires_at = std::chrono::steady_clock::now() + std::chrono::seconds{seconds}});
 
 					response_type res_rep{status_type::ok, _req.version()};

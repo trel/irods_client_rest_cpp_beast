@@ -5,8 +5,10 @@
 #include "irods/private/http_api/log.hpp"
 #include "irods/private/http_api/process_stash.hpp"
 #include "irods/private/http_api/session.hpp"
+#include "irods/private/http_api/transport.hpp"
 #include "irods/private/http_api/version.hpp"
 
+#include <irods/base64.hpp>
 #include <irods/client_connection.hpp>
 #include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
@@ -18,12 +20,21 @@
 #include <irods/ticketAdmin.h>
 
 #include <boost/any.hpp>
+#include <boost/asio.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/beast.hpp>
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+
 #include <string>
+#include <string_view>
+
+// clang-format off
+namespace beast = boost::beast; // from <boost/beast.hpp>
+namespace net   = boost::asio;  // from <boost/asio.hpp>
+// clang-format on
 
 namespace irods::http
 {
@@ -207,6 +218,159 @@ namespace irods::http
 		return parse_url(fmt::format("http://ignored{}", _req.target()));
 	} // parse_url
 
+	auto url_encode_body(const body_arguments& _args) -> std::string
+	{
+		auto encode_pair{[](const body_arguments::value_type& i) {
+			return fmt::format("{}={}", encode(i.first), encode(i.second));
+		}};
+
+		return std::transform_reduce(
+			std::next(std::cbegin(_args)),
+			std::cend(_args),
+			encode_pair(*std::cbegin(_args)),
+			[](const auto& a, const auto& b) { return fmt::format("{}&{}", a, b); },
+			encode_pair);
+	}
+
+	auto safe_base64_encode(std::string_view _view) -> std::string
+	{
+		namespace logging = irods::http::log;
+
+		constexpr auto char_per_byte_set{4};
+		constexpr auto byte_set_size{3};
+
+		const auto max_size{char_per_byte_set * ((_view.size() + 2) / byte_set_size)};
+		auto max_size_plus_null_term{max_size + 1};
+
+		std::string encoded_data;
+		encoded_data.resize(max_size);
+
+		auto res{irods::base64_encode(
+			reinterpret_cast<const unsigned char*>(_view.data()),
+			_view.size(),
+			reinterpret_cast<unsigned char*>(encoded_data.data()),
+			&max_size_plus_null_term)};
+		if (res) {
+			logging::error("{}: Failed to encode the string [{}], output may be unusable.", __func__, _view);
+		}
+		return encoded_data;
+	}
+
+	auto create_host_field(boost::urls::url_view _url, std::string_view _port) -> std::string
+	{
+		if ((_port == "443" && _url.scheme_id() == boost::urls::scheme::https) ||
+		    (_port == "80" && _url.scheme_id() == boost::urls::scheme::http))
+		{
+			return _url.host();
+		}
+		return fmt::format("{}:{}", _url.host(), _port);
+	}
+
+	auto create_oidc_request(boost::urls::url_view _url) -> beast::http::request<beast::http::string_body>
+	{
+		constexpr auto http_version_number{11};
+		beast::http::request<beast::http::string_body> req{beast::http::verb::post, _url.path(), http_version_number};
+
+		const auto port{get_port_from_url(_url)};
+
+		req.set(beast::http::field::host, create_host_field(_url, *port));
+		req.set(beast::http::field::user_agent, irods::http::version::server_name);
+		req.set(beast::http::field::content_type, "application/x-www-form-urlencoded");
+		req.set(beast::http::field::accept, "application/json");
+
+		if (const auto secret_key{irods::http::globals::oidc_configuration().find("client_secret")};
+		    secret_key != std::end(irods::http::globals::oidc_configuration()))
+		{
+			const auto format_bearer_token{[](std::string_view _client_id, std::string_view _client_secret) {
+				auto encode_me{fmt::format("{}:{}", encode(_client_id), encode(_client_secret))};
+				return safe_base64_encode(encode_me);
+			}};
+
+			const auto& client_id{
+				irods::http::globals::oidc_configuration().at("client_id").get_ref<const std::string&>()};
+			const auto& client_secret{secret_key->get_ref<const std::string&>()};
+			const auto auth_string{fmt::format("Basic {}", format_bearer_token(client_id, client_secret))};
+
+			req.set(beast::http::field::authorization, auth_string);
+		}
+
+		return req;
+	}
+
+	auto hit_introspection_endpoint(std::string _encoded_body) -> nlohmann::json
+	{
+		namespace logging = irods::http::log;
+
+		const auto introspection_endpoint{irods::http::globals::oidc_endpoint_configuration()
+		                                      .at("introspection_endpoint")
+		                                      .get_ref<const std::string&>()};
+
+		const auto parsed_uri{boost::urls::parse_uri(introspection_endpoint)};
+
+		if (parsed_uri.has_error()) {
+			logging::error(
+				"{}: Error trying to parse introspection_endpoint [{}]. Please check configuration.",
+				__func__,
+				introspection_endpoint);
+			return {{"error", "bad endpoint"}};
+		}
+
+		const auto url{*parsed_uri};
+		const auto port{get_port_from_url(url)};
+
+		// Addr
+		net::io_context io_ctx;
+		auto tcp_stream{irods::http::transport_factory(url.scheme_id(), io_ctx)};
+		tcp_stream->connect(url.host(), *port);
+
+		// Build Request
+		auto req{create_oidc_request(url)};
+		req.body() = std::move(_encoded_body);
+		req.prepare_payload();
+
+		// Send request & receive response
+		auto res{tcp_stream->communicate(req)};
+
+		logging::debug("{}: Received the following response: [{}]", __func__, res.body());
+
+		// JSONize response
+		return nlohmann::json::parse(res.body());
+	}
+
+	auto map_json_to_user(const nlohmann::json& _json) -> std::optional<std::string>
+	{
+		const auto& oidc_config{irods::http::globals::oidc_configuration()};
+		const static auto user_claim{oidc_config.find("irods_user_claim")};
+		const static auto attribute_mapping{oidc_config.find("user_attribute_mapping")};
+
+		if (user_claim != std::end(oidc_config)) {
+			if (auto claim{_json.find(user_claim->get_ref<const std::string&>())}; claim != std::end(_json)) {
+				return {*claim};
+			}
+		}
+		else if (attribute_mapping != std::end(oidc_config)) {
+			const auto& mappings{*attribute_mapping};
+
+			for (auto& [key, value] : mappings.items()) {
+				const auto comparison_func{[&_json](const auto& _iter) -> bool {
+					const auto value_of_interest{_json.find(_iter.key())};
+					if (value_of_interest == std::end(_json)) {
+						return false;
+					}
+
+					return *value_of_interest == _iter.value();
+				}};
+
+				if (auto proxy_iter{value.items()};
+				    std::all_of(std::begin(proxy_iter), std::end(proxy_iter), comparison_func)) {
+					return key;
+				}
+			}
+		}
+
+		return std::nullopt;
+	}
+
 	auto resolve_client_identity(const request_type& _req) -> client_identity_resolution_result
 	{
 		namespace logging = irods::http::log;
@@ -237,6 +401,29 @@ namespace irods::http
 		// Verify the bearer token is known to the server. If not, return an error.
 		auto mapped_value{irods::http::process_stash::find(bearer_token)};
 		if (!mapped_value.has_value()) {
+			// If we're running as a protected resource, assume we have a OIDC token
+			if (irods::http::globals::oidc_configuration().at("mode").get_ref<const std::string&>() ==
+			    "protected_resource") {
+				body_arguments args{{"token", bearer_token}, {"token_type_hint", "access_token"}};
+
+				auto json_res{hit_introspection_endpoint(url_encode_body(args))};
+
+				// Validate access token
+				if (!json_res.at("active").get<bool>()) {
+					logging::warn("{}: Access token is invalid or expired.", __func__);
+					return {.response = fail(status_type::unauthorized)};
+				}
+
+				// Do mapping of user to irods user
+				auto user{map_json_to_user(json_res)};
+				if (user) {
+					return {.client_info = {.username = *std::move(user)}};
+				}
+
+				logging::warn("{}: Could not find a matching user.", __func__);
+				return {.response = fail(status_type::unauthorized)};
+			}
+
 			logging::error("{}: Could not find bearer token matching [{}].", __func__, bearer_token);
 			return {.response = fail(status_type::unauthorized)};
 		}
