@@ -16,6 +16,8 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <chrono>
 #include <memory>
 #include <optional>
@@ -44,6 +46,7 @@ namespace irods::http
 	using request_handler_map_type = std::unordered_map<std::string_view, request_handler_type>;
 
 	using query_arguments_type = std::unordered_map<std::string, std::string>;
+	using body_arguments = std::unordered_map<std::string, std::string>;
 
 	using handler_type = void (*)(session_pointer_type, request_type&, query_arguments_type&);
 	// clang-format on
@@ -154,6 +157,17 @@ namespace irods::http
 	auto parse_url(const std::string& _url) -> url;
 
 	auto parse_url(const request_type& _req) -> url;
+
+	auto url_encode_body(const body_arguments& _args) -> std::string;
+
+	auto safe_base64_encode(std::string_view _view) -> std::string;
+
+	auto create_host_field(boost::urls::url_view _url, std::string_view _port) -> std::string;
+
+	auto create_oidc_request(boost::urls::url_view _url)
+		-> boost::beast::http::request<boost::beast::http::string_body>;
+
+	auto map_json_to_user(const nlohmann::json& _json) -> std::optional<std::string>;
 
 	auto resolve_client_identity(const request_type& _req) -> client_identity_resolution_result;
 

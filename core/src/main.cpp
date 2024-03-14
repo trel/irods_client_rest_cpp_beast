@@ -239,29 +239,72 @@ constexpr auto default_jsonschema() -> std::string_view
                                     "minimum": 1
                                 }},
                                 "provider_url": {{
-                                    "type": "string"
+                                    "type": "string",
+                                    "format": "uri"
+                                }},
+                                "mode": {{
+                                    "enum": ["client", "protected_resource"]
                                 }},
                                 "client_id": {{
                                     "type": "string"
                                 }},
-                                "redirect_uri": {{
+                                "client_secret": {{
                                     "type": "string"
+                                }},
+                                "redirect_uri": {{
+                                    "type": "string",
+                                    "format": "uri"
                                 }},
                                 "irods_user_claim": {{
                                     "type": "string"
                                 }},
                                 "tls_certificates_directory": {{
                                     "type": "string"
+                                }},
+                                "user_attribute_mapping": {{
+                                    "type": "object",
+                                    "additionalProperties": {{
+                                        "type": "object"
+                                    }},
+                                    "minProperties": 1
                                 }}
                             }},
                             "required": [
                                 "timeout_in_seconds",
                                 "state_timeout_in_seconds",
                                 "provider_url",
+                                "mode",
                                 "client_id",
                                 "redirect_uri",
-                                "irods_user_claim",
                                 "tls_certificates_directory"
+                            ],
+                            "oneOf": [
+                                {{
+                                    "required": [
+                                        "irods_user_claim"
+                                    ]
+                                }},
+                                {{
+                                    "required": [
+                                        "user_attribute_mapping"
+                                    ]
+                                }}
+                            ],
+                            "anyOf": [
+                                {{
+                                    "not": {{
+                                        "properties": {{
+                                            "mode": {{
+                                                "const": "protected_resource"
+                                            }}
+                                        }}
+                                    }}
+                                }},
+                                {{
+                                    "required": [
+                                        "client_secret"
+                                    ]
+                                }}
                             ]
                         }}
                     }},
@@ -485,6 +528,8 @@ auto print_configuration_template() -> void
                 "state_timeout_in_seconds": 3600,
                 "provider_url": "<string>",
                 "client_id": "<string>",
+                "client_secret": "<string>",
+                "mode": "client",
                 "redirect_uri": "<string>",
                 "irods_user_claim": "<string>",
                 "tls_certificates_directory": "<string>"
@@ -779,9 +824,9 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 		tcp_stream->connect(url.host(), *port);
 
 		// Build Request
-		constexpr auto version_number{11};
-		beast::http::request<beast::http::string_body> req{beast::http::verb::get, path, version_number};
-		req.set(beast::http::field::host, fmt::format("{}:{}", url.host(), *port));
+		constexpr auto http_version_number{11};
+		beast::http::request<beast::http::string_body> req{beast::http::verb::get, path, http_version_number};
+		req.set(beast::http::field::host, irods::http::create_host_field(url, *port));
 		req.set(beast::http::field::user_agent, irods::http::version::server_name);
 
 		// Sends and recieves response
