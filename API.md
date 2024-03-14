@@ -30,12 +30,16 @@ Reauthentication can be performed at anytime and will result in a brand new toke
 
 ### Scheme: OpenID Connect (OIDC)
 
-For authenticating with OpenID Connect, there are two methods:
+For authenticating with OpenID Connect, there are three methods, two of which are run as clients:
 
-- Resource Owner Password Credentials Grant
-- Authorization Code Grant
+- Client-Based
+  - [Resource Owner Password Credentials Grant](#resource-owner-password-credentials-grant)
+  - [Authorization Code Grant](#authorization-code-grant)
+- [Protected Resource](#irods-as-an-oauth-protected-resource)
 
 #### Resource Owner Password Credentials Grant
+
+To run this client-based scheme, you must set `mode` in the `openid_connect` stanza to `client`.
 
 The core advantage of this grant is the flexibility in how it may be applied.
 
@@ -52,6 +56,8 @@ curl -X POST -H "Authorization: iRODS $username_and_password" \
 A string representing a bearer token that can be used to execute operations as the authenticated user.
 
 #### Authorization Code Grant
+
+To run this client-based scheme, you must set `mode` in the `openid_connect` stanza to `client`.
 
 Using this grant requires a bit more work to extract the token.
 Authentication is done in the browser.
@@ -83,6 +89,20 @@ This will open a browser window that will allow you to authenticate in.
 
 ##### Response
 The bearer token should be returned and viewable in the browser window after authenticating.
+
+#### iRODS as an OAuth Protected Resource
+To run as an OAuth protected resource, set `mode` in the `openid_connect` stanza to `protected_resource`.
+
+While running in this mode, the HTTP API does not provide any grants to which you can authenticate.
+Instead, you must implement an OAuth client yourself, authenticate, and provide an access token as a
+Bearer token when querying the HTTP API endpoints.
+
+In order for the access token to be accepted, two conditions must be met:
+1. The OpenID Provider recognizes the token as valid and active.
+2. The token must be able to be mapped to a user, using either `irods_user_claim` or `user_attribute_mapping`. 
+
+If these conditions are met, then the access token will be accepted, and the action will be carried out as the mapped
+user.
 
 ## Collection Operations
 

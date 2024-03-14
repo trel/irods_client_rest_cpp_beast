@@ -263,6 +263,16 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
                 // The client id given to the application by OIDC provider.
                 "client_id": "irods_http_api",
 
+                // The client secret used for accessing the introspection endpoint.
+                // Optional unless running as a protected resource.
+                "client_secret": "xxxxxxxxxxxxxxx",
+
+                // The OIDC mode the HTTP API will run as.
+                // The following values are supported:
+                // - client:              Run the HTTP API as an OIDC client
+                // - protected_resource:  Run as an OAuth Protected Resource
+                "mode": "client",
+
                 // URI pointing to the irods HTTP API auth endpoint.
                 "redirect_uri": "https://<domain>/irods-http-api/0.2.0/authenticate",
 
@@ -271,8 +281,19 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
                 "state_timeout_in_seconds": 600,
 
                 // The name of the OIDC claim which provides the mapping of an
-                // OIDC user to an iRODS user account
+                // OIDC user to an iRODS user account.
+                // "irods_user_claim" and "user_attribute_mapping" cannot be used together.
                 "irods_user_claim": "irods_username",
+
+                // The mapping of a user to the provided values. All values must
+                // be matched to map an OIDC user to an iRODS user account.
+                // "irods_user_claim" and "user_attribute_mapping" cannot be used together.
+                "user_attribute_mapping": {
+                    "irods_username": {
+                        "sub": "123-abc-456-xyz",
+                        "email": "rods_user@example.org"
+                    }
+                },
 
                 // The path to the TLS certificates directory.
                 // Used for HTTPS connections.
