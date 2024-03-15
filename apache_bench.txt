@@ -6,16 +6,16 @@
 #
 # "-p" instructs "ab" to send a post request. Normally, the file passed would contain URL encoded data, but
 # for this application, the endpoint doesn't accept any data other than the "Authorization" header.
-ab -A '<username>:<password>' -p <empty_file> -n <total_requests> -c <total_concurrent_requests> 'http://localhost:<port>/irods-http-api/0.2.0/authenticate'
+ab -A '<username>:<password>' -p <empty_file> -n <total_requests> -c <total_concurrent_requests> 'http://localhost:<port>/irods-http-api/<version>/authenticate'
 
 # To test other things, get a bearer token by running the following first.
-bearer_token=$(curl -s -X POST --user '<username>:<password>' 'http://localhost:<port>/irods-http-api/0.2.0/authenticate')
+bearer_token=$(curl -s -X POST --user '<username>:<password>' 'http://localhost:<port>/irods-http-api/<version>/authenticate')
 
 # Stat'ing a collection.
-ab -n <total_requests> -c <total_concurrent_requests> -H "Authorization: Bearer $bearer_token" 'http://localhost:<port>/irods-http-api/0.2.0/collections?op=stat&lpath=/tempZone/home/<username>'
+ab -n <total_requests> -c <total_concurrent_requests> -H "Authorization: Bearer $bearer_token" 'http://localhost:<port>/irods-http-api/<version>/collections?op=stat&lpath=/tempZone/home/<username>'
 
 # Stat'ing a resource.
-ab -n <total_requests> -c <total_concurrent_requests> -H "Authorization: Bearer $bearer_token" 'http://localhost:<port>/irods-http-api/0.2.0/resources?op=stat&name=demoResc'
+ab -n <total_requests> -c <total_concurrent_requests> -H "Authorization: Bearer $bearer_token" 'http://localhost:<port>/irods-http-api/<version>/resources?op=stat&name=demoResc'
 
 # Reading bytes in a data object.
-ab -n <total_requests> -c <total_concurrent_requests> -H "Authorization: Bearer $bearer_token" 'http://localhost:<port>/irods-http-api/0.2.0/data-objects?op=read&lpath=/tempZone/home/<username>/foo&count=8192'
+ab -n <total_requests> -c <total_concurrent_requests> -H "Authorization: Bearer $bearer_token" 'http://localhost:<port>/irods-http-api/<version>/data-objects?op=read&lpath=/tempZone/home/<username>/foo&count=8192'
