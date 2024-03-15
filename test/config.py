@@ -6,7 +6,7 @@ test_config = {
 
     'host': 'localhost',
     'port': 9000,
-    'url_base': '/irods-http-api/0.2.0',
+    'url_base': '/irods-http-api/0.3.0',
 
     'openid_connect': {
         'mode': 'client'
@@ -30,7 +30,7 @@ test_config = {
 
 schema = {
     '$schema': 'http://json-schema.org/draft-07/schema#',
-    '$id': 'https://schemas.irods.org/irods-http-api/test/0.2.0/test-schema.json',
+    '$id': 'https://schemas.irods.org/irods-http-api/test/0.3.0/test-schema.json',
     'type': 'object',
     'properties': {
         'host': {
