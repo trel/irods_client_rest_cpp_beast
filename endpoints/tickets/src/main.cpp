@@ -8,6 +8,7 @@
 
 #include <irods/irods_exception.hpp>
 #include <irods/rodsErrorTable.h>
+#include <irods/ticketAdmin.h>
 #include <irods/ticket_administration.hpp>
 
 #include <boost/algorithm/string.hpp>
@@ -17,6 +18,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <chrono>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -218,7 +220,7 @@ namespace
 				}
 
 				auto conn = irods::get_connection(client_info.username);
-				const auto ticket = adm::ticket::client::create_ticket(conn, ticket_type, lpath_iter->second);
+				auto ticket = adm::ticket::client::create_ticket(conn, ticket_type, lpath_iter->second);
 
 				auto constraint_iter = _args.find("use-count");
 				if (constraint_iter != std::end(_args)) {
@@ -252,8 +254,34 @@ namespace
 
 				constraint_iter = _args.find("seconds-until-expiration");
 				if (constraint_iter != std::end(_args)) {
-					// TODO Not yet supported by the ticket administration library.
-					logging::warn("{}: Ignoring [seconds-until-expiration]. Not implemented at this time.", fn);
+					// TODO(#283): This is similar to what the ticket administration library would provide.
+					const auto secs = std::stoll(constraint_iter->second);
+					if (secs <= 0) {
+						logging::error(
+							"{}: Invalid value for [seconds-until-expiration] parameter. Must be greater than 0.", fn);
+						return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
+					}
+
+					using std::chrono::seconds;
+					using std::chrono::system_clock;
+
+					const auto expiration_ts = system_clock::now() + seconds{secs};
+					auto seconds_since_epoch = std::to_string(system_clock::to_time_t(expiration_ts));
+
+					char mod[] = "mod"; // NOLINT(cppcoreguidelines-avoid-c-arrays, modernize-avoid-c-arrays)
+					char expire[] = "expire"; // NOLINT(cppcoreguidelines-avoid-c-arrays, modernize-avoid-c-arrays)
+					char empty[] = ""; // NOLINT(cppcoreguidelines-avoid-c-arrays, modernize-avoid-c-arrays)
+
+					TicketAdminInput input{};
+					input.arg1 = mod;
+					input.arg2 = ticket.data();
+					input.arg3 = expire;
+					input.arg4 = seconds_since_epoch.data();
+					input.arg5 = empty;
+
+					if (const auto ec = rcTicketAdmin(static_cast<RcComm*>(conn), &input); ec < 0) {
+						THROW(ec, "Ticket operation failed");
+					}
 				}
 
 				constraint_iter = _args.find("users");
