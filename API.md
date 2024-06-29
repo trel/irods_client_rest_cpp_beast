@@ -1255,6 +1255,63 @@ curl http://localhost:<port>/irods-http-api/<version>/query \
 }
 ```
 
+### add_specific_query
+
+Adds a SpecificQuery to the iRODS zone.
+
+This operation requires rodsadmin level privileges.
+
+#### Request
+
+```bash
+curl http://localhost:<port>/irods-http-api/<version>/query \
+    -H 'Authorization: Bearer <token>' \
+    --data-urlencode 'op=add_specific_query' \
+    --data-urlencode 'name=<string>' \ # The name of the SpecificQuery.
+    --data-urlencode 'sql=<string>' # The SQL attached to the SpecificQuery.
+```
+
+#### Response
+
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
+
+```js
+{
+    "irods_response": {
+        "status_code": 0
+        "status_message": "string" // Optional
+    }
+}
+```
+
+### remove_specific_query
+
+Removes a SpecificQuery from the iRODS zone.
+
+This operation requires rodsadmin level privileges.
+
+#### Request
+
+```bash
+curl http://localhost:<port>/irods-http-api/<version>/query \
+    -H 'Authorization: Bearer <token>' \
+    --data-urlencode 'op=remove_specific_query' \
+    --data-urlencode 'name=<string>' # The name of the SpecificQuery.
+```
+
+#### Response
+
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
+
+```js
+{
+    "irods_response": {
+        "status_code": 0
+        "status_message": "string" // Optional
+    }
+}
+```
+
 ## Resource Operations
 
 ### create
