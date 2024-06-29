@@ -1374,6 +1374,49 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 
 If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
 
+### modify
+
+Modifies a single property of a resource.
+
+#### Request
+
+```bash
+curl http://localhost:<port>/irods-http-api/<version>/resources \
+    -H 'Authorization: Bearer <token>' \
+    --data-urlencode 'op=modify' \
+    --data-urlencode 'name=<string>' \ # Name of the resource.
+    --data-urlencode 'property=<string>' \ # Name of the property to modify.
+    --data-urlencode 'value=<string>' # The new value of the property.
+```
+
+The following properties are supported:
+- name
+- type
+- host
+- vault_path
+- context
+- status
+- free_space
+- comments
+- information
+
+For the `status` property, `value` must be set to `up` or `down`. Attempting to pass a value other the ones described will result in an HTTP error.
+
+#### Response
+
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
+
+```js
+{
+    "irods_response": {
+        "status_code": 0
+        "status_message": "string" // Optional
+    }
+}
+```
+
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
+
 ### add_child
 
 Creates a parent-child relationship between two resources.
