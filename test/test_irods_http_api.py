@@ -2778,11 +2778,13 @@ class test_tickets_endpoint(unittest.TestCase):
         # Create a ticket.
         ticket_type = 'read'
         ticket_use_count = 1000
+        ticket_seconds_until_expiration = 3600
         r = requests.post(self.url_endpoint, headers=headers, data={
             'op': 'create',
             'lpath': data_object,
             'type': ticket_type,
-            'use-count': ticket_use_count
+            'use-count': ticket_use_count,
+            'seconds-until-expiration': ticket_seconds_until_expiration
         })
         self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
@@ -2797,7 +2799,7 @@ class test_tickets_endpoint(unittest.TestCase):
         # for this.
         r = requests.get(f'{self.url_base}/query', headers=headers, params={
             'op': 'execute_genquery',
-            'query': 'select TICKET_STRING, TICKET_TYPE, TICKET_DATA_NAME, TICKET_USES_LIMIT'
+            'query': 'select TICKET_STRING, TICKET_TYPE, TICKET_DATA_NAME, TICKET_USES_LIMIT, TICKET_EXPIRY'
         })
         self.logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
@@ -2808,6 +2810,7 @@ class test_tickets_endpoint(unittest.TestCase):
         self.assertEqual(result['rows'][0][1], ticket_type)
         self.assertEqual(result['rows'][0][2], os.path.basename(data_object))
         self.assertEqual(result['rows'][0][3], str(ticket_use_count))
+        self.assertGreater(int(result['rows'][0][4]), 0)
 
         # Remove the ticket.
         r = requests.post(self.url_endpoint, headers=headers, data={'op': 'remove', 'name': ticket_string})
