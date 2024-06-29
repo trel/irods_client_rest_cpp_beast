@@ -6,6 +6,7 @@
 #include "irods/private/http_api/session.hpp"
 #include "irods/private/http_api/version.hpp"
 
+#include <irods/generalAdmin.h>
 #include <irods/irods_at_scope_exit.hpp>
 #include <irods/irods_exception.hpp>
 #include <irods/irods_query.hpp>
@@ -433,17 +434,122 @@ namespace
 
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_add_specific_query)
 	{
-		(void) _req;
-		(void) _args;
-		logging::error("{}: Operation not implemented.", __func__);
-		return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
+		auto result = irods::http::resolve_client_identity(_req);
+		if (result.response) {
+			return _sess_ptr->send(std::move(*result.response));
+		}
+
+		const auto client_info = result.client_info;
+
+		irods::http::globals::background_task(
+			[fn = __func__, _sess_ptr, client_info, _req = std::move(_req), _args = std::move(_args)] {
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
+
+				http::response<http::string_body> res{http::status::ok, _req.version()};
+				res.set(http::field::server, irods::http::version::server_name);
+				res.set(http::field::content_type, "application/json");
+				res.keep_alive(_req.keep_alive());
+
+				try {
+					const auto name_iter = _args.find("name");
+					if (name_iter == std::end(_args)) {
+						logging::error("{}: Missing [name] parameter.", fn);
+						return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+					}
+
+					const auto sql_iter = _args.find("sql");
+					if (name_iter == std::end(_args)) {
+						logging::error("{}: Missing [sql] parameter.", fn);
+						return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+					}
+
+					GeneralAdminInput input{};
+					input.arg0 = "add";
+					input.arg1 = "specificQuery";
+					input.arg2 = sql_iter->second.c_str();
+					input.arg3 = name_iter->second.c_str();
+
+					auto conn = irods::get_connection(client_info.username);
+					const auto ec = rcGeneralAdmin(static_cast<RcComm*>(conn), &input);
+
+					res.body() = json{{"irods_response", {{"status_code", ec}}}}.dump();
+				}
+				catch (const irods::exception& e) {
+					logging::error("{}: {}", fn, e.client_display_what());
+					// clang-format off
+					res.body() = json{
+						{"irods_response", {
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
+						}}
+					}.dump();
+					// clang-format on
+				}
+				catch (const std::exception& e) {
+					logging::error("{}: {}", fn, e.what());
+					res.result(http::status::internal_server_error);
+				}
+
+				res.prepare_payload();
+
+				return _sess_ptr->send(std::move(res));
+			});
 	} // op_add_specific_query
 
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_remove_specific_query)
 	{
-		(void) _req;
-		(void) _args;
-		logging::error("{}: Operation not implemented.", __func__);
-		return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
+		auto result = irods::http::resolve_client_identity(_req);
+		if (result.response) {
+			return _sess_ptr->send(std::move(*result.response));
+		}
+
+		const auto client_info = result.client_info;
+
+		irods::http::globals::background_task(
+			[fn = __func__, _sess_ptr, client_info, _req = std::move(_req), _args = std::move(_args)] {
+				logging::info("{}: client_info.username = [{}]", fn, client_info.username);
+
+				http::response<http::string_body> res{http::status::ok, _req.version()};
+				res.set(http::field::server, irods::http::version::server_name);
+				res.set(http::field::content_type, "application/json");
+				res.keep_alive(_req.keep_alive());
+
+				try {
+					const auto name_iter = _args.find("name");
+					if (name_iter == std::end(_args)) {
+						logging::error("{}: Missing [name] parameter.", fn);
+						return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+					}
+
+					GeneralAdminInput input{};
+					input.arg0 = "rm";
+					input.arg1 = "specificQuery";
+					input.arg2 = name_iter->second.c_str();
+
+					auto conn = irods::get_connection(client_info.username);
+					const auto ec = rcGeneralAdmin(static_cast<RcComm*>(conn), &input);
+
+					res.body() = json{{"irods_response", {{"status_code", ec}}}}.dump();
+				}
+				catch (const irods::exception& e) {
+					logging::error("{}: {}", fn, e.client_display_what());
+					// clang-format off
+					res.body() = json{
+						{"irods_response", {
+							{"status_code", e.code()},
+							{"status_message", e.client_display_what()}
+						}}
+					}.dump();
+					// clang-format on
+				}
+				catch (const std::exception& e) {
+					logging::error("{}: {}", fn, e.what());
+					res.result(http::status::internal_server_error);
+				}
+
+				res.prepare_payload();
+
+				return _sess_ptr->send(std::move(res));
+			});
 	} // op_remove_specific_query
 } // anonymous namespace

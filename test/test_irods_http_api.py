@@ -2342,6 +2342,63 @@ class test_query_endpoint(unittest.TestCase):
         self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertGreaterEqual(len(result['rows']), 0)
 
+    def test_adding_and_removing_specific_queries(self):
+        rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        specific_query_name = 'get_rodsgroup_token_id'
+
+        # Show that rodsusers are NOT allowed to add specific queries.
+        r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+            'op': 'add_specific_query',
+            'name': specific_query_name,
+            'sql': "select token_id from R_TOKN_MAIN where token_name = 'rodsgroup'"
+        })
+        self.logger.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.SYS_NO_API_PRIV)
+
+        # Show that only rodsadmin are allowed to add specific queries.
+        r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+            'op': 'add_specific_query',
+            'name': specific_query_name,
+            'sql': "select token_id from R_TOKN_MAIN where token_name = 'rodsgroup'"
+        })
+        self.logger.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+        try:
+            # Use the new specific query.
+            r = requests.get(self.url_endpoint, headers=rodsuser_headers, params={
+                'op': 'execute_specific_query',
+                'name': specific_query_name
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(result['rows'][0][0], '200') # The token ID of rodsgroup is always 200.
+
+            # Show that rodsusers are NOT allowed to remove specific queries.
+            r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+                'op': 'remove_specific_query',
+                'name': specific_query_name
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.SYS_NO_API_PRIV)
+
+        finally:
+            # Show that only rodsadmins are allowed to remove specific queries.
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'remove_specific_query',
+                'name': specific_query_name
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
     def test_server_reports_error_when_http_method_is_not_supported(self):
         do_test_server_reports_error_when_http_method_is_not_supported(self)
 
