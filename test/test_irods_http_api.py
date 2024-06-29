@@ -2714,6 +2714,129 @@ class test_resources_endpoint(unittest.TestCase):
         self.assertEqual(result['irods_response']['status_code'], 0)
         self.assertEqual(len(result['rows']), 0)
 
+    def test_modifying_resource_properties(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+        resource = 'test_modifying_resource_properties_original'
+
+        # Create a new resource.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'create',
+            'name': resource,
+            'type': 'replication'
+        })
+        self.logger.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+        try:
+            # The list of updates to apply in sequence.
+            property_map = [
+                ('name',        'test_modifying_resource_properties_renamed'),
+                ('type',        'passthru'),
+                ('host',        'example.org'),
+                ('vault_path',  '/tmp/test_modifying_resource_properties_vault'),
+                ('status',      'down'),
+                ('status',      'up'),
+                ('comments',    'test_modifying_resource_properties_comments'),
+                ('information', 'test_modifying_resource_properties_information'),
+                ('free_space',  'test_modifying_resource_properties_free_space'),
+                ('context',     'test_modifying_resource_properties_context')
+            ]
+
+            # Apply each update to the resource and verify that each one results
+            # in the expected results.
+            for p, v in property_map:
+                with self.subTest(f'Setting property [{p}] to value [{v}]'):
+                    # Change a property of the resource.
+                    r = requests.post(self.url_endpoint, headers=headers, data={
+                        'op': 'modify',
+                        'name': resource,
+                        'property': p,
+                        'value': v
+                    })
+                    self.logger.debug(r.content)
+                    self.assertEqual(r.status_code, 200)
+                    self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+                    # Make sure to update the "resource" variable following a successful rename.
+                    if 'name' == p:
+                        self.logger.debug('Resource name updated successfully. Capturing new name.')
+                        resource = v
+
+                    # Show the property was modified.
+                    r = requests.get(self.url_endpoint, headers=headers, params={
+                        'op': 'stat',
+                        'name': resource
+                    })
+                    self.logger.debug(r.content)
+                    self.assertEqual(r.status_code, 200)
+                    result = r.json()
+                    self.assertEqual(result['irods_response']['status_code'], 0)
+                    self.assertEqual(result['info'][p], v)
+
+        finally:
+            # Remove the resource.
+            r = requests.post(self.url_endpoint, headers=headers, data={
+                'op': 'remove',
+                'name': resource
+            })
+            self.logger.debug(r.content)
+
+    def test_setting_invalid_value_for_status_property_results_in_an_error(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+        resource = 'test_modifying_resource_properties_original'
+
+        # Create a new resource.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'create',
+            'name': resource,
+            'type': 'replication'
+        })
+        self.logger.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+        try:
+            # Capture the status of the resource.
+            r = requests.get(self.url_endpoint, headers=headers, params={
+                'op': 'stat',
+                'name': resource
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            original_status = result['info']['status']
+
+            # Attempt to set the status of the resource to an invalid value.
+            r = requests.post(self.url_endpoint, headers=headers, data={
+                'op': 'modify',
+                'name': resource,
+                'property': 'status',
+                'value': 'invalid'
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 400)
+
+            # Show the property has not changed.
+            r = requests.get(self.url_endpoint, headers=headers, params={
+                'op': 'stat',
+                'name': resource
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(result['info']['status'], original_status)
+
+        finally:
+            # Remove the resource.
+            r = requests.post(self.url_endpoint, headers=headers, data={
+                'op': 'remove',
+                'name': resource
+            })
+            self.logger.debug(r.content)
+
     def test_server_reports_error_when_http_method_is_not_supported(self):
         do_test_server_reports_error_when_http_method_is_not_supported(self)
 

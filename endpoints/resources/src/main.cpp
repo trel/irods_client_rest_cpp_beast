@@ -7,6 +7,7 @@
 #include "irods/private/http_api/shared_api_operations.hpp"
 #include "irods/private/http_api/version.hpp"
 
+#include <irods/generalAdmin.h>
 #include <irods/irods_exception.hpp>
 #include <irods/query_builder.hpp>
 #include <irods/resource_administration.hpp>
@@ -221,49 +222,136 @@ namespace
 
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_modify)
 	{
-#if 0
-        auto result = irods::http::resolve_client_identity(_req);
-        if (result.response) {
-            return _sess_ptr->send(std::move(*result.response));
-        }
+		auto result = irods::http::resolve_client_identity(_req);
+		if (result.response) {
+			return _sess_ptr->send(std::move(*result.response));
+		}
 
-        const auto client_info = result.client_info;
+		const auto client_info = result.client_info;
 
-        irods::http::globals::background_task([fn = __func__, client_info, _sess_ptr, _req = std::move(_req), _args = std::move(_args)] {
-            logging::info("{}: client_info.username = [{}]", fn, client_info.username);
+		irods::http::globals::background_task([fn = __func__,
+		                                       client_info,
+		                                       _sess_ptr,
+		                                       _req = std::move(_req),
+		                                       _args = std::move(_args)] {
+			logging::info("{}: client_info.username = [{}]", fn, client_info.username);
 
-            http::response<http::string_body> res{http::status::ok, _req.version()};
-            res.set(http::field::server, irods::http::version::server_name);
-            res.set(http::field::content_type, "application/json");
-            res.keep_alive(_req.keep_alive());
+			http::response<http::string_body> res{http::status::ok, _req.version()};
+			res.set(http::field::server, irods::http::version::server_name);
+			res.set(http::field::content_type, "application/json");
+			res.keep_alive(_req.keep_alive());
 
-            try {
-            }
-            catch (const irods::exception& e) {
+			try {
+				const auto name_iter = _args.find("name");
+				if (name_iter == std::end(_args)) {
+					logging::error("{}: Missing [name] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+				}
+
+				const auto property_iter = _args.find("property");
+				if (property_iter == std::end(_args)) {
+					logging::error("{}: Missing [property] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+				}
+
+				const auto value_iter = _args.find("value");
+				if (value_iter == std::end(_args)) {
+					logging::error("{}: Missing [value] parameter.", fn);
+					return _sess_ptr->send(irods::http::fail(http::status::bad_request));
+				}
+
+				auto conn = irods::get_connection(client_info.username);
+
+				if (property_iter->second == "name") {
+					// TODO(#284): Remove this once the resource administration library grows support
+					// for renaming resources.
+					//
+					// The following is identical to what the resource administration library would
+					// provide.
+					GeneralAdminInput input{};
+					input.arg0 = "modify";
+					input.arg1 = "resource";
+					input.arg2 = name_iter->second.c_str();
+					input.arg3 = "name";
+					input.arg4 = value_iter->second.c_str();
+
+					if (const auto ec = rcGeneralAdmin(static_cast<RcComm*>(conn), &input); ec < 0) {
+						constexpr const char* msg = "Could not change resource name to [{}] for resource [{}]";
+						// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+						THROW(ec, fmt::format(msg, input.arg4, input.arg2));
+					}
+				}
+				else if (property_iter->second == "type") {
+					adm::client::modify_resource(
+						conn, name_iter->second, adm::resource_type_property{value_iter->second});
+				}
+				else if (property_iter->second == "host") {
+					adm::client::modify_resource(conn, name_iter->second, adm::host_name_property{value_iter->second});
+				}
+				else if (property_iter->second == "vault_path") {
+					adm::client::modify_resource(conn, name_iter->second, adm::vault_path_property{value_iter->second});
+				}
+				else if (property_iter->second == "status") {
+					auto status_enum = adm::resource_status::up;
+
+					if (value_iter->second == "up") {
+						status_enum = adm::resource_status::up;
+					}
+					else if (value_iter->second == "down") {
+						status_enum = adm::resource_status::down;
+					}
+					else {
+						logging::error(
+							"{}: Invalid value for [value] parameter. Received [{}]. Expected [up] or [down] for "
+							"[status] property.",
+							fn,
+							value_iter->second);
+						res.result(http::status::bad_request);
+						res.prepare_payload();
+						return _sess_ptr->send(std::move(res));
+					}
+
+					adm::client::modify_resource(conn, name_iter->second, adm::resource_status_property{status_enum});
+				}
+				else if (property_iter->second == "comments") {
+					adm::client::modify_resource(
+						conn, name_iter->second, adm::resource_comments_property{value_iter->second});
+				}
+				else if (property_iter->second == "information") {
+					adm::client::modify_resource(
+						conn, name_iter->second, adm::resource_info_property{value_iter->second});
+				}
+				else if (property_iter->second == "free_space") {
+					adm::client::modify_resource(conn, name_iter->second, adm::free_space_property{value_iter->second});
+				}
+				else if (property_iter->second == "context") {
+					adm::client::modify_resource(
+						conn, name_iter->second, adm::context_string_property{value_iter->second});
+				}
+
+				res.body() = json{{"irods_response", {{"status_code", 0}}}}.dump();
+			}
+			catch (const irods::exception& e) {
 				logging::error("{}: {}", fn, e.client_display_what());
-                res.result(http::status::bad_request);
-                res.body() = json{
-                    {"irods_response", {
-                        {"status_code", e.code()},
-                        {"status_message", e.client_display_what()}
-                    }}
-                }.dump();
-            }
-            catch (const std::exception& e) {
+				res.result(http::status::bad_request);
+				// clang-format off
+				res.body() = json{
+					{"irods_response", {
+						{"status_code", e.code()},
+						{"status_message", e.client_display_what()}
+					}}
+				}.dump();
+				// clang-format on
+			}
+			catch (const std::exception& e) {
 				logging::error("{}: {}", fn, e.what());
-                res.result(http::status::internal_server_error);
-            }
+				res.result(http::status::internal_server_error);
+			}
 
-            res.prepare_payload();
+			res.prepare_payload();
 
-            return _sess_ptr->send(std::move(res));
-        });
-#else
-		(void) _req;
-		(void) _args;
-		logging::error("{}: Operation not implemented.", __func__);
-		return _sess_ptr->send(irods::http::fail(http::status::not_implemented));
-#endif
+			return _sess_ptr->send(std::move(res));
+		});
 	} // op_modify
 
 	IRODS_HTTP_API_ENDPOINT_OPERATION_SIGNATURE(op_add_child)
@@ -495,7 +583,7 @@ namespace
 							{"zone", row[2]},
 							{"host", row[3]},
 							{"vault_path", row[4]},
-							{"status", adm::to_resource_status(row[5])},
+							{"status", row[5]},
 							{"context", row[6]},
 							{"comments", row[7]},
 							{"information", row[8]},
@@ -516,6 +604,14 @@ namespace
 				else if (const auto resc = adm::client::resource_info(conn, name_iter->second); resc) {
 					exists = true;
 
+					std::string_view status = "?";
+					if (resc->status() == adm::resource_status::up) {
+						status = "up";
+					}
+					else if (resc->status() == adm::resource_status::down) {
+						status = "down";
+					}
+
 					// clang-format off
 					info = {
 						{"id", resc->id()},
@@ -524,7 +620,7 @@ namespace
 						{"zone", resc->zone_name()},
 						{"host", resc->host_name()},
 						{"vault_path", resc->vault_path()},
-						{"status", resc->status()},
+						{"status", status},
 						{"context", resc->context_string()},
 						{"comments", resc->comments()},
 						{"information", resc->information()},
