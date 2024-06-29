@@ -2172,6 +2172,133 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 ## Zone Operations
 
+### add
+
+Adds a remote zone to the local zone.
+
+#### Request
+
+```bash
+curl http://localhost:<port>/irods-http-api/<version>/zones \
+    -H 'Authorization: Bearer <token>' \
+    --data-urlencode 'op=add' \
+    --data-urlencode 'name=<string>' \ # The name of the remote zone to add.
+    --data-urlencode 'connection-info=<string>' \ # The host and port to connect to. Optional.
+    --data-urlencode 'comment=<string>' # A comment to attach to the remote zone. Optional.
+```
+
+If `connection-info` is included, it must have the following structure: `<host>:<port>`
+
+#### Response
+
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
+
+```js
+{
+    "irods_response": {
+        "status_code": 0
+        "status_message": "string" // Optional
+    }
+}
+```
+
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
+
+### remove
+
+Removes a remote zone from the local zone.
+
+#### Request
+
+```bash
+curl http://localhost:<port>/irods-http-api/<version>/zones \
+    -H 'Authorization: Bearer <token>' \
+    --data-urlencode 'op=remove' \
+    --data-urlencode 'name=<string>' # The name of the remote zone to remove.
+```
+
+#### Response
+
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
+
+```js
+{
+    "irods_response": {
+        "status_code": 0
+        "status_message": "string" // Optional
+    }
+}
+```
+
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
+
+### modify
+
+Modifies properties of a remote zone.
+
+#### Request
+
+```bash
+curl http://localhost:<port>/irods-http-api/<version>/zones \
+    -H 'Authorization: Bearer <token>' \
+    --data-urlencode 'op=modify' \
+    --data-urlencode 'name=<string>' \ # The name of the remote zone to modify.
+    --data-urlencode 'property=<string>' \ # The property to modify.
+    --data-urlencode 'value=<string>' # The new value of the property.
+```
+
+The following properties are supported:
+- name
+- connection_info
+- comment
+
+The value for `connection_info` must have the following structure: `<host>:<port>`
+
+#### Response
+
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
+
+```js
+{
+    "irods_response": {
+        "status_code": 0
+        "status_message": "string" // Optional
+    }
+}
+```
+
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
+
+### set_zone_collection_permission
+
+Add or remove user permissions on a zone collection.
+
+#### Request
+
+```bash
+curl http://localhost:<port>/irods-http-api/<version>/zones \
+    -H 'Authorization: Bearer <token>' \
+    --data-urlencode 'op=set_zone_collection_permission' \
+    --data-urlencode 'name=<string>' \ # The name of the remote zone to modify.
+    --data-urlencode 'user=<string>' \ # The user the permission will apply to.
+    --data-urlencode 'permission=<string>' # The permission to set for the user. null or read.
+```
+
+#### Response
+
+If an HTTP status code of 200 is returned, the body of the response will contain JSON. Its structure is shown below.
+
+```js
+{
+    "irods_response": {
+        "status_code": 0
+        "status_message": "string" // Optional
+    }
+}
+```
+
+If there was an error, expect an HTTP status code in either the 4XX or 5XX range.
+
 ### report
 
 Returns information about the iRODS zone.
