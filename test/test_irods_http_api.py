@@ -3384,7 +3384,11 @@ class test_zones_endpoint(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        setup_class(cls, {'endpoint_name': 'zones', 'create_rodsuser': False})
+        setup_class(cls, {'endpoint_name': 'zones'})
+
+    @classmethod
+    def tearDownClass(cls):
+        tear_down_class(cls)
 
     def setUp(self):
         self.assertFalse(self._class_init_error, 'Class initialization failed. Cannot continue.')
@@ -3402,6 +3406,263 @@ class test_zones_endpoint(unittest.TestCase):
         self.assertIn('schema_version', zone_report)
         self.assertIn('zones', zone_report)
         self.assertGreaterEqual(len(zone_report['zones']), 1)
+
+    def test_adding_removing_and_modifying_zones(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+
+        # Add a remote zone to the local zone.
+        # The new zone will not have any connection information or anything else.
+        zone_name = 'other_zone'
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'add',
+            'name': zone_name
+        })
+        self.logger.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+        try:
+            # Show the new zone exists by executing the stat operation on it.
+            r = requests.get(self.url_endpoint, headers=headers, params={
+                'op': 'stat',
+                'name': zone_name
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(result['exists'], True)
+            self.assertEqual(result['info']['name'], zone_name)
+            self.assertEqual(result['info']['type'], 'remote')
+            self.assertEqual(result['info']['connection_info'], '')
+            self.assertEqual(result['info']['comment'], '')
+
+            # The properties to update.
+            property_map = [
+                ('name',            'other_zone_renamed'),
+                ('connection_info', 'example.org:1247'),
+                ('comment',         'updated comment')
+            ]
+
+            # Change the properties of the new zone.
+            for p, v in property_map:
+                with self.subTest(f'Setting property [{p}] to value [{v}]'):
+                    r = requests.post(self.url_endpoint, headers=headers, data={
+                        'op': 'modify',
+                        'name': zone_name,
+                        'property': p,
+                        'value': v 
+                    })
+                    self.logger.debug(r.content)
+                    self.assertEqual(r.status_code, 200)
+                    self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+                    # Capture the new name of the zone following its renaming.
+                    if 'name' == p:
+                        zone_name = v
+
+                    # Show the new zone was modified successfully.
+                    r = requests.get(self.url_endpoint, headers=headers, params={
+                        'op': 'stat',
+                        'name': zone_name
+                    })
+                    self.logger.debug(r.content)
+                    self.assertEqual(r.status_code, 200)
+
+                    result = r.json()
+                    self.assertEqual(result['irods_response']['status_code'], 0)
+                    self.assertEqual(result['exists'], True)
+                    self.assertEqual(result['info'][p], v)
+
+        finally:
+            # Remove the remote zone.
+            r = requests.post(self.url_endpoint, headers=headers, data={
+                'op': 'remove',
+                'name': zone_name
+            })
+            self.logger.debug(r.content)
+
+    def test_setting_invalid_connection_info_results_in_an_error(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+
+        # Add a remote zone to the local zone.
+        # The new zone will not have any connection information or anything else.
+        zone_name = 'other_zone'
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'add',
+            'name': zone_name
+        })
+        self.logger.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+        try:
+            # Capture the new zone's connection information.
+            r = requests.get(self.url_endpoint, headers=headers, params={
+                'op': 'stat',
+                'name': zone_name
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(result['exists'], True)
+            original_conn_info = result['info']['connection_info']
+
+            # The properties to update.
+            value_error_map = [
+                ('example.org:', irods_error_codes.CAT_INVALID_ARGUMENT),
+                (':1247', irods_error_codes.CAT_HOSTNAME_INVALID),
+                (':', irods_error_codes.CAT_HOSTNAME_INVALID),
+                ('', irods_error_codes.CAT_INVALID_ARGUMENT),
+                ('example.org', irods_error_codes.CAT_INVALID_ARGUMENT)
+            ]
+
+            # Attempt to change the properties of the new zone.
+            for conn_info, ec in value_error_map:
+                with self.subTest(f'Invalid connection info [{conn_info}] results in error code [{ec}]'):
+                    r = requests.post(self.url_endpoint, headers=headers, data={
+                        'op': 'modify',
+                        'name': zone_name,
+                        'property': 'connection_info',
+                        'value': conn_info 
+                    })
+                    self.logger.debug(r.content)
+                    self.assertEqual(r.status_code, 200)
+                    self.assertEqual(r.json()['irods_response']['status_code'], ec)
+
+                    # Show the new zone was not changed.
+                    r = requests.get(self.url_endpoint, headers=headers, params={
+                        'op': 'stat',
+                        'name': zone_name
+                    })
+                    self.logger.debug(r.content)
+                    self.assertEqual(r.status_code, 200)
+
+                    result = r.json()
+                    self.assertEqual(result['irods_response']['status_code'], 0)
+                    self.assertEqual(result['exists'], True)
+                    self.assertEqual(result['info']['connection_info'], original_conn_info)
+
+        finally:
+            # Remove the remote zone.
+            r = requests.post(self.url_endpoint, headers=headers, data={
+                'op': 'remove',
+                'name': zone_name
+            })
+            self.logger.debug(r.content)
+
+    @unittest.skip('TODO(#290): Enable once "iadmin modzonecollacl" is fully understood.')
+    def test_modifying_permissions_of_zone_collection(self):
+        rodsadmin_headers = {'Authorization': 'Bearer ' + self.rodsadmin_bearer_token}
+        rodsuser_headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        zone_name = 'tempZone'
+
+        try:
+            # Show the rodsuser cannot list the contents of the zone collection.
+            r = requests.get(f'{self.url_base}/collections', headers=rodsuser_headers, params={
+                'op': 'list',
+                'lpath': f'/{zone_name}'
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 400)
+            self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_COLLECTION)
+
+            # Give the rodsuser permission to read the contents of the zone collection.
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'set_zone_collection_permission',
+                'name': zone_name,
+                'user': self.rodsuser_username,
+                'permission': 'read'
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show the rodsuser can now list the contents of the zone collection.
+            r = requests.get(f'{self.url_base}/collections', headers=rodsuser_headers, params={
+                'op': 'list',
+                'lpath': f'/{zone_name}'
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Remove the rodsuser's permissions from the zone collection.
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'set_zone_collection_permission',
+                'name': zone_name,
+                'user': self.rodsuser_username,
+                'permission': 'null'
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show the rodsuser can no longer list the contents of the zone collection.
+            r = requests.get(f'{self.url_base}/collections', headers=rodsuser_headers, params={
+                'op': 'list',
+                'lpath': f'/{zone_name}'
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 400)
+            self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.NOT_A_COLLECTION)
+
+        finally:
+            # Remove the rodsuser's permissions from the zone collection.
+            r = requests.post(self.url_endpoint, headers=rodsadmin_headers, data={
+                'op': 'set_zone_collection_permission',
+                'name': zone_name,
+                'user': self.rodsuser_username,
+                'permission': 'null'
+            })
+            self.logger.debug(r.content)
+
+    def test_non_admin_users_are_not_allowed_to_add_remove_or_modify_zones(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+
+        # Non-admins are not allowed to add zones.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'add',
+            'name': 'other_zone'
+        })
+        self.logger.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.SYS_NO_API_PRIV)
+
+        # Non-admins are not allowed to remove zones.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'remove',
+            'name': 'tempZone'
+        })
+        self.logger.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.SYS_NO_API_PRIV)
+
+        # Non-admins are not allowed to modify zones.
+        r = requests.post(self.url_endpoint, headers=headers, data={
+            'op': 'modify',
+            'name': 'tempZone',
+            'property': 'comment',
+            'value': 'nope'
+        })
+        self.logger.debug(r.content)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.SYS_NO_API_PRIV)
+
+        # TODO(#290): Disabled until "iadmin modzonecollacl" is fully understood.
+        # Non-admins are not allowed to modify ACLs of zone collection.
+        #r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
+        #    'op': 'set_zone_collection_permission',
+        #    'name': zone_name,
+        #    'user': self.rodsuser_username,
+        #    'permission': 'read'
+        #})
+        #self.logger.debug(r.content)
+        #self.assertEqual(r.status_code, 200)
+        #self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.SYS_NO_API_PRIV)
 
     def test_server_reports_error_when_http_method_is_not_supported(self):
         do_test_server_reports_error_when_http_method_is_not_supported(self)
