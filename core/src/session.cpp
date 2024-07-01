@@ -77,7 +77,7 @@ namespace irods::http
 		}
 
 		if (ec == boost::beast::http::error::body_limit) {
-			log::error("{}: Request constraint error: {}", __func__, ec.message());
+			log::error(*this, "{}: Request constraint error: {}", __func__, ec.message());
 			return;
 		}
 
@@ -93,17 +93,17 @@ namespace irods::http
 
 		// Print the headers.
 		for (auto&& h : req_.base()) {
-			log::debug("{}: Header: ({}, {})", __func__, h.name_string(), h.value());
+			log::debug(*this, "{}: Header: ({}, {})", __func__, h.name_string(), h.value());
 		}
 
 		// Print the components of the request URL.
-		log::debug("{}: Method: {}", __func__, req_.method_string());
-		log::debug("{}: Version: {}", __func__, req_.version());
-		log::debug("{}: Target: {}", __func__, req_.target());
-		log::debug("{}: Keep Alive: {}", __func__, req_.keep_alive());
-		log::debug("{}: Has Content Length: {}", __func__, req_.has_content_length());
-		log::debug("{}: Chunked: {}", __func__, req_.chunked());
-		log::debug("{}: Needs EOF: {}", __func__, req_.need_eof());
+		log::debug(*this, "{}: Method: {}", __func__, req_.method_string());
+		log::debug(*this, "{}: Version: {}", __func__, req_.version());
+		log::debug(*this, "{}: Target: {}", __func__, req_.target());
+		log::debug(*this, "{}: Keep Alive: {}", __func__, req_.keep_alive());
+		log::debug(*this, "{}: Has Content Length: {}", __func__, req_.has_content_length());
+		log::debug(*this, "{}: Chunked: {}", __func__, req_.chunked());
+		log::debug(*this, "{}: Needs EOF: {}", __func__, req_.need_eof());
 
 		namespace http = boost::beast::http;
 
@@ -127,7 +127,7 @@ namespace irods::http
 			send(irods::http::fail(http::status::not_found));
 		}
 		catch (const std::exception& e) {
-			log::error("{}: {}", __func__, e.what());
+			log::error(*this, "{}: {}", __func__, e.what());
 			send(irods::http::fail(http::status::internal_server_error));
 		}
 	} // on_read
