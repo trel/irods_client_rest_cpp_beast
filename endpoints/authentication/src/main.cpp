@@ -116,7 +116,7 @@ namespace irods::http::handler
 				error_log_itter = fmt::format_to(error_log_itter, ", Error URI [{}]", *error_uri);
 			}
 
-			log::warn(token_error_log);
+			log::warn(fmt::runtime(token_error_log));
 			return true;
 		}
 
@@ -295,7 +295,7 @@ namespace irods::http::handler
 							responses_iter = fmt::format_to(responses_iter, ", Error URI [{}]", error_uri_iter->second);
 						}
 
-						log::warn(responses);
+						log::warn(fmt::runtime(responses));
 
 						return _sess_ptr->send(fail(status_type::bad_request));
 					}

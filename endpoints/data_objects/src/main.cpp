@@ -687,7 +687,7 @@ namespace
 							out_ptr = &iter->second.streams.at(sindex)->stream();
 						}
 						catch (const std::exception& e) {
-							logging::error("{}: Invalid argument for [stream-index] parameter.");
+							logging::error("{}: Invalid argument for [stream-index] parameter.", fn);
 							return _sess_ptr->send(irods::http::fail(res, http::status::bad_request));
 						}
 					}
