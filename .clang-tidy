@@ -38,6 +38,7 @@ WarningsAsErrors:
     boost-*,
     bugprone-*,
     -bugprone-easily-swappable-parameters,
+    -bugprone-lambda-function-name,
     clang-diagnostic-*,
     clang-analyzer-*,
     cert-dcl*,
