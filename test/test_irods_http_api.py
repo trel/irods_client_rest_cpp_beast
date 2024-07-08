@@ -1073,7 +1073,9 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
-            self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.OVERWRITE_WITHOUT_FORCE_FLAG)
+            # CAT_NO_ACCESS_PERMISSION is returned because the rodsuser does not have permission
+            # to read the parent collection of "public".
+            self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.CAT_NO_ACCESS_PERMISSION)
 
             # Now, try again using the overwrite parameter.
             r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
@@ -1084,6 +1086,8 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
+            # CAT_NO_ACCESS_PERMISSION is returned because the rodsuser does not have permission
+            # to read the parent collection of "public".
             self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.CAT_NO_ACCESS_PERMISSION)
 
             # Create a collection.
@@ -1105,7 +1109,7 @@ class test_data_objects_endpoint(unittest.TestCase):
             })
             self.logger.debug(r.content)
             self.assertEqual(r.status_code, 200)
-            self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.OVERWRITE_WITHOUT_FORCE_FLAG)
+            self.assertEqual(r.json()['irods_response']['status_code'], irods_error_codes.CAT_NAME_EXISTS_AS_COLLECTION)
 
             # Now, try again using the overwrite parameter.
             r = requests.post(self.url_endpoint, headers=rodsuser_headers, data={
