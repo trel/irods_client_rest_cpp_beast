@@ -604,12 +604,14 @@ namespace
 				else if (const auto resc = adm::client::resource_info(conn, name_iter->second); resc) {
 					exists = true;
 
-					std::string_view status = "?";
-					if (resc->status() == adm::resource_status::up) {
-						status = "up";
-					}
-					else if (resc->status() == adm::resource_status::down) {
-						status = "down";
+					// The resource administration library interprets the resource status. That behavior has
+					// been deemed undesirable due to the fact that some admins may have established conventions
+					// for the resource status. Therefore, the HTTP API uses GenQuery to retrieve the status
+					// value set by the admin.
+					std::string status;
+					const auto gql = fmt::format("select RESC_STATUS where RESC_NAME = '{}'", name_iter->second);
+					for (auto&& row : irods::experimental::query_builder{}.build<RcComm>(conn, gql)) {
+						status = std::move(row[0]);
 					}
 
 					// clang-format off
