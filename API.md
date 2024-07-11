@@ -358,12 +358,12 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
         "status_code": 0
         "status_message": "string", // Optional
         "failed_operation": {
+            "error_message": "string",
             "operation": {
                 "entity_name": "string", // The name of a user or group.
                 "acl": "string" // null, read, write, or own.
             },
-            "operation_index": 0,
-            "status_message": "string"
+            "operation_index": 0
         }
     }
 }
@@ -420,14 +420,14 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
         "status_code": 0
         "status_message": "string", // Optional
         "failed_operation": {
+            "error_message": "string",
             "operation": {
                 "operation": "string", // add or remove.
                 "attribute": "string",
                 "value": "string",
                 "units": "string" // Optional.
             },
-            "operation_index": 0,
-            "status_message": "string"
+            "operation_index": 0
         }
     }
 }
@@ -1014,14 +1014,14 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
         "status_code": 0
         "status_message": "string", // Optional
         "failed_operation": {
+            "error_message": "string",
             "operation": {
                 "operation": "string", // add or remove.
                 "attribute": "string",
                 "value": "string",
                 "units": "string" // Optional.
             },
-            "operation_index": 0,
-            "status_message": "string"
+            "operation_index": 0
         }
     }
 }
@@ -1107,12 +1107,12 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
         "status_code": 0
         "status_message": "string", // Optional
         "failed_operation": {
+            "error_message": "string",
             "operation": {
                 "entity_name": "string", // The name of a user or group.
                 "acl": "string" // null, read, write, or own.
             },
-            "operation_index": 0,
-            "status_message": "string"
+            "operation_index": 0
         }
     }
 }
@@ -1622,14 +1622,14 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
         "status_code": 0
         "status_message": "string", // Optional
         "failed_operation": {
+            "error_message": "string",
             "operation": {
                 "operation": "string", // add or remove.
                 "attribute": "string",
                 "value": "string",
                 "units": "string" // Optional.
             },
-            "operation_index": 0,
-            "status_message": "string"
+            "operation_index": 0
         }
     }
 }
@@ -2220,14 +2220,14 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
         "status_code": 0
         "status_message": "string", // Optional
         "failed_operation": {
+            "error_message": "string",
             "operation": {
                 "operation": "string", // add or remove.
                 "attribute": "string",
                 "value": "string",
                 "units": "string" // Optional.
             },
-            "operation_index": 0,
-            "status_message": "string"
+            "operation_index": 0
         }
     }
 }
