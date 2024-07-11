@@ -401,9 +401,21 @@ namespace irods::http
 		// Verify the bearer token is known to the server. If not, return an error.
 		auto mapped_value{irods::http::process_stash::find(bearer_token)};
 		if (!mapped_value.has_value()) {
+			const auto& config = irods::http::globals::configuration();
+
+			// It's possible that the admin didn't include the OIDC configuration stanza.
+			// This use-case is allowed, therefore we check for the OIDC configuration before
+			// attempting to access it. Without this logic, the server would crash.
+			const auto oidc_config_iter =
+				config.find(nlohmann::json::json_pointer{"/http_server/authentication/openid_connect"});
+			if (oidc_config_iter == std::end(config)) {
+				logging::debug("{}: No 'openid_connect' stanza found in server configuration.", __func__);
+				logging::error("{}: Could not find bearer token matching [{}].", __func__, bearer_token);
+				return {.response = fail(status_type::unauthorized)};
+			}
+
 			// If we're running as a protected resource, assume we have a OIDC token
-			if (irods::http::globals::oidc_configuration().at("mode").get_ref<const std::string&>() ==
-			    "protected_resource") {
+			if (oidc_config_iter->at("mode").get_ref<const std::string&>() == "protected_resource") {
 				body_arguments args{{"token", bearer_token}, {"token_type_hint", "access_token"}};
 
 				auto json_res{hit_introspection_endpoint(url_encode_body(args))};
