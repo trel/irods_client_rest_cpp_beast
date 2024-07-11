@@ -394,6 +394,10 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
         //
         // This option should be used when the HTTP API is configured to
         // communicate with an iRODS 4.2 server.
+        //
+        // NOTE: The HTTP API will not be able to detect changes in policy
+        // within the connected iRODS server unless this option is enabled.
+        // See the "connection_pool" option for additional details.
         "enable_4_2_compatibility": false,
 
         // The credentials for the rodsadmin user that will act as a proxy
@@ -404,6 +408,18 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
         },
 
         // Defines options for the connection pool.
+        //
+        // The options defined in this section are only used when
+        // "enable_4_2_compatibility" is set to false.
+        //
+        // When connection pooling is used, the HTTP API will not be able
+        // to detect changes in policy within the connected iRODS server.
+        // Any changes in policy will require a restart of the HTTP API.
+        //
+        // If this is a concern, set "enable_4_2_compatibility" to true to
+        // force the HTTP API to use a new iRODS connection for every HTTP
+        // request. The additional connections will honor any iRODS server
+        // policy changes, but will degrade overall performance.
         "connection_pool": {
             // The number of connections in the pool.
             "size": 6,
