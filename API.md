@@ -813,6 +813,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Registers a new data object and/or replica into the catalog.
 
+This operation may require rodsadmin level privileges depending on the configuration of the iRODS zone. Contact the administrator of the iRODS zone to be sure non-rodsadmin users are allowed to execute this operation.
+
 #### Request
 
 ```bash
@@ -1338,6 +1340,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 
 Creates a new resource.
 
+This operation requires rodsadmin level privileges.
+
 #### Request
 
 ```bash
@@ -1370,6 +1374,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Removes a resource.
 
+This operation requires rodsadmin level privileges.
+
 #### Request
 
 ```bash
@@ -1397,6 +1403,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 ### modify
 
 Modifies a single property of a resource.
+
+This operation requires rodsadmin level privileges.
 
 #### Request
 
@@ -1441,6 +1449,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Creates a parent-child relationship between two resources.
 
+This operation requires rodsadmin level privileges.
+
 #### Request
 
 ```bash
@@ -1471,6 +1481,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Removes the parent-child relationship between two resources.
 
+This operation requires rodsadmin level privileges.
+
 #### Request
 
 ```bash
@@ -1499,6 +1511,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 ### rebalance
 
 Rebalances a resource hierarchy.
+
+This operation requires rodsadmin level privileges.
 
 #### Request
 
@@ -1575,6 +1589,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 ### modify_metadata
 
 Adjust multiple AVUs on a resource.
+
+This operation requires rodsadmin level privileges.
 
 #### Request
 
@@ -1804,6 +1820,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Creates a new user.
 
+This operation requires rodsadmin or groupadmin level privileges.
+
 #### Request
 
 ```bash
@@ -1834,6 +1852,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Removes a user.
 
+This operation requires rodsadmin level privileges.
+
 #### Request
 
 ```bash
@@ -1862,6 +1882,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 ### set_password
 
 Changes a user's password.
+
+This operation requires rodsadmin level privileges.
 
 #### Request
 
@@ -1893,6 +1915,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Changes a user's type.
 
+This operation requires rodsadmin level privileges.
+
 #### Request
 
 ```bash
@@ -1923,6 +1947,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Creates a new group.
 
+This operation requires rodsadmin or groupadmin level privileges.
+
 #### Request
 
 ```bash
@@ -1951,6 +1977,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Removes a group.
 
+This operation requires rodsadmin level privileges.
+
 #### Request
 
 ```bash
@@ -1978,6 +2006,14 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 ### add_to_group
 
 Adds a user to a group.
+
+This operation requires rodsadmin or groupadmin level privileges.
+
+Users of type groupadmin are allowed to execute this operation if at least one of the following conditions is true:
+- The target group is initially empty
+- The groupadmin user is a member of the group
+
+Users of type groupadmin are always allowed to add themselves to an empty group. If the target group is not empty and the groupadmin user isn't a member of the group, execution of this operation will result in an error.
 
 #### Request
 
@@ -2009,6 +2045,10 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Removes a user from a group.
 
+This operation requires rodsadmin or groupadmin level privileges.
+
+If the user is of type groupadmin, they must be a member of the target group to execute this operation.
+
 #### Request
 
 ```bash
@@ -2038,6 +2078,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 ### users
 
 Lists all users in the zone.
+
+This operation requires rodsadmin level privileges.
 
 #### Request
 
@@ -2074,6 +2116,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 ### groups
 
 Lists all groups in the zone.
+
+This operation requires rodsadmin level privileges.
 
 #### Request
 
@@ -2174,6 +2218,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Adjust multiple AVUs on a user or group.
 
+This operation requires rodsadmin level privileges.
+
 #### Request
 
 ```bash
@@ -2239,6 +2285,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Adds a remote zone to the local zone.
 
+This operation requires rodsadmin level privileges.
+
 #### Request
 
 ```bash
@@ -2271,6 +2319,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 
 Removes a remote zone from the local zone.
 
+This operation requires rodsadmin level privileges.
+
 #### Request
 
 ```bash
@@ -2298,6 +2348,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 ### modify
 
 Modifies properties of a remote zone.
+
+This operation requires rodsadmin level privileges.
 
 #### Request
 
@@ -2335,6 +2387,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 ### report
 
 Returns information about the iRODS zone.
+
+This operation requires rodsadmin level privileges.
 
 #### Request
 
