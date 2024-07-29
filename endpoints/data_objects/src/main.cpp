@@ -1397,17 +1397,16 @@ namespace
 					});
 				}
 
-				res.body() =
-					json{
-						{"irods_response", {{"status_code", 0}}},
-						{"type", irods::to_object_type_string(status.type())},
-						{"permissions", perms},
-						{"size", fs::client::data_object_size(conn, lpath_iter->second)},
-						{"checksum", fs::client::data_object_checksum(conn, lpath_iter->second)},
-						{"registered", fs::client::is_data_object_registered(conn, lpath_iter->second)},
-						{"modified_at",
-				         fs::client::last_write_time(conn, lpath_iter->second).time_since_epoch().count()}}
-						.dump();
+				// clang-format off
+				res.body() = json{
+					{"irods_response", {{"status_code", 0}}},
+					{"type", irods::to_object_type_string(status.type())},
+					{"permissions", perms},
+					{"size", fs::client::data_object_size(conn, lpath_iter->second)},
+					{"checksum", fs::client::data_object_checksum(conn, lpath_iter->second)},
+					{"modified_at", fs::client::last_write_time(conn, lpath_iter->second).time_since_epoch().count()}
+				}.dump();
+				// clang-format on
 			}
 			catch (const fs::filesystem_error& e) {
 				logging::error("{}: {}", fn, e.what());
