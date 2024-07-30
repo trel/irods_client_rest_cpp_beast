@@ -339,33 +339,24 @@ namespace irods::http
 
 	auto map_json_to_user(const nlohmann::json& _json) -> std::optional<std::string>
 	{
-		const auto& oidc_config{irods::http::globals::oidc_configuration()};
-		const static auto user_claim{oidc_config.find("irods_user_claim")};
-		const static auto attribute_mapping{oidc_config.find("user_attribute_mapping")};
+		namespace logging = irods::http::log;
 
-		if (user_claim != std::end(oidc_config)) {
-			if (auto claim{_json.find(user_claim->get_ref<const std::string&>())}; claim != std::end(_json)) {
-				return {*claim};
-			}
+		const auto json_res_string{to_string(_json)};
+		const static auto match_func{
+			irods::http::globals::user_mapping_lib().get<int(const char*, char**)>("user_mapper_match")};
+		const static auto free_func{irods::http::globals::user_mapping_lib().get<void(char*)>("user_mapper_free")};
+
+		char* res{};
+		if (auto rc{match_func(json_res_string.c_str(), &res)}; rc != 0) {
+			logging::error("{}: An error occured when attempting to match with error code [{}].", __func__, rc);
+			return std::nullopt;
 		}
-		else if (attribute_mapping != std::end(oidc_config)) {
-			const auto& mappings{*attribute_mapping};
 
-			for (auto& [key, value] : mappings.items()) {
-				const auto comparison_func{[&_json](const auto& _iter) -> bool {
-					const auto value_of_interest{_json.find(_iter.key())};
-					if (value_of_interest == std::end(_json)) {
-						return false;
-					}
+		if (nullptr != res) {
+			std::string matched_user{res};
+			free_func(res);
 
-					return *value_of_interest == _iter.value();
-				}};
-
-				if (auto proxy_iter{value.items()};
-				    std::all_of(std::begin(proxy_iter), std::end(proxy_iter), comparison_func)) {
-					return key;
-				}
-			}
+			return matched_user;
 		}
 
 		return std::nullopt;

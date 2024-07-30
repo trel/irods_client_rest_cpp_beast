@@ -99,7 +99,7 @@ Bearer token when querying the HTTP API endpoints.
 
 In order for the access token to be accepted, two conditions must be met:
 1. The OpenID Provider recognizes the token as valid and active.
-2. The token must be able to be mapped to a user, using either `irods_user_claim` or `user_attribute_mapping`. 
+2. The token must be able to be mapped to a local zone user using a valid user mapping plugin.
 
 If these conditions are met, then the access token will be accepted, and the action will be carried out as the mapped
 user.
