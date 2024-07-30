@@ -1153,7 +1153,7 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 
 `resource-hierarchy` and `replica-number` are mutually exclusive parameters.
 
-All parameters having a prefix of `new-` represent modifiable properties of the target replica. At least one modifiable property is required for the operation to succeed.
+All parameters having a prefix of `new-` represent modifiable properties of the target replica. At least one modifiable property is required for the operation to succeed. This operation allows multiple properties to be modified in a single call.
 
 #### Response
 
