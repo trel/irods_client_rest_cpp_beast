@@ -1282,7 +1282,6 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 {
     "api_version": "string",
     "build": "string",
-    "genquery2_enabled": false,
     "irods_zone": "string",
     "max_number_of_parallel_write_streams": 0,
     "max_number_of_rows_per_catalog_query": 0,
