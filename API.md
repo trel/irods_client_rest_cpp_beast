@@ -270,9 +270,27 @@ curl http://localhost:<port>/irods-http-api/<version>/collections \
     --data-urlencode 'op=set_permission' \
     --data-urlencode 'lpath=<string>' \
     --data-urlencode 'entity-name=<string>' \ # The name of a user or group.
-    --data-urlencode 'permission=<string>' \ # null, read, write, or own.
+    --data-urlencode 'permission=<string>' \
     --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
 ```
+
+The following permission levels are supported:
+- own
+- delete_object
+- modify_object _(equivalent to write)_
+- create_object
+- delete_metadata
+- modify_metadata
+- create_metadata
+- read_object _(equivalent to read)_
+- read_metadata
+- null
+
+The following legacy permission levels are supported as well:
+- own
+- write
+- read
+- null
 
 #### Response
 
@@ -1093,9 +1111,27 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     --data-urlencode 'op=set_permission' \
     --data-urlencode 'lpath=<string>' \ # Absolute logical path to a data object.
     --data-urlencode 'entity-name=<string>' \ # The name of a user or group.
-    --data-urlencode 'permission=<string>' \ # null, read, write, or own.
+    --data-urlencode 'permission=<string>' \
     --data-urlencode 'admin=<integer>' # 0 or 1. Defaults to 0. Execute as a rodsadmin. Optional.
 ```
+
+The following permission levels are supported:
+- own
+- delete_object
+- modify_object _(equivalent to write)_
+- create_object
+- delete_metadata
+- modify_metadata
+- create_metadata
+- read_object _(equivalent to read)_
+- read_metadata
+- null
+
+The following legacy permission levels are supported as well:
+- own
+- write
+- read
+- null
 
 #### Response
 
