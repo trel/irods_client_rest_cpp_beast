@@ -5,6 +5,7 @@
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/thread_pool.hpp>
+#include <boost/dll.hpp>
 #include <nlohmann/json.hpp>
 
 #include <functional>
@@ -29,6 +30,9 @@ namespace irods::http::globals
 
 	auto set_oidc_configuration(const nlohmann::json& _config) -> void;
 	auto oidc_configuration() -> const nlohmann::json&;
+
+	auto set_user_mapping_lib(boost::dll::shared_library _lib) -> void;
+	auto user_mapping_lib() -> boost::dll::shared_library&;
 } // namespace irods::http::globals
 
 #endif // IRODS_HTTP_API_GLOBALS_HPP

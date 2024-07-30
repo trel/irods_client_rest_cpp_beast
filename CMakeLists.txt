@@ -109,6 +109,7 @@ include(ObjectTargetHelpers)
 
 add_subdirectory(core)
 add_subdirectory(endpoints)
+add_subdirectory(plugins)
 
 add_executable(${IRODS_HTTP_API_BINARY_NAME})
 target_link_objects(

@@ -21,6 +21,9 @@ namespace
 
 	// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 	const nlohmann::json* g_oidc_endpoints{};
+
+	// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+	boost::dll::shared_library g_user_map_lib;
 } // anonymous namespace
 
 namespace irods::http::globals
@@ -95,4 +98,14 @@ namespace irods::http::globals
 	{
 		return *g_oidc_config;
 	} // oidc_configuration
+
+	auto set_user_mapping_lib(boost::dll::shared_library _lib) -> void
+	{
+		g_user_map_lib = std::move(_lib);
+	} // set_user_mapping_lib
+
+	auto user_mapping_lib() -> boost::dll::shared_library&
+	{
+		return g_user_map_lib;
+	} // user_mapping_lib
 } // namespace irods::http::globals

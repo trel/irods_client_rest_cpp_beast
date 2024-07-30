@@ -22,6 +22,7 @@
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/thread_pool.hpp>
 #include <boost/config.hpp>
+#include <boost/dll.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
 #include <boost/url/parse.hpp>
@@ -230,18 +231,23 @@ constexpr auto default_jsonschema() -> std::string_view
                                     "type": "string",
                                     "format": "uri"
                                 }},
-                                "irods_user_claim": {{
-                                    "type": "string"
-                                }},
                                 "tls_certificates_directory": {{
                                     "type": "string"
                                 }},
-                                "user_attribute_mapping": {{
+                                "user_mapping": {{
                                     "type": "object",
-                                    "additionalProperties": {{
-                                        "type": "object"
+                                    "properties": {{
+                                        "plugin_path": {{
+                                            "type": "string"
+                                        }},
+                                        "configuration": {{
+                                            "type": "object"
+                                        }}
                                     }},
-                                    "minProperties": 1
+                                    "required": [
+                                        "plugin_path",
+                                        "configuration"
+                                    ]
                                 }}
                             }},
                             "required": [
@@ -251,19 +257,8 @@ constexpr auto default_jsonschema() -> std::string_view
                                 "mode",
                                 "client_id",
                                 "redirect_uri",
-                                "tls_certificates_directory"
-                            ],
-                            "oneOf": [
-                                {{
-                                    "required": [
-                                        "irods_user_claim"
-                                    ]
-                                }},
-                                {{
-                                    "required": [
-                                        "user_attribute_mapping"
-                                    ]
-                                }}
+                                "tls_certificates_directory",
+                                "user_mapping"
                             ],
                             "anyOf": [
                                 {{
@@ -506,7 +501,11 @@ auto print_configuration_template() -> void
                 "client_secret": "<string>",
                 "mode": "client",
                 "redirect_uri": "<string>",
-                "irods_user_claim": "<string>",
+                "user_mapping": {{
+                    "plugin_path": "<string>",
+                    "configuration": {{
+                    }}
+                }},
                 "tls_certificates_directory": "<string>"
             }}
         }},
@@ -822,6 +821,36 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 	return true;
 } // load_oidc_configuration
 
+auto load_user_mapping_plugin(const json& _user_mapping_config) -> bool
+{
+	const auto& map_lib{_user_mapping_config.at("plugin_path").get_ref<const std::string&>()};
+	const auto config_string{to_string(_user_mapping_config.at("configuration"))};
+
+	// Load shared lib
+	logging::trace("{}: Loading shared library at [{}].", __func__, map_lib);
+	boost::dll::shared_library user_map_lib{map_lib};
+	irods::http::globals::set_user_mapping_lib(user_map_lib);
+
+	// See if symbols matching interface exist
+	if (!(user_map_lib.has("user_mapper_init") && user_map_lib.has("user_mapper_match") &&
+	      user_map_lib.has("user_mapper_close") && user_map_lib.has("user_mapper_free")))
+	{
+		logging::error("{}: Could not find all required symbols for library [{}].", __func__, map_lib);
+		return false;
+	}
+
+	// Get init func
+	const auto init_func{user_map_lib.get<int(const char*)>("user_mapper_init")};
+
+	// Init mapping plugin
+	if (auto rc{init_func(config_string.c_str())}; rc != 0) {
+		logging::error("{}: Plugin initialization failed with code [{}].", __func__, rc);
+		return false;
+	}
+
+	return true;
+} // load_user_mapping_plugin
+
 class process_stash_eviction_manager
 {
 	net::steady_timer timer_;
@@ -950,6 +979,12 @@ auto main(int _argc, char* _argv[]) -> int
 				logging::error("Invalid OIDC configuration, server not starting.");
 				return 1;
 			}
+
+			// Initialize User Mapping plugin
+			if (!load_user_mapping_plugin(oi_config.at("user_mapping"))) {
+				logging::error("Plugin failed to load, server not starting.");
+				return 1;
+			}
 		}
 		else {
 			logging::info("No OIDC configuration detected, running without OIDC features.");
@@ -1035,6 +1070,16 @@ auto main(int _argc, char* _argv[]) -> int
 
 		logging::trace("Waiting for I/O thread pool to shut down.");
 		io_threads.join();
+
+		// If user_mapping stanza exists, a user mapping plugin needs to be cleaned up
+		if (http_server_config.contains(json::json_pointer{"/authentication/openid_connect/user_mapping"})) {
+			logging::trace("Cleaning up user mapper...");
+			auto close_mapper{irods::http::globals::user_mapping_lib().get<int()>("user_mapper_close")};
+			if (auto rc{close_mapper()}; rc != 0) {
+				logging::error("An error occured while closing the mapping plugin with code [{}].", rc);
+				return 1;
+			}
+		}
 
 		logging::info("Shutdown complete.");
 

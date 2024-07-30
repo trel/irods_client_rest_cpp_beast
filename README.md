@@ -256,18 +256,16 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
                 // times out, requiring another attempt at authentication.
                 "state_timeout_in_seconds": 600,
 
-                // The name of the OIDC claim which provides the mapping of an
-                // OIDC user to an iRODS user account.
-                // "irods_user_claim" and "user_attribute_mapping" cannot be used together.
-                "irods_user_claim": "irods_username",
+                // Defines relevant information related to the User Mapping plugin system.
+                // Allows for the selection and configuration of the plugin.
+                "user_mapping": {
+                    // The full path to the desired plugin to load.
+                    // See the section titled "Mapping OpenID Users to iRODS" for more details on available plugins.
+                    "plugin_path": "/path/to/plugin/the_plugin.so",
 
-                // The mapping of a user to the provided values. All values must
-                // be matched to map an OIDC user to an iRODS user account.
-                // "irods_user_claim" and "user_attribute_mapping" cannot be used together.
-                "user_attribute_mapping": {
-                    "irods_username": {
-                        "sub": "123-abc-456-xyz",
-                        "email": "rods_user@example.org"
+                    // The configuration information required by the selected plugin to execute properly.
+                    // See the section titled "Mapping OpenID Users to iRODS" for more details on plugin configuration.
+                    "configuration": {
                     }
                 },
 
@@ -463,13 +461,69 @@ Additionally, the OIDC `redirect_uri` parameter must be set to the HTTP API's au
 This is required, as the Authorization Code Grant needs to be redirected back to the HTTP API, to complete
 HTTP API token generation.
 
-### Add your specified `irods_user_claim` to the user's claims
+### Mapping OpenID Users to iRODS
 
-Currently, the server looks for the custom claim in the ID Token, which is specified in the `irods_user_claim` parameter.
-This serves as the mapping mechanism for an OIDC User to an iRODS User.
+Before you can use OpenID with iRODS, you must enable one of the two shipped plugins, or develop your own to suit your specific needs.
 
-A user who authenticates but does not have the claim specified in `irods_user_claim` mapped in their account
-will not have access to the API. A HTTP 400 Bad Request status code will be returned if the claim specified in `irods_user_claim` is not found.
+#### Local File plugin
+
+Within the `user_mapping` stanza, set `plugin_path` to the absolute path of `libirods_http_api_plugin-local_file.so`.
+On most Linux-based systems, the HTTP API user mapping plugins will be installed under `/usr/lib/irods_http_api/user_mapping`.
+
+This plugin allows for the defining of mappings of iRODS users based on desired attributes.
+The attributes specified within the file can be updated, and the plugin will reload the file
+to update the mappings without having to restart the server.
+
+##### Configuration
+
+The required configuraiton for this plugin is as follows:
+
+```json
+"configuration": {
+    "file_path": "/path/to/file.json"
+}
+```
+
+Where `file_path` is the full path to a JSON file containing the mapping of desired attributes to an iRODS user.
+An example of what the JSON file can contain is as follows:
+
+```json
+{
+    "alice": {
+        "email": "alice@example.org",
+        "sub": "123-abc-456-xyz"
+    },
+    "bob": {
+        "email": "bob@example.org",
+        "phone": "56709"
+    }
+}
+```
+
+#### User Claim plugin
+
+Within the `user_mapping` stanza, set `plugin_path` to the absolute path of `libirods_http_api_plugin-user_claim.so`.
+On most Linux-based systems, the HTTP API user mapping plugins will be installed under `/usr/lib/irods_http_api/user_mapping`.
+
+This plugin looks for a claim that provides a direct mapping of an authenticated OpenID user to an iRODS user.
+This requires that you have the ability to add a claim within the OpenID Provider.
+
+##### Configuration
+
+The configuration for this plugin is as follows:
+
+```json
+"configuration": {
+    "irods_user_claim": "claim_to_map_user"
+}
+```
+
+In this particular example, `claim_to_map_user` is the claim that maps the OpenID user to an iRODS user.
+
+### Plugin Development
+
+To develop your own plugin, make sure to conform to the plugin interface defined in [interface.h](./plugins/user_mapping/include/irods/http_api/plugins/user_mapping/interface.h).
+Further documentation on the interface functions are within the file.
 
 ### Supported Grants
 
