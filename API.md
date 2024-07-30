@@ -112,6 +112,8 @@ Creates a new collection.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/collections \
     -H 'Authorization: Bearer <token>' \
@@ -141,6 +143,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Removes a collection.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/collections \
@@ -173,6 +177,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Returns information about a collection.
 
 #### Request
+
+HTTP Method: GET
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/collections \
@@ -218,6 +224,8 @@ Returns the contents of a collection.
 
 #### Request
 
+HTTP Method: GET
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/collections \
     -H 'Authorization: Bearer <token>' \
@@ -254,6 +262,8 @@ Sets the permission of a user or group on a collection.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/collections \
     -H 'Authorization: Bearer <token>' \
@@ -285,6 +295,8 @@ Enable or disable inheritance on a collection.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/collections \
     -H 'Authorization: Bearer <token>' \
@@ -314,6 +326,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Adjust permissions for multiple users and groups on a collection atomically.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/collections \
@@ -374,6 +388,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Adjust multiple AVUs on a collection.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/collections \
@@ -439,6 +455,8 @@ Renames or moves a collection.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/collections \
     -H 'Authorization: Bearer <token>' \
@@ -467,6 +485,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Updates the mtime of an existing collection.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/collections \
@@ -500,6 +520,8 @@ Updates the mtime of an existing data object or creates a new data object if it 
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
@@ -532,6 +554,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Removes a data object or unregisters all replicas.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
@@ -568,6 +592,8 @@ Calculates the checksum for a data object.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
@@ -603,6 +629,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Verifies the checksum information for a data object.
 
 #### Request
+
+HTTP Method: GET
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
@@ -649,6 +677,8 @@ Returns information about a data object.
 
 #### Request
 
+HTTP Method: GET
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
@@ -692,6 +722,8 @@ Renames or moves a data object.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
@@ -720,6 +752,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Copies a data object.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
@@ -753,6 +787,8 @@ Replicates an existing replica from one resource to another resource.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
@@ -783,6 +819,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Trims an existing replica or removes its catalog entry.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
@@ -817,6 +855,8 @@ This operation may require rodsadmin level privileges depending on the configura
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
@@ -850,6 +890,8 @@ Reads bytes from a data object.
 
 #### Request
 
+HTTP Method: GET
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
@@ -872,6 +914,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Writes bytes to a data object.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
@@ -916,6 +960,8 @@ Returns a parallel-write-handle that can be used for parallel write operations.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
@@ -947,6 +993,8 @@ This operation MUST be called to complete the parallel write operation. Failing 
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
@@ -970,6 +1018,8 @@ curl http://localhost:<port>/irods-http-api/<version>/data-objects \
 Adjust multiple AVUs on a data object.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
@@ -1035,6 +1085,8 @@ Sets the permission of a user or group on a data object.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
@@ -1065,6 +1117,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Adjust permissions for multiple users and groups on a data object atomically.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
@@ -1128,6 +1182,8 @@ Modifies properties of a single replica.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/data-objects \
     -H 'Authorization: Bearer <token>' \
@@ -1176,6 +1232,8 @@ Returns general information about the iRODS HTTP API server.
 
 ### Request
 
+HTTP Method: GET
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/info
 ```
@@ -1204,6 +1262,8 @@ If an HTTP status code of 200 is returned, the body of the response will contain
 Executes a GenQuery string and returns the results.
 
 #### Request
+
+HTTP Method: GET
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/query \
@@ -1249,6 +1309,8 @@ Executes a specific query and returns the results.
 
 #### Request
 
+HTTP Method: GET
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/query \
     -H 'Authorization: Bearer <token>' \
@@ -1285,6 +1347,8 @@ This operation requires rodsadmin level privileges.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/query \
     -H 'Authorization: Bearer <token>' \
@@ -1313,6 +1377,8 @@ Removes a SpecificQuery from the iRODS zone.
 This operation requires rodsadmin level privileges.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/query \
@@ -1343,6 +1409,8 @@ Creates a new resource.
 This operation requires rodsadmin level privileges.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/resources \
@@ -1378,6 +1446,8 @@ This operation requires rodsadmin level privileges.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/resources \
     -H 'Authorization: Bearer <token>' \
@@ -1407,6 +1477,8 @@ Modifies a single property of a resource.
 This operation requires rodsadmin level privileges.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/resources \
@@ -1453,6 +1525,8 @@ This operation requires rodsadmin level privileges.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/resources \
     -H 'Authorization: Bearer <token>' \
@@ -1485,6 +1559,8 @@ This operation requires rodsadmin level privileges.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/resources \
     -H 'Authorization: Bearer <token>' \
@@ -1516,6 +1592,8 @@ This operation requires rodsadmin level privileges.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/resources \
     -H 'Authorization: Bearer <token>' \
@@ -1543,6 +1621,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Returns information about a resource.
 
 #### Request
+
+HTTP Method: GET
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/resources \
@@ -1593,6 +1673,8 @@ Adjust multiple AVUs on a resource.
 This operation requires rodsadmin level privileges.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/resources \
@@ -1659,6 +1741,8 @@ Lists the available rule engine plugin instances of the connected iRODS server.
 
 #### Request
 
+HTTP Method: GET
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/rules \
     -H 'Authorization: Bearer <token>' \
@@ -1691,6 +1775,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Executes rule code.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/rules \
@@ -1725,6 +1811,8 @@ Removes a delay rule from the catalog.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/rules \
     -H 'Authorization: Bearer <token>' \
@@ -1754,6 +1842,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Creates a new ticket for a collection or data object.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/tickets \
@@ -1792,6 +1882,8 @@ Removes a ticket.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/tickets \
     -H 'Authorization: Bearer <token>' \
@@ -1823,6 +1915,8 @@ Creates a new user.
 This operation requires rodsadmin or groupadmin level privileges.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
@@ -1856,6 +1950,8 @@ This operation requires rodsadmin level privileges.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
     -H 'Authorization: Bearer <token>' \
@@ -1886,6 +1982,8 @@ Changes a user's password.
 This operation requires rodsadmin level privileges.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
@@ -1919,6 +2017,8 @@ This operation requires rodsadmin level privileges.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
     -H 'Authorization: Bearer <token>' \
@@ -1951,6 +2051,8 @@ This operation requires rodsadmin or groupadmin level privileges.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
     -H 'Authorization: Bearer <token>' \
@@ -1980,6 +2082,8 @@ Removes a group.
 This operation requires rodsadmin level privileges.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
@@ -2017,6 +2121,8 @@ Users of type groupadmin are always allowed to add themselves to an empty group.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
     -H 'Authorization: Bearer <token>' \
@@ -2051,6 +2157,8 @@ If the user is of type groupadmin, they must be a member of the target group to 
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
     -H 'Authorization: Bearer <token>' \
@@ -2082,6 +2190,8 @@ Lists all users in the zone.
 This operation requires rodsadmin level privileges.
 
 #### Request
+
+HTTP Method: GET
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
@@ -2121,6 +2231,8 @@ This operation requires rodsadmin level privileges.
 
 #### Request
 
+HTTP Method: GET
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
     -H 'Authorization: Bearer <token>' \
@@ -2154,6 +2266,8 @@ Returns whether a user is a member of a group.
 
 #### Request
 
+HTTP Method: GET
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
     -H 'Authorization: Bearer <token>' \
@@ -2185,6 +2299,8 @@ If there was an error, expect an HTTP status code in either the 4XX or 5XX range
 Returns information about a user or group.
 
 #### Request
+
+HTTP Method: GET
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
@@ -2221,6 +2337,8 @@ Adjust multiple AVUs on a user or group.
 This operation requires rodsadmin level privileges.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/users-groups \
@@ -2289,6 +2407,8 @@ This operation requires rodsadmin level privileges.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/zones \
     -H 'Authorization: Bearer <token>' \
@@ -2323,6 +2443,8 @@ This operation requires rodsadmin level privileges.
 
 #### Request
 
+HTTP Method: POST
+
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/zones \
     -H 'Authorization: Bearer <token>' \
@@ -2352,6 +2474,8 @@ Modifies properties of a remote zone.
 This operation requires rodsadmin level privileges.
 
 #### Request
+
+HTTP Method: POST
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/zones \
@@ -2391,6 +2515,8 @@ Returns information about the iRODS zone.
 This operation requires rodsadmin level privileges.
 
 #### Request
+
+HTTP Method: GET
 
 ```bash
 curl http://localhost:<port>/irods-http-api/<version>/zones \
