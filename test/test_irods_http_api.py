@@ -2113,6 +2113,55 @@ class test_data_objects_endpoint(unittest.TestCase):
     def test_return_error_on_missing_parameters(self):
         pass
 
+    def test_server_correctly_handles_embedded_CRLFs_in_multipart_form_data(self):
+        headers = {'Authorization': 'Bearer ' + self.rodsuser_bearer_token}
+        data_object = f'/{self.zone_name}/home/{self.rodsuser_username}/embedded_crlfs.txt'
+
+        try:
+            # Create a data object using multipart/form-data encoding.
+            # The body of the request will contain an embedded CRLF. The CRLF is what triggers
+            # the bug in the original parser. This would cause the data to be truncated.
+            # For more information, see issue #273.
+            content = 'look, an embedded \r\n CRLF.'
+            r = requests.post(self.url_endpoint, headers=headers, files={
+                'op': 'write',
+                'lpath': data_object,
+                'bytes': content
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.json()['irods_response']['status_code'], 0)
+
+            # Show the iRODS server recorded the correct size for the data object.
+            r = requests.get(self.url_endpoint, headers=headers, params={
+                'op': 'stat',
+                'lpath': data_object
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            result = r.json()
+            self.assertEqual(result['irods_response']['status_code'], 0)
+            self.assertEqual(int(result['size']), len(content))
+
+            # Show the data object stored in iRODS contains the expected data.
+            r = requests.get(self.url_endpoint, headers=headers, params={
+                'op': 'read',
+                'lpath': data_object
+            })
+            self.logger.debug(r.content)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.content.decode('utf-8'), content)
+
+        finally:
+            # Remove the data object.
+            r = requests.post(self.url_endpoint, headers=headers, data={
+                'op': 'remove',
+                'lpath': data_object,
+                'catalog-only': 0,
+                'no-trash': 1
+            })
+            self.logger.debug(r.content)
+
 class test_information_endpoint(unittest.TestCase):
 
     @classmethod
