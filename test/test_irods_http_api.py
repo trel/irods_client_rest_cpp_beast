@@ -3415,7 +3415,7 @@ class test_users_groups_endpoint(unittest.TestCase):
         self.assertIn({'name': self.rodsadmin_username, 'zone': self.zone_name}, result['users'])
         self.assertIn({'name': self.rodsuser_username, 'zone': self.zone_name}, result['users'])
 
-    def test_listing_all_grops_in_zone(self):
+    def test_listing_all_groups_in_zone(self):
         headers = {'Authorization': f'Bearer {self.rodsadmin_bearer_token}'}
 
         # Create a new group.
