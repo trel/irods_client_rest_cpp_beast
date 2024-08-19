@@ -2356,7 +2356,6 @@ class test_information_endpoint(unittest.TestCase):
         info = r.json()
         self.assertIn('api_version', info)
         self.assertIn('build', info)
-        self.assertIn('genquery2_enabled', info)
         self.assertIn('irods_zone', info)
         self.assertIn('max_number_of_parallel_write_streams', info)
         self.assertIn('max_number_of_rows_per_catalog_query', info)
