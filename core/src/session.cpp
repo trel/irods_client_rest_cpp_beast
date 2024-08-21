@@ -69,6 +69,8 @@ namespace irods::http
 
 	auto session::on_read(boost::beast::error_code ec, std::size_t bytes_transferred) -> void
 	{
+		namespace logging = irods::http::log;
+
 		boost::ignore_unused(bytes_transferred);
 
 		// This means they closed the connection
@@ -77,7 +79,7 @@ namespace irods::http
 		}
 
 		if (ec == boost::beast::http::error::body_limit) {
-			log::error(*this, "{}: Request constraint error: {}", __func__, ec.message());
+			logging::error(*this, "{}: Request constraint error: {}", __func__, ec.message());
 			return;
 		}
 
@@ -93,17 +95,17 @@ namespace irods::http
 
 		// Print the headers.
 		for (auto&& h : req_.base()) {
-			log::debug(*this, "{}: Header: ({}, {})", __func__, h.name_string(), h.value());
+			logging::debug(*this, "{}: Header: ({}, {})", __func__, h.name_string(), h.value());
 		}
 
 		// Print the components of the request URL.
-		log::debug(*this, "{}: Method: {}", __func__, req_.method_string());
-		log::debug(*this, "{}: Version: {}", __func__, req_.version());
-		log::debug(*this, "{}: Target: {}", __func__, req_.target());
-		log::debug(*this, "{}: Keep Alive: {}", __func__, req_.keep_alive());
-		log::debug(*this, "{}: Has Content Length: {}", __func__, req_.has_content_length());
-		log::debug(*this, "{}: Chunked: {}", __func__, req_.chunked());
-		log::debug(*this, "{}: Needs EOF: {}", __func__, req_.need_eof());
+		logging::debug(*this, "{}: Method: {}", __func__, req_.method_string());
+		logging::debug(*this, "{}: Version: {}", __func__, req_.version());
+		logging::debug(*this, "{}: Target: {}", __func__, req_.target());
+		logging::debug(*this, "{}: Keep Alive: {}", __func__, req_.keep_alive());
+		logging::debug(*this, "{}: Has Content Length: {}", __func__, req_.has_content_length());
+		logging::debug(*this, "{}: Chunked: {}", __func__, req_.chunked());
+		logging::debug(*this, "{}: Needs EOF: {}", __func__, req_.need_eof());
 
 		namespace http = boost::beast::http;
 
@@ -127,7 +129,7 @@ namespace irods::http
 			send(irods::http::fail(http::status::not_found));
 		}
 		catch (const std::exception& e) {
-			log::error(*this, "{}: {}", __func__, e.what());
+			logging::error(*this, "{}: {}", __func__, e.what());
 			send(irods::http::fail(http::status::internal_server_error));
 		}
 	} // on_read

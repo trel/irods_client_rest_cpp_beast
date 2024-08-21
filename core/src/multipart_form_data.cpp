@@ -11,6 +11,8 @@ namespace irods::http
 {
 	auto get_multipart_form_data_boundary(const std::string_view _data) -> std::optional<std::string_view>
 	{
+		namespace logging = irods::http::log;
+
 		// The ext_list type does not treat "multipart/form-data" as a single string.
 		// I'm not sure if this is by design, but we have to skip the multipart/ prefix so that
 		// ext_list can extract the boundary argument.
@@ -25,13 +27,13 @@ namespace irods::http
 		const auto iter = list.find("form-data");
 
 		if (iter == std::end(list)) {
-			log::error("{}: Missing [boundary] parameter in [multipart/form-data] value.", __func__);
+			logging::error("{}: Missing [boundary] parameter in [multipart/form-data] value.", __func__);
 			return std::nullopt;
 		}
 
 		for (auto&& param : iter->second) {
 			if (param.first == "boundary") {
-				log::debug("{}: Parameter => (name={}, value={})", __func__, param.first, param.second);
+				logging::debug("{}: Parameter => (name={}, value={})", __func__, param.first, param.second);
 				return param.second;
 			}
 		}
@@ -43,6 +45,8 @@ namespace irods::http
 	auto parse_multipart_form_data(const std::string_view _boundary, const std::string_view _data)
 		-> query_arguments_type
 	{
+		namespace logging = irods::http::log;
+
 		if (_data.empty()) {
 			return {};
 		}
@@ -70,7 +74,7 @@ namespace irods::http
 				case find_boundary_start: {
 					const auto bs_pos = _data.find(boundary_start, pos);
 					if (std::string_view::npos == bs_pos) {
-						log::error(
+						logging::error(
 							"{}: Expected boundary start [{}]. Malformed message structure.", __func__, boundary_start);
 						return args;
 					}
@@ -78,7 +82,7 @@ namespace irods::http
 
 					// Did we actually find a boundary end marker?
 					if (boundary_end == _data.substr(pos, boundary_end.size())) {
-						log::trace("{}: Found boundary end [{}]. Done.", __func__, boundary_end);
+						logging::trace("{}: Found boundary end [{}]. Done.", __func__, boundary_end);
 						return args;
 					}
 
@@ -91,7 +95,7 @@ namespace irods::http
 					// Check that the boundary start ends with a CRLF sequence.
 					const auto crlf_pos = pos + boundary_start.size();
 					if ("\r\n" != _data.substr(crlf_pos, 2)) {
-						log::error(
+						logging::error(
 							"{}: Expected CRLF [\\r\\n] after boundary start. Malformed message structure.", __func__);
 						return args;
 					}
@@ -105,22 +109,23 @@ namespace irods::http
 					// Extract the header name.
 					auto colon_pos = _data.find(':', pos);
 					if (std::string_view::npos == colon_pos) {
-						log::error("{}: Expected colon [:] in header line. Malformed message structure.", __func__);
+						logging::error("{}: Expected colon [:] in header line. Malformed message structure.", __func__);
 						return args;
 					}
 					const auto hdr_n = _data.substr(pos, colon_pos - pos);
-					log::debug("{}: Header name = [{}]", __func__, hdr_n);
+					logging::debug("{}: Header name = [{}]", __func__, hdr_n);
 					auto header_name = boost::trim_copy(std::string{hdr_n});
 
 					// Extract the header value.
 					pos = colon_pos + 1;
 					auto crlf_pos = _data.find("\r\n", pos);
 					if (std::string_view::npos == crlf_pos) {
-						log::error("{}: Expected CRLF [\\r\\n] in header line. Malformed message structure.", __func__);
+						logging::error(
+							"{}: Expected CRLF [\\r\\n] in header line. Malformed message structure.", __func__);
 						return args;
 					}
 					const auto hdr_v = _data.substr(pos, crlf_pos - pos);
-					log::debug("{}: Header value = [{}]", __func__, hdr_v);
+					logging::debug("{}: Header value = [{}]", __func__, hdr_v);
 
 					// Capture the parameter name.
 					if (boost::iequals(header_name, "content-disposition")) {
@@ -132,7 +137,7 @@ namespace irods::http
 						if (type_iter != std::end(list)) {
 							for (auto&& param : type_iter->second) {
 								if (param.first == "name") {
-									log::debug(
+									logging::debug(
 										"{}: Parameter => (name={}, value={})", __func__, param.first, param.second);
 									param_name = param.second;
 									break;
@@ -159,14 +164,14 @@ namespace irods::http
 					// It should be located just before the next boundary.
 					const auto bs_pos = _data.find(boundary_start, pos);
 					if (std::string_view::npos == bs_pos) {
-						log::error("{}: Expected boundary start/end. Malformed message structure.", __func__);
+						logging::error("{}: Expected boundary start/end. Malformed message structure.", __func__);
 						return args;
 					}
 
 					// Move the read position back by two bytes to account for the CRLF.
 					const auto crlf_pos = bs_pos - 2;
 					if ("\r\n" != _data.substr(crlf_pos, 2)) {
-						log::error(
+						logging::error(
 							"{}: Expected CRLF [\\r\\n] before message body. Malformed message structure.", __func__);
 						return args;
 					}

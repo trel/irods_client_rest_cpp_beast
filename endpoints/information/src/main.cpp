@@ -18,9 +18,11 @@ namespace irods::http::handler
 	// NOLINTNEXTLINE(performance-unnecessary-value-param)
 	IRODS_HTTP_API_ENDPOINT_ENTRY_FUNCTION_SIGNATURE(information)
 	{
+		namespace logging = irods::http::log;
+
 		try {
 			if (_req.method() != boost::beast::http::verb::get) {
-				log::error("{}: HTTP method not supported.", __func__);
+				logging::error("{}: HTTP method not supported.", __func__);
 				return _sess_ptr->send(fail(status_type::method_not_allowed));
 			}
 
@@ -51,7 +53,7 @@ namespace irods::http::handler
 			return _sess_ptr->send(std::move(res));
 		}
 		catch (const std::exception& e) {
-			log::error(*_sess_ptr, "{}: {}", __func__, e.what());
+			logging::error(*_sess_ptr, "{}: {}", __func__, e.what());
 			return _sess_ptr->send(irods::http::fail(boost::beast::http::status::internal_server_error));
 		}
 	} // information

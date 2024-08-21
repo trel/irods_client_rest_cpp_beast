@@ -42,8 +42,8 @@
 #include <vector>
 
 // clang-format off
-namespace beast = boost::beast; // from <boost/beast.hpp>
-namespace net   = boost::asio;  // from <boost/asio.hpp>
+namespace net     = boost::asio;  // from <boost/asio.hpp>
+namespace logging = irods::http::log;
 // clang-format on
 
 namespace irods::http::handler
@@ -70,7 +70,7 @@ namespace irods::http::handler
 		const auto parsed_uri{boost::urls::parse_uri(token_endpoint)};
 
 		if (parsed_uri.has_error()) {
-			log::error(
+			logging::error(
 				"{}: Error trying to parse token_endpoint [{}]. Please check configuration.", __func__, token_endpoint);
 			return {{"error", "bad endpoint"}};
 		}
@@ -89,7 +89,7 @@ namespace irods::http::handler
 
 		// Send request and Read back response
 		auto res{tcp_stream->communicate(req)};
-		log::debug("Got the following resp back: {}", res.body());
+		logging::debug("Got the following resp back: {}", res.body());
 
 		// JSONize response
 		return nlohmann::json::parse(res.body());
@@ -116,7 +116,7 @@ namespace irods::http::handler
 				error_log_itter = fmt::format_to(error_log_itter, ", Error URI [{}]", *error_uri);
 			}
 
-			log::warn(fmt::runtime(token_error_log));
+			logging::warn(fmt::runtime(token_error_log));
 			return true;
 		}
 
@@ -127,7 +127,7 @@ namespace irods::http::handler
 	{
 		std::string authorization{_encoded_data};
 		boost::trim(authorization);
-		log::debug("{}: Authorization value (trimmed): [{}]", __func__, authorization);
+		logging::debug("{}: Authorization value (trimmed): [{}]", __func__, authorization);
 
 		constexpr auto max_creds_size = 128;
 		std::uint64_t size{max_creds_size};
@@ -135,7 +135,7 @@ namespace irods::http::handler
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
 		const auto ec = irods::base64_decode(
 			reinterpret_cast<unsigned char*>(authorization.data()), authorization.size(), creds.data(), &size);
-		log::debug("{}: base64 - error code=[{}], decoded size=[{}]", __func__, ec, size);
+		logging::debug("{}: base64 - error code=[{}], decoded size=[{}]", __func__, ec, size);
 
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
 		std::string_view sv{reinterpret_cast<char*>(creds.data()), size};
@@ -169,7 +169,7 @@ namespace irods::http::handler
 	{
 		if (_req.method() == boost::beast::http::verb::get) {
 			if (!is_oidc_running_as_client()) {
-				log::error(*_sess_ptr, "{}: HTTP GET method cannot be used for Basic authentication.", __func__);
+				logging::error(*_sess_ptr, "{}: HTTP GET method cannot be used for Basic authentication.", __func__);
 				return _sess_ptr->send(fail(status_type::method_not_allowed));
 			}
 
@@ -203,7 +203,7 @@ namespace irods::http::handler
 					                             .get_ref<const std::string&>()};
 					const auto encoded_url{fmt::format("{}?{}", auth_endpoint, irods::http::url_encode_body(args))};
 
-					log::debug(*_sess_ptr, "{}: Proper redirect to [{}]", fn, encoded_url);
+					logging::debug(*_sess_ptr, "{}: Proper redirect to [{}]", fn, encoded_url);
 
 					response_type res{status_type::found, _req.version()};
 					res.set(field_type::server, irods::http::version::server_name);
@@ -224,7 +224,7 @@ namespace irods::http::handler
 
 					// Invalid/Fake request... Should have state query param
 					if (state_iter == std::end(url.query)) {
-						log::warn(
+						logging::warn(
 							*_sess_ptr,
 							"{}: Received an Authorization response with no 'state' query parameter. Ignoring.",
 							fn);
@@ -258,7 +258,7 @@ namespace irods::http::handler
 
 					// The state is invalid (i.e. doesn't exist, or have been used)
 					if (!is_state_valid(state_iter->second)) {
-						log::warn(
+						logging::warn(
 							*_sess_ptr,
 							"{}: Received an Authorization response with an invalid 'state' query parameter. Ignoring.",
 							fn);
@@ -274,7 +274,7 @@ namespace irods::http::handler
 
 						// Required error parameter missing, malformed response
 						if (error_iter == std::end(url.query)) {
-							log::warn(
+							logging::warn(
 								*_sess_ptr,
 								"{}: Received an Authorization response with no 'code' or 'error' query parameters. "
 								"Ignoring.",
@@ -299,7 +299,7 @@ namespace irods::http::handler
 							responses_iter = fmt::format_to(responses_iter, ", Error URI [{}]", error_uri_iter->second);
 						}
 
-						log::warn(*_sess_ptr, fmt::runtime(responses));
+						logging::warn(*_sess_ptr, fmt::runtime(responses));
 
 						return _sess_ptr->send(fail(status_type::bad_request));
 					}
@@ -341,7 +341,8 @@ namespace irods::http::handler
 								? decoded_token.at("preferred_username").get<const std::string>()
 								: ""};
 
-						log::error(*_sess_ptr, "{}: No irods user associated with authenticated user [{}].", fn, user);
+						logging::error(
+							*_sess_ptr, "{}: No irods user associated with authenticated user [{}].", fn, user);
 						return _sess_ptr->send(fail(status_type::bad_request));
 					}
 
@@ -378,7 +379,7 @@ namespace irods::http::handler
 					return _sess_ptr->send(fail(status_type::bad_request));
 				}
 
-				log::debug(*_sess_ptr, "{}: Authorization value: [{}]", fn, iter->value());
+				logging::debug(*_sess_ptr, "{}: Authorization value: [{}]", fn, iter->value());
 
 				// Basic Auth case
 				if (const auto pos{iter->value().find("Basic ")}; pos != std::string_view::npos) {
@@ -398,7 +399,7 @@ namespace irods::http::handler
 					//
 					// The error will occur when rc_switch_user is invoked on the non-existent user.
 					if ("anonymous" == username && password.empty()) {
-						log::trace(
+						logging::trace(
 							*_sess_ptr,
 							"{}: Detected the anonymous user account. Skipping auth check and returning token.",
 							fn);
@@ -476,7 +477,7 @@ namespace irods::http::handler
 
 							if (const auto ec = rc_check_auth_credentials(static_cast<RcComm*>(conn), &input, &correct);
 							    ec < 0) {
-								log::error(
+								logging::error(
 									*_sess_ptr,
 									"{}: Error verifying native authentication credentials for user [{}]: error code "
 									"[{}].",
@@ -485,14 +486,14 @@ namespace irods::http::handler
 									ec);
 							}
 							else {
-								log::debug(*_sess_ptr, "{}: correct = [{}]", fn, fmt::ptr(correct));
-								log::debug(*_sess_ptr, "{}: *correct = [{}]", fn, (correct ? *correct : -1));
+								logging::debug(*_sess_ptr, "{}: correct = [{}]", fn, fmt::ptr(correct));
+								logging::debug(*_sess_ptr, "{}: *correct = [{}]", fn, (correct ? *correct : -1));
 								login_successful = (correct && 1 == *correct);
 							}
 						}
 					}
 					catch (const irods::exception& e) {
-						log::error(
+						logging::error(
 							*_sess_ptr,
 							"{}: Error verifying native authentication credentials for user [{}]: {}",
 							fn,
@@ -500,7 +501,7 @@ namespace irods::http::handler
 							e.client_display_what());
 					}
 					catch (const std::exception& e) {
-						log::error(
+						logging::error(
 							*_sess_ptr,
 							"{}: Error verifying native authentication credentials for user [{}]: {}",
 							fn,
@@ -570,7 +571,8 @@ namespace irods::http::handler
 								? decoded_token.at("preferred_username").get<const std::string>()
 								: ""};
 
-						log::error(*_sess_ptr, "{}: No irods user associated with authenticated user [{}].", fn, user);
+						logging::error(
+							*_sess_ptr, "{}: No irods user associated with authenticated user [{}].", fn, user);
 						return _sess_ptr->send(fail(status_type::bad_request));
 					}
 
@@ -601,7 +603,7 @@ namespace irods::http::handler
 		}
 		else {
 			// Nothing recognized
-			log::error(*_sess_ptr, "{}: HTTP method not supported.", __func__);
+			logging::error(*_sess_ptr, "{}: HTTP method not supported.", __func__);
 			return _sess_ptr->send(fail(status_type::method_not_allowed));
 		}
 	} // authentication
