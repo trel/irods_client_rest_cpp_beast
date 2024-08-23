@@ -946,7 +946,7 @@ namespace
 
 				static const auto max_number_of_bytes_per_write =
 					irods::http::globals::configuration()
-						.at(json::json_pointer{"/irods_client/buffer_size_in_bytes_for_write_operations"})
+						.at(json::json_pointer{"/irods_client/max_number_of_bytes_per_write_operation"})
 						.get<std::int64_t>();
 
 				// clang-format off
