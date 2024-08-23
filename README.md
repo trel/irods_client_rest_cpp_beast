@@ -421,8 +421,9 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
         // during a single read operation.
         "max_number_of_bytes_per_read_operation": 8192,
 
-        // The buffer size used for write operations.
-        "buffer_size_in_bytes_for_write_operations": 8192,
+        // The maximum number of bytes that can be written to a data object
+        // during a single write operation.
+        "max_number_of_bytes_per_write_operation": 8192,
 
         // The number of rows that can be returned by a General or Specific
         // query. If the client specifies a number greater than the value

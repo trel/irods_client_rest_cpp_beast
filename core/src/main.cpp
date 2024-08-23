@@ -474,7 +474,7 @@ constexpr auto default_jsonschema() -> std::string_view
                     "type": "integer",
                     "minimum": 1
                 }},
-                "buffer_size_in_bytes_for_write_operations": {{
+                "max_number_of_bytes_per_write_operation": {{
                     "type": "integer",
                     "minimum": 1
                 }},
@@ -492,7 +492,7 @@ constexpr auto default_jsonschema() -> std::string_view
                 "connection_pool",
                 "max_number_of_parallel_write_streams",
                 "max_number_of_bytes_per_read_operation",
-                "buffer_size_in_bytes_for_write_operations",
+                "max_number_of_bytes_per_write_operation",
                 "max_number_of_rows_per_catalog_query"
             ]
         }}
@@ -580,7 +580,7 @@ auto print_configuration_template() -> void
         "max_number_of_parallel_write_streams": 3,
 
         "max_number_of_bytes_per_read_operation": 8192,
-        "buffer_size_in_bytes_for_write_operations": 8192,
+        "max_number_of_bytes_per_write_operation": 8192,
 
         "max_number_of_rows_per_catalog_query": 15
     }}

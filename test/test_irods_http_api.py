@@ -1652,7 +1652,7 @@ class test_data_objects_endpoint(unittest.TestCase):
 
     def test_parallel_writes_with_data_exceeding_internal_write_threshold(self):
         # This test assumes the HTTP API is configured to use a value smaller than
-        # 96kb for "/irods_client/buffer_size_in_bytes_for_write_operations". This is
+        # 96kb for "/irods_client/max_number_of_bytes_per_write_operation". This is
         # important because values greater than or equal to 96kb will result in the
         # background thread pool only being used one time. This test is designed to
         # force the HTTP API to schedule multiple writes across the thread pool.
@@ -1766,7 +1766,7 @@ class test_data_objects_endpoint(unittest.TestCase):
 
     def test_non_parallel_writes_with_data_exceeding_internal_write_threshold(self):
         # This test assumes the HTTP API is configured to use a value smaller than
-        # 64kb for "/irods_client/buffer_size_in_bytes_for_write_operations". This is
+        # 64kb for "/irods_client/max_number_of_bytes_per_write_operation". This is
         # important because values greater than or equal to 64kb will result in the
         # background thread pool only being used one time. This test is designed to
         # force the HTTP API to schedule multiple writes across the thread pool.
