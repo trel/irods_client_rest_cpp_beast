@@ -164,9 +164,6 @@ namespace irods::http
 
 	auto create_host_field(boost::urls::url_view _url, std::string_view _port) -> std::string;
 
-	auto create_oidc_request(boost::urls::url_view _url)
-		-> boost::beast::http::request<boost::beast::http::string_body>;
-
 	auto map_json_to_user(const nlohmann::json& _json) -> std::optional<std::string>;
 
 	auto resolve_client_identity(const request_type& _req) -> client_identity_resolution_result;
