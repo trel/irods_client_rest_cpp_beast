@@ -14,6 +14,7 @@ add_library(
   "${CMAKE_CURRENT_SOURCE_DIR}/src/globals.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/multipart_form_data.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/openid.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/process_stash.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/session.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/transport.cpp"
@@ -27,6 +28,7 @@ target_link_libraries(
   "${IRODS_EXTERNALS_FULLPATH_BOOST}/lib/libboost_program_options.so"
   "${IRODS_EXTERNALS_FULLPATH_BOOST}/lib/libboost_url.so"
   CURL::libcurl
+  jwt-cpp::jwt-cpp
 )
 
 target_compile_definitions(

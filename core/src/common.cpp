@@ -3,6 +3,7 @@
 #include "irods/private/http_api/globals.hpp"
 #include "irods/private/http_api/log.hpp"
 #include "irods/private/http_api/multipart_form_data.hpp"
+#include "irods/private/http_api/openid.hpp"
 #include "irods/private/http_api/process_stash.hpp"
 #include "irods/private/http_api/session.hpp"
 #include "irods/private/http_api/transport.hpp"
@@ -25,6 +26,8 @@
 #include <boost/beast.hpp>
 
 #include <curl/curl.h>
+#include <jwt-cpp/jwt.h>
+#include <jwt-cpp/traits/nlohmann-json/traits.h>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -266,77 +269,6 @@ namespace irods::http
 		return fmt::format("{}:{}", _url.host(), _port);
 	}
 
-	auto create_oidc_request(boost::urls::url_view _url) -> beast::http::request<beast::http::string_body>
-	{
-		constexpr auto http_version_number{11};
-		beast::http::request<beast::http::string_body> req{beast::http::verb::post, _url.path(), http_version_number};
-
-		const auto port{get_port_from_url(_url)};
-
-		req.set(beast::http::field::host, create_host_field(_url, *port));
-		req.set(beast::http::field::user_agent, irods::http::version::server_name);
-		req.set(beast::http::field::content_type, "application/x-www-form-urlencoded");
-		req.set(beast::http::field::accept, "application/json");
-
-		if (const auto secret_key{irods::http::globals::oidc_configuration().find("client_secret")};
-		    secret_key != std::end(irods::http::globals::oidc_configuration()))
-		{
-			const auto format_bearer_token{[](std::string_view _client_id, std::string_view _client_secret) {
-				auto encode_me{fmt::format("{}:{}", encode(_client_id), encode(_client_secret))};
-				return safe_base64_encode(encode_me);
-			}};
-
-			const auto& client_id{
-				irods::http::globals::oidc_configuration().at("client_id").get_ref<const std::string&>()};
-			const auto& client_secret{secret_key->get_ref<const std::string&>()};
-			const auto auth_string{fmt::format("Basic {}", format_bearer_token(client_id, client_secret))};
-
-			req.set(beast::http::field::authorization, auth_string);
-		}
-
-		return req;
-	}
-
-	auto hit_introspection_endpoint(std::string _encoded_body) -> nlohmann::json
-	{
-		namespace logging = irods::http::log;
-
-		const auto introspection_endpoint{irods::http::globals::oidc_endpoint_configuration()
-		                                      .at("introspection_endpoint")
-		                                      .get_ref<const std::string&>()};
-
-		const auto parsed_uri{boost::urls::parse_uri(introspection_endpoint)};
-
-		if (parsed_uri.has_error()) {
-			logging::error(
-				"{}: Error trying to parse introspection_endpoint [{}]. Please check configuration.",
-				__func__,
-				introspection_endpoint);
-			return {{"error", "bad endpoint"}};
-		}
-
-		const auto url{*parsed_uri};
-		const auto port{get_port_from_url(url)};
-
-		// Addr
-		net::io_context io_ctx;
-		auto tcp_stream{irods::http::transport_factory(url.scheme_id(), io_ctx)};
-		tcp_stream->connect(url.host(), *port);
-
-		// Build Request
-		auto req{create_oidc_request(url)};
-		req.body() = std::move(_encoded_body);
-		req.prepare_payload();
-
-		// Send request & receive response
-		auto res{tcp_stream->communicate(req)};
-
-		logging::debug("{}: Received the following response: [{}]", __func__, res.body());
-
-		// JSONize response
-		return nlohmann::json::parse(res.body());
-	}
-
 	auto map_json_to_user(const nlohmann::json& _json) -> std::optional<std::string>
 	{
 		namespace logging = irods::http::log;
@@ -397,23 +329,45 @@ namespace irods::http
 			// It's possible that the admin didn't include the OIDC configuration stanza.
 			// This use-case is allowed, therefore we check for the OIDC configuration before
 			// attempting to access it. Without this logic, the server would crash.
-			const auto oidc_config_iter =
-				config.find(nlohmann::json::json_pointer{"/http_server/authentication/openid_connect"});
-			if (oidc_config_iter == std::end(config)) {
+			static const auto oidc_conf_exists{
+				config.contains(nlohmann::json::json_pointer{"/http_server/authentication/openid_connect"})};
+			if (!oidc_conf_exists) {
 				logging::debug("{}: No 'openid_connect' stanza found in server configuration.", __func__);
 				logging::error("{}: Could not find bearer token matching [{}].", __func__, bearer_token);
 				return {.response = fail(status_type::unauthorized)};
 			}
 
 			// If we're running as a protected resource, assume we have a OIDC token
-			if (oidc_config_iter->at("mode").get_ref<const std::string&>() == "protected_resource") {
-				body_arguments args{{"token", bearer_token}, {"token_type_hint", "access_token"}};
+			if (irods::http::globals::oidc_configuration().at("mode").get_ref<const std::string&>() ==
+			    "protected_resource") {
+				nlohmann::json json_res;
 
-				auto json_res{hit_introspection_endpoint(url_encode_body(args))};
+				// Try parsing token as JWT Access Token
+				try {
+					auto token{jwt::decode<jwt::traits::nlohmann_json>(bearer_token)};
+					auto possible_json_res{openid::validate_using_local_validation(token)};
 
-				// Validate access token
-				if (!json_res.at("active").get<bool>()) {
-					logging::warn("{}: Access token is invalid or expired.", __func__);
+					if (possible_json_res) {
+						json_res = *possible_json_res;
+					}
+				}
+				// Parsing of the token failed, this is not a JWT access token
+				catch (const std::exception& e) {
+					logging::debug("{}: {}", __func__, e.what());
+				}
+
+				// Use introspection endpoint if it exists and local validation fails
+				static const auto introspection_endpoint_exists{
+					irods::http::globals::oidc_endpoint_configuration().contains("introspection_endpoint")};
+				if (json_res.empty() && introspection_endpoint_exists) {
+					auto possible_json_res{openid::validate_using_introspection_endpoint(bearer_token)};
+					if (possible_json_res) {
+						json_res = *possible_json_res;
+					}
+				}
+
+				if (json_res.empty()) {
+					logging::error("{}: Could not find bearer token matching [{}].", __func__, bearer_token);
 					return {.response = fail(status_type::unauthorized)};
 				}
 

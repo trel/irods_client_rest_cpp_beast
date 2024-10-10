@@ -243,6 +243,13 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
                 // Optional unless running as a protected resource.
                 "client_secret": "xxxxxxxxxxxxxxx",
 
+                // The secret used when validating a JWT signed with
+                // a symmetric algorithm (e.g. HS256).
+                // Used if provided, otherwise, defaults to validating
+                // with "client_secret".
+                // If provided, it MUST be base64url encoded.
+                "realm_secret": "xxxxxxxxxxxxxxx",
+
                 // The OIDC mode the HTTP API will run as.
                 // The following values are supported:
                 // - client:              Run the HTTP API as an OIDC client
@@ -260,11 +267,14 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
                 // Allows for the selection and configuration of the plugin.
                 "user_mapping": {
                     // The full path to the desired plugin to load.
-                    // See the section titled "Mapping OpenID Users to iRODS" for more details on available plugins.
+                    // See the section titled "Mapping OpenID Users to iRODS"
+                    // for more details on available plugins.
                     "plugin_path": "/path/to/plugin/the_plugin.so",
 
-                    // The configuration information required by the selected plugin to execute properly.
-                    // See the section titled "Mapping OpenID Users to iRODS" for more details on plugin configuration.
+                    // The configuration information required by
+                    // the selected plugin to execute properly.
+                    // See the section titled "Mapping OpenID Users to iRODS"
+                    // for more details on plugin configuration.
                     "configuration": {
                     }
                 },
