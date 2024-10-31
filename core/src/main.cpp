@@ -41,6 +41,7 @@
 #include <csignal>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -74,6 +75,7 @@ extern "C" const char* __asan_default_options()
 namespace beast   = boost::beast; // from <boost/beast.hpp>
 namespace net     = boost::asio;  // from <boost/asio.hpp>
 namespace po      = boost::program_options;
+namespace fs      = std::filesystem;
 namespace logging = irods::http::log;
 
 using json = nlohmann::json;
@@ -946,11 +948,25 @@ auto main(int _argc, char* _argv[]) -> int
 		}
 
 		if (vm.count("config-file") == 0) {
-			fmt::print(stderr, "Error: Missing [CONFIG_FILE_PATH] parameter.");
+			fmt::print(stderr, "Error: Missing [CONFIG_FILE_PATH] parameter.\n");
 			return 1;
 		}
 
-		const auto config = json::parse(std::ifstream{vm["config-file"].as<std::string>()});
+		const auto& config_file_path = vm["config-file"].as<std::string>();
+		if (!fs::exists(config_file_path)) {
+			fmt::print(stderr, "Error: Configuration file [{}] does not exist.\n", config_file_path);
+			return 1;
+		}
+
+		const auto config = [&config_file_path] {
+			std::ifstream file{config_file_path};
+			if (!file.is_open()) {
+				throw std::runtime_error{fmt::format("Cannot open configuration file [{}].", config_file_path)};
+			}
+
+			return json::parse(file);
+		}();
+
 		irods::http::globals::set_configuration(config);
 
 		{
