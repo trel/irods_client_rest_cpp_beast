@@ -342,8 +342,31 @@ namespace irods::http::handler
 								: ""};
 
 						logging::error(
-							*_sess_ptr, "{}: No irods user associated with authenticated user [{}].", fn, user);
+							*_sess_ptr, "{}: No iRODS user associated with authenticated user [{}].", fn, user);
 						return _sess_ptr->send(fail(status_type::bad_request));
+					}
+
+					// Confirm the irods user exists before returning a token.
+					{
+						namespace adm = irods::experimental::administration;
+						using json_pointer = nlohmann::json::json_pointer;
+
+						static const auto& config = irods::http::globals::configuration();
+						static const auto& rodsadmin_username =
+							config.at(json_pointer{"/irods_client/proxy_admin_account/username"})
+								.get_ref<const std::string&>();
+						static const auto& zone =
+							config.at(json_pointer{"/irods_client/zone"}).get_ref<const std::string&>();
+
+						auto conn = irods::get_connection(rodsadmin_username);
+
+						if (!adm::client::exists(conn, adm::user{*irods_username, zone})) {
+							logging::error(
+								"{}: ID token is valid, but associated iRODS user [{}] does not exist in catalog.",
+								fn,
+								*irods_username);
+							return _sess_ptr->send(fail(status_type::unauthorized));
+						}
 					}
 
 					// Issue token?
@@ -572,8 +595,31 @@ namespace irods::http::handler
 								: ""};
 
 						logging::error(
-							*_sess_ptr, "{}: No irods user associated with authenticated user [{}].", fn, user);
+							*_sess_ptr, "{}: No iRODS user associated with authenticated user [{}].", fn, user);
 						return _sess_ptr->send(fail(status_type::bad_request));
+					}
+
+					// Confirm the irods user exists before returning a token.
+					{
+						namespace adm = irods::experimental::administration;
+						using json_pointer = nlohmann::json::json_pointer;
+
+						static const auto& config = irods::http::globals::configuration();
+						static const auto& rodsadmin_username =
+							config.at(json_pointer{"/irods_client/proxy_admin_account/username"})
+								.get_ref<const std::string&>();
+						static const auto& zone =
+							config.at(json_pointer{"/irods_client/zone"}).get_ref<const std::string&>();
+
+						auto conn = irods::get_connection(rodsadmin_username);
+
+						if (!adm::client::exists(conn, adm::user{*irods_username, zone})) {
+							logging::error(
+								"{}: ID token is valid, but associated iRODS user [{}] does not exist in catalog.",
+								fn,
+								*irods_username);
+							return _sess_ptr->send(fail(status_type::unauthorized));
+						}
 					}
 
 					// Issue token?
