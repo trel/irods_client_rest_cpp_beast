@@ -816,7 +816,11 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 		irods::http::globals::set_oidc_endpoint_configuration(_endpoint_config);
 	}
 	catch (const json::out_of_range& e) {
-		logging::trace("Invalid OIDC configuration, ignoring. Reason: {}", e.what());
+		logging::info("Invalid OIDC configuration, ignoring. Reason: {}", e.what());
+		return false;
+	}
+	catch (const boost::beast::system_error& e) {
+		logging::error("Unable to establish connection to OpenID Provider. Reason: [{}]", e.what());
 		return false;
 	}
 
