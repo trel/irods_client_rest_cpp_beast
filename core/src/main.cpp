@@ -805,14 +805,28 @@ auto load_oidc_configuration(const json& _config, json& _oi_config, json& _endpo
 		req.set(beast::http::field::host, irods::http::create_host_field(url, *port));
 		req.set(beast::http::field::user_agent, irods::http::version::server_name);
 
-		// Sends and recieves response
+		// Sends and receives response
 		auto res{tcp_stream->communicate(req)};
 
-		// TODO: Check resposnse code...
+		// Check status code
+		if (res.result() != boost::beast::http::status::ok) {
+			logging::error("Did not get a status code 200 OK response from OpenID Provider.");
+			return false;
+		}
+
 		logging::debug("Got the following back: {}", res.body());
 
 		// Convert http json response to nlomman json response
 		_endpoint_config = json::parse(res.body());
+
+		// Check required items in response
+		if (!(_endpoint_config.contains("issuer") && _endpoint_config.contains("authorization_endpoint") &&
+		      _endpoint_config.contains("jwks_uri")))
+		{
+			logging::error("Failed to extract required OpenID Provider metadata.");
+			return false;
+		}
+
 		irods::http::globals::set_oidc_endpoint_configuration(_endpoint_config);
 	}
 	catch (const json::out_of_range& e) {
