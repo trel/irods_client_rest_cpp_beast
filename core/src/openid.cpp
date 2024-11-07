@@ -98,14 +98,78 @@ namespace irods::http::openid
 	{
 		namespace logging = irods::http::log;
 
-		body_arguments args{{"token", _bearer_token}, {"token_type_hint", "access_token"}};
+		const body_arguments args{{"token", _bearer_token}, {"token_type_hint", "access_token"}};
 
 		auto json_res{hit_introspection_endpoint(url_encode_body(args))};
 
-		// Validate access token
-		if (!json_res.at("active").get<bool>()) {
+		// Check that the access token is active. If active is false or missing from
+		// the response, reject the token.
+		// The exact meaning of an active state may vary between OpenID Providers,
+		// so we should assert the other attributes when available.
+		if (const auto active_iter{json_res.find("active")};
+		    active_iter == std::end(json_res) || !active_iter->get<bool>()) {
 			logging::warn("{}: Access token is invalid or expired.", __func__);
 			return std::nullopt;
+		}
+
+		// The rest of the members are optional, but validate the ones that do exist.
+		// In total, there are 11 optional members defined by the RFC that may be used.
+
+		// Token must not be used early if given 'not before' time.
+		if (auto nbf_iter{json_res.find("nbf")}; nbf_iter != std::end(json_res)) {
+			logging::trace("{}: Attempting [nbf] validation.", __func__);
+
+			// Get current time
+			const auto now{std::chrono::system_clock::now()};
+
+			// Convert to appropriate representation
+			const std::chrono::seconds nbf_seconds{nbf_iter->get<std::time_t>()};
+
+			// Setup expire time
+			const std::chrono::time_point<std::chrono::system_clock> not_before_time{nbf_seconds};
+
+			// Reject tokens that are used too early
+			if (now < not_before_time) {
+				logging::warn("{}: Current time is before [nbf]. Validation failed.", __func__);
+				return std::nullopt;
+			}
+		}
+
+		// We should be part of the intended audience for the access token.
+		if (const auto aud_iter{json_res.find("aud")}; aud_iter != std::end(json_res)) {
+			logging::trace("{}: Attempting [aud] validation.", __func__);
+
+			const auto& client_id{irods::http::globals::oidc_configuration().at("client_id")};
+			const auto& aud{*aud_iter};
+
+			if (aud.is_array()) {
+				auto aud_list_iter{aud.items()};
+				auto client_id_in_list{std::any_of(
+					std::begin(aud_list_iter), std::end(aud_list_iter), [&client_id](const auto& _kvp) -> bool {
+						return _kvp.value() == client_id;
+					})};
+
+				// If we are not in the list, reject the token
+				if (!client_id_in_list) {
+					logging::warn("{}: Could not find our [client_id] in [aud]. Validation failed.", __func__);
+					return std::nullopt;
+				}
+			}
+			else if (aud.get_ref<const std::string&>() != client_id) {
+				logging::warn("{}: Could not find our [client_id] in [aud]. Validation failed.", __func__);
+				return std::nullopt;
+			}
+		}
+
+		// The 'iss' provided should match the 'issuer' retrieved from the OpenID Provider's
+		// well-known endpoint.
+		if (const auto iss_iter{json_res.find("iss")}; iss_iter != std::end(json_res)) {
+			logging::trace("{}: Attempting [iss] validation.", __func__);
+			if (iss_iter->get_ref<const std::string&>() !=
+			    irods::http::globals::oidc_endpoint_configuration().at("issuer")) {
+				logging::warn("{}: [iss] did not match OpenID Provider's [issuer]. Validation failed.", __func__);
+				return std::nullopt;
+			}
 		}
 
 		return json_res;
