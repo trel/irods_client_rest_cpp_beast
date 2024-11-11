@@ -345,7 +345,7 @@ namespace irods::http
 				// Try parsing token as JWT Access Token
 				try {
 					auto token{jwt::decode<jwt::traits::nlohmann_json>(bearer_token)};
-					auto possible_json_res{openid::validate_using_local_validation(token)};
+					auto possible_json_res{openid::validate_using_local_validation(openid::token_type::access, token)};
 
 					if (possible_json_res) {
 						json_res = *possible_json_res;
