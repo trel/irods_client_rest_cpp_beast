@@ -327,19 +327,22 @@ namespace irods::http::handler
 					}
 
 					// Not an error, likely to have id_token
-					// TODO: Consider handling bit flip cases
 					const std::string jwt_token{oidc_response.at("id_token").get_ref<const std::string&>()};
+					auto real_decoded_token{jwt::decode<jwt::traits::nlohmann_json>(jwt_token)};
+					auto token_claims{
+						openid::validate_using_local_validation(openid::token_type::id, real_decoded_token)};
 
-					// Get OIDC token && feed to JWT parser
-					// TODO: Handle case where we throw!!!
-					auto decoded_token{jwt::decode<jwt::traits::nlohmann_json>(jwt_token).get_payload_json()};
+					if (!token_claims) {
+						logging::error("{}: ID Token could not be verified.", fn);
+						return _sess_ptr->send(fail(status_type::bad_request));
+					}
 
-					auto irods_username{irods::http::map_json_to_user(decoded_token)};
+					auto irods_username{irods::http::map_json_to_user(*token_claims)};
 
 					if (!irods_username) {
 						const auto user{
-							decoded_token.contains("preferred_username")
-								? decoded_token.at("preferred_username").get<const std::string>()
+							token_claims->contains("preferred_username")
+								? token_claims->at("preferred_username").get<const std::string>()
 								: ""};
 
 						logging::error(
@@ -586,13 +589,21 @@ namespace irods::http::handler
 					const std::string& jwt_token{oidc_response.at("id_token").get_ref<const std::string&>()};
 
 					// Feed to JWT parser
-					auto decoded_token{jwt::decode<jwt::traits::nlohmann_json>(jwt_token).get_payload_json()};
-					auto irods_username{irods::http::map_json_to_user(decoded_token)};
+					auto real_decoded_token{jwt::decode<jwt::traits::nlohmann_json>(jwt_token)};
+					auto token_claims{
+						openid::validate_using_local_validation(openid::token_type::id, real_decoded_token)};
+
+					if (!token_claims) {
+						logging::error("{}: ID Token could not be verified.", fn);
+						return _sess_ptr->send(fail(status_type::bad_request));
+					}
+
+					auto irods_username{irods::http::map_json_to_user(*token_claims)};
 
 					if (!irods_username) {
 						const auto user{
-							decoded_token.contains("preferred_username")
-								? decoded_token.at("preferred_username").get<const std::string>()
+							token_claims->contains("preferred_username")
+								? token_claims->at("preferred_username").get<const std::string>()
 								: ""};
 
 						logging::error(

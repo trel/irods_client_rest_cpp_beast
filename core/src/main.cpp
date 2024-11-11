@@ -232,6 +232,9 @@ constexpr auto default_jsonschema() -> std::string_view
                                 "realm_secret": {{
                                     "type": "string"
                                 }},
+                                "nonstandard_id_token_secret": {{
+                                    "type": "string"
+                                }},
                                 "redirect_uri": {{
                                     "type": "string",
                                     "format": "uri"
