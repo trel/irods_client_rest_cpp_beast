@@ -229,7 +229,7 @@ constexpr auto default_jsonschema() -> std::string_view
                                 "client_secret": {{
                                     "type": "string"
                                 }},
-                                "realm_secret": {{
+                                "access_token_secret": {{
                                     "type": "string"
                                 }},
                                 "nonstandard_id_token_secret": {{
