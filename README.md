@@ -248,7 +248,7 @@ Notice how some of the configuration values are wrapped in angle brackets (e.g. 
                 // Used if provided, otherwise, defaults to validating
                 // with "client_secret".
                 // If provided, it MUST be base64url encoded.
-                "realm_secret": "xxxxxxxxxxxxxxx",
+                "access_token_secret": "xxxxxxxxxxxxxxx",
 
                 // The secret used when validating an OpenID Connect ID Token
                 // signed with a symmetric algorithm (e.g. HS256).

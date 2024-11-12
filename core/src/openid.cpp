@@ -235,13 +235,13 @@ namespace irods::http::openid
 		// available, symmetric validation cannot be performed.
 		std::string key;
 
-		// Use a realm_secret if provided. It should be base64url encoded, as the key might
+		// Use a access_token_secret if provided. It should be base64url encoded, as the key might
 		// not be ASCII printable.
-		if (auto realm_secret{irods::http::globals::oidc_configuration().find("realm_secret")};
-		    _type == token_type::access && realm_secret != std::end(irods::http::globals::oidc_configuration()))
+		if (auto access_token_secret{irods::http::globals::oidc_configuration().find("access_token_secret")};
+		    _type == token_type::access && access_token_secret != std::end(irods::http::globals::oidc_configuration()))
 		{
 			key = jwt::base::decode<jwt::alphabet::base64url>(
-				jwt::base::pad<jwt::alphabet::base64url>(realm_secret->get_ref<const std::string&>()));
+				jwt::base::pad<jwt::alphabet::base64url>(access_token_secret->get_ref<const std::string&>()));
 		}
 		// Some OpenID Providers do not follow OpenID Connect Core 1.0 incorporating errata set 2,
 		// Section 3.1.3.7, Bullet Point 8. This variable would allow for non-standard behavior, if provided.
