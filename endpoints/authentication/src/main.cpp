@@ -482,14 +482,14 @@ namespace irods::http::handler
 							// credentials for native authentication.
 
 							CheckAuthCredentialsInput input{};
-							username.copy(input.username, sizeof(CheckAuthCredentialsInput::username));
-							zone.copy(input.zone, sizeof(CheckAuthCredentialsInput::zone));
+							username.copy(input.username, sizeof(CheckAuthCredentialsInput::username) - 1);
+							zone.copy(input.zone, sizeof(CheckAuthCredentialsInput::zone) - 1);
 
 							namespace adm = irods::experimental::administration;
 							const adm::user_password_property prop{password, rodsadmin_password};
 							const auto obfuscated_password =
 								irods::experimental::administration::obfuscate_password(prop);
-							obfuscated_password.copy(input.password, sizeof(CheckAuthCredentialsInput::password));
+							obfuscated_password.copy(input.password, sizeof(CheckAuthCredentialsInput::password) - 1);
 
 							int* correct{};
 
