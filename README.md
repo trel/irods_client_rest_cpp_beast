@@ -495,7 +495,7 @@ to update the mappings without having to restart the server.
 
 ##### Configuration
 
-The required configuraiton for this plugin is as follows:
+The required configuration for this plugin is as follows:
 
 ```json
 "configuration": {
