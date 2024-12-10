@@ -1616,6 +1616,7 @@ namespace
 
 				try {
 					DataObjInp input{};
+					irods::at_scope_exit free_memory{[&input] { clearKeyVal(&input.condInput); }};
 
 					if (const auto lpath_iter = _args.find("lpath"); lpath_iter != std::end(_args)) {
 						irods::strncpy_null_terminated(input.objPath, lpath_iter->second.c_str());
